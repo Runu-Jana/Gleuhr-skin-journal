@@ -1,0 +1,200 @@
+/* Accessibility Styles */
+
+/* High Contrast Mode */
+body.high-contrast {
+  filter: contrast(1.5);
+}
+
+body.high-contrast * {
+  border-color: #000 !important;
+  box-shadow: none !important;
+}
+
+body.high-contrast .bg-white {
+  background-color: #fff !important;
+  border: 2px solid #000 !important;
+}
+
+body.high-contrast .bg-gray-50 {
+  background-color: #f5f5f5 !important;
+  border: 2px solid #000 !important;
+}
+
+body.high-contrast .text-gray-500 {
+  color: #000 !important;
+}
+
+body.high-contrast .text-gray-600 {
+  color: #000 !important;
+}
+
+body.high-contrast .text-gray-700 {
+  color: #000 !important;
+}
+
+body.high-contrast button {
+  border: 2px solid #000 !important;
+  font-weight: 600 !important;
+}
+
+body.high-contrast input,
+body.high-contrast textarea,
+body.high-contrast select {
+  border: 2px solid #000 !important;
+  background-color: #fff !important;
+  color: #000 !important;
+}
+
+/* Large Text Mode */
+body.large-text {
+  font-size: 120% !important;
+}
+
+body.large-text .text-sm {
+  font-size: 1.1rem !important;
+}
+
+body.large-text .text-base {
+  font-size: 1.3rem !important;
+}
+
+body.large-text .text-lg {
+  font-size: 1.5rem !important;
+}
+
+body.large-text .text-xl {
+  font-size: 1.7rem !important;
+}
+
+body.large-text .text-2xl {
+  font-size: 2rem !important;
+}
+
+body.large-text button {
+  padding: 0.75rem 1.5rem !important;
+  font-size: 1.1rem !important;
+}
+
+body.large-text input,
+body.large-text textarea,
+body.large-text select {
+  padding: 0.75rem !important;
+  font-size: 1.1rem !important;
+}
+
+/* Reduced Motion */
+body.reduced-motion *,
+body.reduced-motion *::before,
+body.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+body.reduced-motion .animate-spin,
+body.reduced-motion .animate-pulse,
+body.reduced-motion .animate-bounce {
+  animation: none !important;
+}
+
+/* Focus Indicators */
+*:focus {
+  outline: 3px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+
+button:focus,
+input:focus,
+textarea:focus,
+select:focus,
+a:focus {
+  outline: 3px solid #2563eb !important;
+  outline-offset: 2px !important;
+  border-color: #2563eb !important;
+}
+
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.sr-only:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0.5rem 1rem !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+/* Keyboard Navigation Styles */
+.keyboard-nav *:focus {
+  outline: 3px solid #2563eb !important;
+  outline-offset: 2px !important;
+  background-color: #eff6ff !important;
+}
+
+/* High Contrast Mode Specific Adjustments */
+body.high-contrast .bg-light {
+  background-color: #fff !important;
+}
+
+body.high-contrast .bg-brand {
+  background-color: #000 !important;
+  color: #fff !important;
+}
+
+body.high-contrast .border-light {
+  border-color: #000 !important;
+  border-width: 2px !important;
+}
+
+body.high-contrast .shadow-lg {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Large Text Mode - Responsive Adjustments */
+@media (max-width: 768px) {
+  body.large-text {
+    font-size: 110% !important;
+  }
+  
+  body.large-text .container {
+    padding: 1rem !important;
+  }
+  
+  body.large-text button {
+    padding: 1rem !important;
+    margin: 0.5rem 0 !important;
+  }
+}
+
+/* Print Styles for Accessibility */
+@media print {
+  body {
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  a[href]:after {
+    content: " (" attr(href) ")" !important;
+    font-size: 0.8em !important;
+  }
+}

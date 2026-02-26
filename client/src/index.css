@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import accessibility styles */
+@import './accessibility.css';
+
+:root {
+  --primary: #c44033;
+  --primary-light: #e85a4a;
+  --primary-dark: #a03328;
+  --background: #faf8f5;
+  --card: #ffffff;
+  --text: #1a1a1a;
+  --text-secondary: #6b7280;
+  --border: #e5e7eb;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#c44033] text-white font-semibold py-3 px-6 rounded-xl 
+           shadow-lg shadow-[#c44033]/20 active:scale-95 transition-all
+           hover:bg-[#a03328] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-secondary {
+    @apply bg-white text-gray-900 font-semibold py-3 px-6 rounded-xl 
+           shadow-md border border-gray-200 active:scale-95 transition-all
+           hover:bg-gray-50;
+  }
+  
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-4;
+  }
+  
+  .progress-ring {
+    @apply relative inline-flex items-center justify-center;
+  }
+  
+  .chip {
+    @apply inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium
+           border transition-all cursor-pointer select-none;
+  }
+  
+  .chip-active {
+    @apply bg-[#c44033] text-white border-[#c44033];
+  }
+  
+  .chip-inactive {
+    @apply bg-white text-gray-600 border-gray-200 hover:border-gray-300;
+  }
+  
+  .toggle-btn {
+    @apply w-14 h-8 rounded-full relative transition-colors duration-200 ease-in-out
+           focus:outline-none focus:ring-2 focus:ring-[#c44033] focus:ring-offset-2;
+  }
+  
+  .toggle-btn-active {
+    @apply bg-[#c44033];
+  }
+  
+  .toggle-btn-inactive {
+    @apply bg-gray-200;
+  }
+  
+  .toggle-knob {
+    @apply absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow 
+           transition-transform duration-200 ease-in-out;
+  }
+  
+  .toggle-knob-active {
+    @apply translate-x-6;
+  }
+  
+  .emoji-btn {
+    @apply w-16 h-16 rounded-2xl flex flex-col items-center justify-center
+           transition-all duration-200 cursor-pointer border-2;
+  }
+  
+  .emoji-btn-active {
+    @apply bg-[#c44033]/10 border-[#c44033] shadow-md;
+  }
+  
+  .emoji-btn-inactive {
+    @apply bg-white border-gray-200 hover:border-gray-300;
+  }
+  
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200
+           px-6 py-3 flex justify-around items-center z-50 pb-safe;
+  }
+  
+  .nav-item {
+    @apply flex flex-col items-center gap-1 text-xs font-medium transition-colors;
+  }
+  
+  .nav-item-active {
+    @apply text-[#c44033];
+  }
+  
+  .nav-item-inactive {
+    @apply text-gray-400 hover:text-gray-600;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  
+  .pt-safe {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+}
