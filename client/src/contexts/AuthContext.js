@@ -124,7 +124,7 @@ export function AuthProvider({ children }) {
   };
 
   const generateDeviceFingerprint = () => {
-    return btoa(navigator.userAgent + screen.width + screen.height + new Date().getTimezoneOffset());
+    return btoa(navigator.userAgent + window.screen.width + window.screen.height + new Date().getTimezoneOffset());
   };
 
   const value = {
