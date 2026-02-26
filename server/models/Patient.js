@@ -134,16 +134,6 @@ const patientSchema = new mongoose.Schema({
     ref: 'Product'
   }],
   
-  // Legacy Fields (for backward compatibility)
-  name: {
-    type: String,
-    trim: true
-  },
-  phone: {
-    type: String,
-    required: true,
-    unique: true
-  },
   profile: {
     age: Number,
     gender: String,
@@ -164,10 +154,6 @@ const patientSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     }
-  },
-  lastLogin: {
-    type: Date,
-    default: Date.now
   },
   createdAt: {
     type: Date,

@@ -10,7 +10,9 @@ const TABLES = {
   PATIENTS: 'Contacts',
   PRODUCTS: 'Products',
   DIET_PLANS: 'Diet Plan',
-  TEAM: 'Team'
+  TEAM: 'Team',
+  REORDER_EVENTS: 'Reorder Events',
+  SKIN_SCORES: 'Skin Scores'
 };
 
 module.exports = { base, TABLES };

@@ -3,6 +3,7 @@ const router = express.Router();
 const Patient = require('../models/Patient');
 const whatsappService = require('../services/whatsappService');
 const crypto = require('crypto');
+const { base, TABLES } = require('../config/airtable');
 
 // POST /api/auth/send-verification - Send WhatsApp verification code
 router.post('/send-verification', async (req, res) => {
@@ -20,14 +21,14 @@ router.post('/send-verification', async (req, res) => {
     }
 
     // Generate 6-digit verification code
-    const verificationCode = whatsappService.generateVerificationCode();
-    
+    const verificationCode = await whatsappService.generateVerificationCode();
+
     // Store verification code with expiry
     await whatsappService.storeVerificationCode(phoneNumber, verificationCode);
-    
+
     // Send WhatsApp message
     const result = await whatsappService.sendOTP(phoneNumber, verificationCode, countryCode || '91');
-    
+
     if (result.success) {
       res.json({
         success: true,
@@ -48,13 +49,13 @@ router.post('/send-verification', async (req, res) => {
 router.post('/resend-verification', async (req, res) => {
   try {
     const { phoneNumber, countryCode } = req.body;
-    
+
     if (!phoneNumber) {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
     // Generate new verification code
-    const verificationCode = whatsappService.generateVerificationCode();
+    const verificationCode = await whatsappService.generateVerificationCode();
     
     // Store new verification code with expiry
     await whatsappService.storeVerificationCode(phoneNumber, verificationCode);
@@ -197,6 +198,51 @@ router.post('/verify-token', async (req, res) => {
     res.status(500).json({ error: 'Authentication failed' });
   }
 });
+
+// Helper: Get patient products from Airtable
+async function getPatientProducts(patientId) {
+  try {
+    const records = await base(TABLES.PRODUCTS)
+      .select({
+        filterByFormula: `SEARCH("${patientId}", {Patient ID})`,
+      })
+      .firstPage();
+    return records.map(r => ({
+      id: r.id,
+      name: r.fields['Product Name'] || '',
+      category: r.fields['Category'] || '',
+      instructions: r.fields['Instructions'] || ''
+    }));
+  } catch (error) {
+    console.error('Error fetching patient products:', error.message);
+    return [];
+  }
+}
+
+// Helper: Get diet plan from Airtable
+async function getDietPlan(dietPlanIds) {
+  try {
+    if (!dietPlanIds || dietPlanIds.length === 0) return null;
+    const records = await base(TABLES.DIET_PLANS)
+      .select({
+        filterByFormula: `RECORD_ID() = '${dietPlanIds[0]}'`,
+        maxRecords: 1
+      })
+      .firstPage();
+    if (records.length === 0) return null;
+    const fields = records[0].fields;
+    return {
+      id: records[0].id,
+      version: fields['Version'] || '',
+      category: fields['Category'] || '',
+      restrictions: fields['Restrictions'] || '',
+      recommendations: fields['Recommendations'] || ''
+    };
+  } catch (error) {
+    console.error('Error fetching diet plan:', error.message);
+    return null;
+  }
+}
 
 // POST /api/auth/token - Legacy endpoint for backward compatibility
 router.post('/token', async (req, res) => {

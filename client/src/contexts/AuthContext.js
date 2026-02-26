@@ -105,7 +105,7 @@ export function AuthProvider({ children }) {
 
   const commitToProgram = async () => {
     try {
-      await axios.patch(`/api/patient/commitment/${patient.phone}`, { hasCommitted: true });
+      await axios.post('/api/self-register/commitment', { phoneNumber: patient.phone, hasCommitted: true });
       const updated = { ...patient, hasCommitted: true };
       setPatient(updated);
       localStorage.setItem('gleuhrPatient', JSON.stringify(updated));

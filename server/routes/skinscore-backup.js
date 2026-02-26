@@ -88,7 +88,7 @@ router.post('/', async (req, res) => {
         await dailyCheckIn.save();
 
         // Update streak
-        await fetch(`${process.env.CLIENT_URL || 'http://localhost:3000'}/api/mongodb/streak/checkin`, {
+        await fetch(`http://localhost:${process.env.PORT || 5000}/api/streak/checkin`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
