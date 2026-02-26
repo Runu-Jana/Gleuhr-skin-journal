@@ -5,9 +5,6 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/mongodb');
 
-// Connect to MongoDB
-connectDB();
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -41,10 +38,6 @@ app.use('/api/checkin', require('./routes/checkin'));
 app.use('/api/reorder', require('./routes/reorder'));
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
 app.use('/api/health', require('./routes/health'));
 
 // Serve React app for all other routes
@@ -55,13 +48,19 @@ app.get('*', (req, res) => {
 // Error handling
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Connect to MongoDB first, then start the server
+const startServer = async () => {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+};
+
+startServer();
