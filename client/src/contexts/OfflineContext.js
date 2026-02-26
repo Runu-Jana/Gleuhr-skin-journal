@@ -57,7 +57,14 @@ export function OfflineProvider({ children }) {
 
   const syncData = useCallback(async () => {
     if (!navigator.onLine) return;
-    
+
+    // Get patient info from localStorage to attach to sync requests
+    const authToken = localStorage.getItem('gleuhrAuthToken');
+    if (!authToken) {
+      console.warn('Sync skipped: not authenticated');
+      return;
+    }
+
     setIsSyncing(true);
     try {
       const { getSyncQueue, removeFromSyncQueue, updateSyncRetry } = await import('../utils/db');
@@ -66,7 +73,7 @@ export function OfflineProvider({ children }) {
       for (const item of queue) {
         try {
           let success = false;
-          
+
           if (item.type === 'checkin') {
             await axios.post('/api/checkin', item.data);
             success = true;
@@ -83,10 +90,11 @@ export function OfflineProvider({ children }) {
           } else if (item.retries < 3) {
             await updateSyncRetry(item.id, item.retries + 1);
           } else {
+            // Max retries exceeded, remove stale item
             await removeFromSyncQueue(item.id);
           }
         } catch (error) {
-          console.error('Sync error for item:', item.id, error);
+          console.error('Sync error for item:', item.id, error?.response?.data || error.message);
           if (item.retries < 3) {
             await updateSyncRetry(item.id, item.retries + 1);
           } else {

@@ -80,7 +80,8 @@ export default function SelfRegisterScreen() {
     setError('');
 
     try {
-      const deviceFingerprint = btoa(navigator.userAgent + screen.width + screen.height + new Date().getTimezoneOffset());
+      const screenRef = window.screen; // eslint-disable-line no-restricted-globals
+      const deviceFingerprint = btoa(navigator.userAgent + screenRef.width + screenRef.height + new Date().getTimezoneOffset());
       
       const response = await fetch('/api/self-register/complete', {
         method: 'POST',

@@ -20,7 +20,7 @@ const weeklyPhotoSchema = new mongoose.Schema({
   },
   photoData: {
     type: String, // Base64 encoded image data
-    required: true
+    default: ''
   },
   uploadDate: {
     type: Date,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useOffline } from '../contexts/OfflineContext';
-import { Wifi, WifiOff, Sync, CheckCircle, AlertCircle, Clock, HardDrive } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle, Clock, HardDrive, Database } from 'lucide-react';
 
 export default function EnhancedOfflineIndicator() {
   const { isOnline, isSyncing, pendingCount, forceSync } = useOffline();
@@ -59,7 +59,7 @@ export default function EnhancedOfflineIndicator() {
         {isSyncing && (
           <div className="mb-3">
             <div className="flex items-center gap-2 text-sm text-blue-600">
-              <Sync className="w-4 h-4 animate-spin" />
+              <RefreshCw className="w-4 h-4 animate-spin" />
               <span>Syncing your data...</span>
             </div>
             <div className="w-full bg-blue-100 rounded-full h-1 mt-2">
