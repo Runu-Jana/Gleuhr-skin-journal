@@ -10,54 +10,75 @@ router.post('/', async (req, res) => {
   try {
     const {
       patientId,
+      patientPhone,
       date,
       day,
-      amRoutine,
-      pmRoutine,
-      sunscreen,
-      dietFollowed,
-      triggerFoods,
+      skinScore,
+      skinScores,
+      mood,
+      energy,
+      sleep,
       waterIntake,
-      skinMood,
-      notes
+      medications,
+      notes,
+      symptoms
     } = req.body;
 
-    // Validate required fields
-    if (!patientId || !date) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Validate required fields - support both patientId and patientPhone
+    if (!patientId && !patientPhone) {
+      return res.status(400).json({ error: 'Missing patient identifier' });
+    }
+    if (!date) {
+      return res.status(400).json({ error: 'Missing required field: date' });
     }
 
-    // Find patient
-    const patient = await Patient.findById(patientId);
+    // Find patient by ID or phone
+    let patient;
+    if (patientId) {
+      patient = await Patient.findById(patientId);
+    }
+    if (!patient && patientPhone) {
+      patient = await Patient.findOne({
+        $or: [
+          { phoneNumber: patientPhone },
+          { phone: patientPhone }
+        ]
+      });
+    }
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Create check-in record
-    const checkin = new DailyCheckin({
-      patient: patientId,
+    const dayOfJourney = day || patient.currentDay || 1;
+
+    // Create check-in record matching DailyCheckIn model schema
+    const checkin = new DailyCheckIn({
+      patientId: patient._id.toString(),
+      patientPhone: patient.phone || patient.phoneNumber,
       date,
-      day,
-      amRoutine: amRoutine || false,
-      pmRoutine: pmRoutine || false,
-      sunscreen: sunscreen || false,
-      dietFollowed: dietFollowed || 'Yes',
-      triggerFoods: triggerFoods ? triggerFoods.join(', ') : '',
-      waterIntake: waterIntake || 2,
-      skinMood: skinMood || 'Okay',
+      dayOfJourney,
+      skinScore: skinScore || 0,
+      skinScores: skinScores || {},
+      mood: mood || 'good',
+      energy: energy || 'medium',
+      sleep: sleep || 8,
+      waterIntake: waterIntake || 8,
+      medications: medications || [],
       notes: notes || '',
-      synced: true
+      symptoms: symptoms || [],
+      completed: true,
+      completedAt: new Date()
     });
 
     await checkin.save();
 
     // Update streak
-    await updateStreak(patient.phone || patient.phoneNumber, day);
+    await updateStreak(patient.phone || patient.phoneNumber, dayOfJourney);
 
     // Update patient progress
-    await Patient.findByIdAndUpdate(patientId, {
-      currentDay: day,
-      completionPercentage: Math.round((day / 90) * 100)
+    await Patient.findByIdAndUpdate(patient._id, {
+      currentDay: dayOfJourney,
+      completionPercentage: Math.round((dayOfJourney / 90) * 100)
     });
 
     res.json({
@@ -88,21 +109,27 @@ router.get('/:phone', async (req, res) => {
     }
     
     // Get check-ins for this patient
-    const checkins = await DailyCheckin.find({ patient: patient._id })
-      .sort({ date: -1 });
+    const checkins = await DailyCheckIn.find({
+      $or: [
+        { patientId: patient._id.toString() },
+        { patientPhone: phone }
+      ]
+    }).sort({ date: -1 });
 
     const checkinData = checkins.map(record => ({
       id: record._id,
       date: record.date,
-      day: record.day,
-      amRoutine: record.amRoutine,
-      pmRoutine: record.pmRoutine,
-      sunscreen: record.sunscreen,
-      dietFollowed: record.dietFollowed,
-      triggerFoods: record.triggerFoods ? record.triggerFoods.split(', ') : [],
+      day: record.dayOfJourney,
+      skinScore: record.skinScore,
+      skinScores: record.skinScores,
+      mood: record.mood,
+      energy: record.energy,
+      sleep: record.sleep,
       waterIntake: record.waterIntake,
-      skinMood: record.skinMood,
-      notes: record.notes
+      medications: record.medications,
+      notes: record.notes,
+      symptoms: record.symptoms,
+      completed: record.completed
     }));
 
     res.json(checkinData);
