@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Phone, Calendar, Target, Sparkles, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,9 +29,23 @@ export default function SelfRegisterScreen() {
   const [verificationCode, setVerificationCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  const { loginWithWhatsApp } = useAuth();
+  const { loginWithToken } = useAuth();
   const { requestPermission } = useNotifications();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Pre-fill phone from login redirect
+  React.useEffect(() => {
+    if (location.state?.phoneNumber) {
+      const incoming = location.state.phoneNumber;
+      const code = location.state?.countryCode || '+91';
+      setFormData(prev => ({
+        ...prev,
+        countryCode: code,
+        phoneNumber: incoming.replace(code, '')
+      }));
+    }
+  }, [location.state]);
 
   const fullPhone = `${formData.countryCode}${formData.phoneNumber.replace(/\s/g, '')}`;
 
@@ -99,16 +113,14 @@ export default function SelfRegisterScreen() {
       if (data.success) {
         // Request notification permission
         await requestPermission();
-        
-        // Login the user
-        const loginResult = await loginWithWhatsApp(fullPhone, verificationCode.trim());
-        
-        if (loginResult.success) {
-          if (data.patient.isNewUser) {
-            navigate('/onboarding');
-          } else {
-            navigate('/');
-          }
+
+        // Login directly with the returned token (don't re-verify the code)
+        await loginWithToken(data.authToken, data.patient);
+
+        if (data.patient.isNewUser) {
+          navigate('/onboarding');
+        } else {
+          navigate('/');
         }
       } else {
         setError(data.error || 'Registration failed');
@@ -476,8 +488,21 @@ export default function SelfRegisterScreen() {
             )}
           </div>
 
-          {/* Help Text */}
+          {/* Login Link */}
           <div className="mt-6 text-center">
+            <p className="text-sm text-gray-500">
+              Already have an account?{' '}
+              <button
+                onClick={() => navigate('/login')}
+                className="text-[#c44033] font-medium hover:underline"
+              >
+                Login here
+              </button>
+            </p>
+          </div>
+
+          {/* Help Text */}
+          <div className="mt-3 text-center">
             <p className="text-sm text-gray-500">
               By registering, you agree to our Terms of Service and Privacy Policy
             </p>

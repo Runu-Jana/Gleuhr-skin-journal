@@ -128,6 +128,16 @@ export function AuthProvider({ children }) {
     return btoa(navigator.userAgent + screenRef.width + screenRef.height + new Date().getTimezoneOffset());
   };
 
+  const loginWithToken = async (authToken, patientData) => {
+    localStorage.setItem('gleuhrAuthToken', authToken);
+    setPatient(patientData);
+    setIsAuthenticated(true);
+    if (patientData.phone) {
+      await loadPatientData(patientData.phone);
+    }
+    return { success: true, hasCommitted: patientData.hasCommitted };
+  };
+
   const value = {
     patient,
     streak,
@@ -135,6 +145,7 @@ export function AuthProvider({ children }) {
     isLoading,
     isAuthenticated,
     loginWithWhatsApp,
+    loginWithToken,
     logout,
     commitToProgram,
     refreshStreak,
