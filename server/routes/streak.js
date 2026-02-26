@@ -50,7 +50,7 @@ router.get('/:phone', async (req, res) => {
     res.json({
       streak: currentStreak,
       shields: shields,
-      lastCheckin: streak.lastCheckinDate,
+      lastCheckin: streak.lastCheckIn,
       day: streak.day || patient.currentDay || 1
     });
   } catch (error) {

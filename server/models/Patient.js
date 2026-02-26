@@ -1,14 +1,7 @@
 const mongoose = require('mongoose');
 
 const patientSchema = new mongoose.Schema({
-  // Legacy Airtable ID for migration
-  airtableId: {
-    type: String,
-    sparse: true,
-    unique: true
-  },
-  
-  // Basic Information - Matching Airtable 'Contacts' table fields
+  // Basic Information
   fullName: {
     type: String,
     required: true,
@@ -51,7 +44,7 @@ const patientSchema = new mongoose.Schema({
     required: true
   },
   
-  // Coach Information - From Airtable 'Contacts' table
+  // Coach Information
   coachName: {
     type: String,
     trim: true
@@ -134,16 +127,6 @@ const patientSchema = new mongoose.Schema({
     ref: 'Product'
   }],
   
-  // Legacy Fields (for backward compatibility)
-  name: {
-    type: String,
-    trim: true
-  },
-  phone: {
-    type: String,
-    required: true,
-    unique: true
-  },
   profile: {
     age: Number,
     gender: String,
@@ -164,10 +147,6 @@ const patientSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     }
-  },
-  lastLogin: {
-    type: Date,
-    default: Date.now
   },
   createdAt: {
     type: Date,

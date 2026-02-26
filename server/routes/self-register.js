@@ -20,7 +20,7 @@ router.post('/send-verification', async (req, res) => {
     }
 
     // Generate 6-digit verification code
-    const verificationCode = whatsappService.generateVerificationCode();
+    const verificationCode = await whatsappService.generateVerificationCode();
     
     // Store verification code with expiry
     await whatsappService.storeVerificationCode(phoneNumber, verificationCode);

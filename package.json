@@ -10,10 +10,9 @@
     "client": "cd client && npm start",
     "build": "cd client && npm run build",
     "install-client": "cd client && npm install",
-    "migrate": "node server/scripts/migrateFromAirtable.js"
+    "install-all": "npm install && cd client && npm install"
   },
   "dependencies": {
-    "airtable": "^0.12.2",
     "axios": "^1.13.5",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

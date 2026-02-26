@@ -21,7 +21,7 @@ router.post('/test-send', async (req, res) => {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
-    const code = whatsappService.generateVerificationCode();
+    const code = await whatsappService.generateVerificationCode();
     const result = await whatsappService.sendOTP(phoneNumber, code, countryCode);
     
     res.json({
