@@ -65,11 +65,6 @@ export default function LoginScreen() {
         }
       }
     } catch (err) {
-      if (err.response?.status === 404) {
-        // Patient not found - redirect to registration
-        navigate('/register', { state: { phoneNumber: fullPhone, countryCode } });
-        return;
-      }
       setError(err.response?.data?.error || 'Failed to send WhatsApp verification. Please try again.');
     } finally {
       setIsLoading(false);
@@ -309,21 +304,8 @@ export default function LoginScreen() {
             )}
           </div>
 
-          {/* Register Link */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">
-              New here?{' '}
-              <button
-                onClick={() => navigate('/register')}
-                className="text-[#c44033] font-medium hover:underline"
-              >
-                Create an account
-              </button>
-            </p>
-          </div>
-
           {/* Help Text */}
-          <div className="mt-3 text-center">
+          <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
               Having trouble?{' '}
               <a

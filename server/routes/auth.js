@@ -4,21 +4,13 @@ const Patient = require('../models/Patient');
 const whatsappService = require('../services/whatsappService');
 const crypto = require('crypto');
 
-// POST /api/auth/send-verification - Send WhatsApp verification code
+// POST /api/auth/send-verification - Send WhatsApp verification code to any phone
 router.post('/send-verification', async (req, res) => {
   try {
     const { phoneNumber, countryCode } = req.body;
 
     if (!phoneNumber) {
       return res.status(400).json({ error: 'Phone number is required' });
-    }
-
-    // Check if patient exists
-    const patient = await Patient.findOne({
-      $or: [{ phoneNumber }, { phone: phoneNumber }]
-    });
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found. Please contact your coach.' });
     }
 
     // Generate 6-digit verification code
@@ -81,7 +73,7 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
-// POST /api/auth/register - Register patient with WhatsApp verification
+// POST /api/auth/register - Verify code, auto-create patient if new, then login
 router.post('/register', async (req, res) => {
   try {
     const { phoneNumber, verificationCode, deviceFingerprint } = req.body;
@@ -98,12 +90,36 @@ router.post('/register', async (req, res) => {
     }
 
     // Find patient by phone number
-    const patient = await Patient.findOne({
+    let patient = await Patient.findOne({
       $or: [{ phoneNumber }, { phone: phoneNumber }]
     });
 
+    let isNewUser = false;
+
+    // Auto-create patient if not found
     if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+      isNewUser = true;
+      patient = new Patient({
+        fullName: phoneNumber,
+        name: phoneNumber,
+        phoneNumber,
+        phone: phoneNumber,
+        startDate: new Date(),
+        hasCommitted: false,
+        isActive: true,
+        currentDay: 1,
+        completionPercentage: 0,
+        totalPoints: 0,
+        level: 1,
+        achievements: [],
+        planType: 'Basic',
+        preferences: {
+          notifications: true,
+          weeklyReminders: true,
+          dailyReminders: true
+        }
+      });
+      await patient.save();
     }
 
     // Generate persistent auth token (90 days)
@@ -124,6 +140,7 @@ router.post('/register', async (req, res) => {
     res.json({
       success: true,
       authToken,
+      isNewUser,
       patient: {
         id: updatedPatient._id,
         name: updatedPatient.name || updatedPatient.fullName,

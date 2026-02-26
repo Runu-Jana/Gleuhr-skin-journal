@@ -89,9 +89,9 @@ function AppRoutes() {
       
       <main id="main-content" tabIndex="-1">
         <Routes>
-          <Route 
-            path="/register" 
-            element={isAuthenticated ? <Navigate to="/" replace /> : <SelfRegisterScreen />} 
+          <Route
+            path="/register"
+            element={<Navigate to="/login" replace />}
           />
           <Route 
             path="/login" 
