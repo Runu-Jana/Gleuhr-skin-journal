@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { base, TABLES } = require('../config/airtable');
+const mongoose = require('mongoose');
 const whatsappService = require('../services/whatsappService');
 
 // Comprehensive health check endpoint
@@ -10,14 +10,11 @@ router.get('/comprehensive', async (req, res) => {
     timestamp: new Date().toISOString(),
     services: {
       server: { status: 'OK', message: 'Server running' },
-      airtable: { status: 'UNKNOWN', message: 'Checking...' },
-      whatsapp: { status: 'UNKNOWN', message: 'Checking...' },
-      database: { status: 'OK', message: 'In-memory storage working' }
+      mongodb: { status: 'UNKNOWN', message: 'Checking...' },
+      whatsapp: { status: 'UNKNOWN', message: 'Checking...' }
     },
-    tables: {},
     routes: {
       auth: 'OK',
-      otp: 'OK',
       patient: 'OK',
       photo: 'OK',
       streak: 'OK',
@@ -28,36 +25,28 @@ router.get('/comprehensive', async (req, res) => {
     environment: {
       nodeEnv: process.env.NODE_ENV || 'development',
       port: process.env.PORT || 5000,
-      hasAirtablePat: !!process.env.AIRTABLE_PAT,
-      hasAirtableBase: !!process.env.AIRTABLE_BASE_ID,
+      hasMongoUri: !!process.env.MONGODB_URI,
       hasJwtSecret: !!process.env.JWT_SECRET,
       hasInteraktKey: !!process.env.INTERAKT_API_KEY,
       hasInteraktUrl: !!process.env.INTERAKT_API_URL
     }
   };
 
-  // Test Airtable connection
+  // Test MongoDB connection
   try {
-    await base(TABLES.PATIENTS).select({ maxRecords: 1 }).firstPage();
-    health.services.airtable = { status: 'OK', message: 'Airtable connection working' };
-    
-    // Test each table
-    for (const [key, tableName] of Object.entries(TABLES)) {
-      try {
-        await base(tableName).select({ maxRecords: 1 }).firstPage();
-        health.tables[key] = { status: 'OK', message: `Table '${tableName}' accessible` };
-      } catch (error) {
-        health.tables[key] = { 
-          status: 'ERROR', 
-          message: `Table '${tableName}' not accessible: ${error.message}` 
-        };
-        health.services.airtable.status = 'PARTIAL';
-      }
+    const state = mongoose.connection.readyState;
+    if (state === 1) {
+      health.services.mongodb = { status: 'OK', message: 'MongoDB connected' };
+    } else if (state === 2) {
+      health.services.mongodb = { status: 'CONNECTING', message: 'MongoDB connecting...' };
+    } else {
+      health.services.mongodb = { status: 'ERROR', message: 'MongoDB disconnected' };
+      health.status = 'DEGRADED';
     }
   } catch (error) {
-    health.services.airtable = { 
-      status: 'ERROR', 
-      message: `Airtable connection failed: ${error.message}` 
+    health.services.mongodb = {
+      status: 'ERROR',
+      message: `MongoDB error: ${error.message}`
     };
     health.status = 'DEGRADED';
   }
@@ -65,35 +54,31 @@ router.get('/comprehensive', async (req, res) => {
   // Test WhatsApp service
   try {
     const whatsappTest = await whatsappService.testConnection();
-    health.services.whatsapp = { 
-      status: whatsappTest.success ? 'OK' : 'ERROR', 
-      message: whatsappTest.success ? 'Interakt API accessible' : `Interakt API error: ${whatsappTest.error}` 
+    health.services.whatsapp = {
+      status: whatsappTest.success ? 'OK' : 'ERROR',
+      message: whatsappTest.success ? 'Interakt API accessible' : `Interakt API error: ${whatsappTest.error}`
     };
     if (!whatsappTest.success) {
       health.status = 'DEGRADED';
     }
   } catch (error) {
-    health.services.whatsapp = { 
-      status: 'ERROR', 
-      message: `WhatsApp service error: ${error.message}` 
+    health.services.whatsapp = {
+      status: 'ERROR',
+      message: `WhatsApp service error: ${error.message}`
     };
     health.status = 'DEGRADED';
   }
 
   // Determine overall status
   const hasErrors = Object.values(health.services).some(s => s.status === 'ERROR');
-  const hasPartial = Object.values(health.services).some(s => s.status === 'PARTIAL');
-  
   if (hasErrors) {
     health.status = 'ERROR';
-  } else if (hasPartial) {
-    health.status = 'DEGRADED';
   }
 
   res.json(health);
 });
 
-// Simple health check (existing functionality)
+// Simple health check
 router.get('/', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { base, TABLES } = require('../config/airtable');
+const ReorderEvent = require('../models/ReorderEvent');
 
 // POST /api/reorder/click - Log banner click event
 router.post('/click', async (req, res) => {
@@ -16,21 +16,19 @@ router.post('/click', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const record = await base(TABLES.REORDER_EVENTS).create([
-      {
-        fields: {
-          'Patient ID': patientId || '',
-          'Patient Email': patientEmail,
-          'Day': day,
-          'Timestamp': timestamp || new Date().toISOString(),
-          'Event Type': 'Reorder Banner Click'
-        }
-      }
-    ]);
+    const reorderEvent = new ReorderEvent({
+      patientId: patientId || '',
+      patientEmail,
+      day,
+      eventType: 'Reorder Banner Click',
+      timestamp: timestamp ? new Date(timestamp) : new Date()
+    });
+
+    await reorderEvent.save();
 
     res.json({
       success: true,
-      id: record[0].id,
+      id: reorderEvent._id,
       message: 'Click event logged'
     });
   } catch (error) {
