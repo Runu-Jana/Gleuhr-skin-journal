@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { saveSkinScore } from '../utils/db';
 import { useOffline } from '../contexts/OfflineContext';
 import { calculateDay, generateId } from '../utils/helpers';
-import { ChevronLeft, Camera, TrendingUp } from 'lucide-react';
+import { ChevronLeft, Camera } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const QUESTIONS = [
@@ -21,7 +21,7 @@ const QUESTIONS = [
 ];
 
 export default function SkinScoreScreen() {
-  const { patient } = useAuth();
+  const { patient, refreshSkinScores } = useAuth();
   const { isOnline, queueForSync } = useOffline();
   const navigate = useNavigate();
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -50,6 +50,7 @@ export default function SkinScoreScreen() {
     const scoreData = {
       id: generateId(),
       patientId: patient?.id,
+      patientPhone: patient?.phone,
       patientEmail: patient?.email,
       date: new Date().toISOString(),
       day,
@@ -58,7 +59,11 @@ export default function SkinScoreScreen() {
       synced: false,
     };
     await saveSkinScore(scoreData);
-    if (isOnline) queueForSync('skinScore', scoreData);
+    if (isOnline) {
+      queueForSync('skinScore', scoreData);
+      // Refresh skin scores from server after sync queued
+      await refreshSkinScores();
+    }
     setIsSubmitting(false);
     navigate('/');
   };
@@ -69,6 +74,8 @@ export default function SkinScoreScreen() {
         answers={answers}
         totalScore={calculateTotal()}
         onRetake={() => setShowResults(false)}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
       />
     );
   }
@@ -208,26 +215,6 @@ export default function SkinScoreScreen() {
               ))}
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex-1 bg-[#c44033] text-white py-4 px-6 rounded-xl font-semibold hover:bg-[#a03328] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <TrendingUp className="w-5 h-5" />
-                    <span>Save Results</span>
-                  </>
-                )}
-              </button>
-            </div>
           </motion.div>
         </motion.div>
       </div>
@@ -236,8 +223,7 @@ export default function SkinScoreScreen() {
 }
 
 // Results Screen Component
-const ResultsScreen = ({ answers, totalScore, onRetake }) => {
-  const navigate = useNavigate();
+const ResultsScreen = ({ answers, totalScore, onRetake, onSubmit, isSubmitting }) => {
 
   const getScoreLabel = (score) => {
     if (score >= 16) return 'Excellent';
@@ -301,15 +287,24 @@ const ResultsScreen = ({ answers, totalScore, onRetake }) => {
           <div className="flex gap-4">
             <button
               onClick={onRetake}
-              className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+              disabled={isSubmitting}
+              className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
             >
               Retake Assessment
             </button>
             <button
-              onClick={() => navigate('/')}
-              className="flex-1 bg-[#c44033] text-white py-3 px-6 rounded-xl font-semibold hover:bg-[#a03328] transition-colors shadow-lg"
+              onClick={onSubmit}
+              disabled={isSubmitting}
+              className="flex-1 bg-[#c44033] text-white py-3 px-6 rounded-xl font-semibold hover:bg-[#a03328] transition-colors shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Continue to Home
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>Save & Continue</span>
+              )}
             </button>
           </div>
         </motion.div>

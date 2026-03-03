@@ -103,6 +103,17 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const refreshSkinScores = async () => {
+    if (patient?.phone) {
+      try {
+        const scoresRes = await axios.get(`/api/skinscore/${patient.phone}`);
+        setSkinScores(scoresRes.data);
+      } catch (error) {
+        console.error('Error refreshing skin scores:', error);
+      }
+    }
+  };
+
   const commitToProgram = async () => {
     try {
       await axios.post('/api/self-register/commitment', { phoneNumber: patient.phone, hasCommitted: true });
@@ -138,6 +149,7 @@ export function AuthProvider({ children }) {
     logout,
     commitToProgram,
     refreshStreak,
+    refreshSkinScores,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
