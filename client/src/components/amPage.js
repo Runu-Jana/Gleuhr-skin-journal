@@ -201,9 +201,13 @@ export default function AMPage() {
 
       setHasSubmitted(true);
       
-      // Show success message
-      setShowCheckinSuccess(true);
-      setTimeout(() => setShowCheckinSuccess(false), 3000);
+      // Navigate to success page
+      navigate('/checkin-success', { 
+        state: { 
+          streak: day, 
+          message: "Your consistency puts you in the top 15% of all Gleuhr users this month." 
+        } 
+      });
       
     } catch (error) {
       console.error('Error submitting AM check-in:', error);

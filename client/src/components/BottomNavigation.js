@@ -9,10 +9,11 @@ export default function BottomNavigation() {
   const getActiveTab = () => {
     const path = location.pathname;
     if (path === '/' || path === '/home') return 'home';
-    if (path === '/am') return 'am';
-    if (path === '/pm') return 'pm';
+    if (path === '/amPage') return 'am';
+    if (path === '/pmPage') return 'pm';
     if (path === '/transformation') return 'photos';
     if (path === '/journey') return 'journey';
+    if (path === '/checkin-success') return 'home'; // Treat success page as home
     return 'home';
   };
 

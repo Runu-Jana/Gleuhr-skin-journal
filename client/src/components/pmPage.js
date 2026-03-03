@@ -433,15 +433,13 @@ export default function PMPage() {
     
     console.log('PM check-in submission completed!');
     
-    // Show success message
-    setShowCheckinSuccess(true);
-    setTimeout(() => setShowCheckinSuccess(false), 3000);
-    
-    // Navigate to home page after successful submission
-    navigate('/');
-    
-    // Scroll to top to show updated state
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Navigate to success page
+    navigate('/checkin-success', { 
+      state: { 
+        streak: day, 
+        message: "Your consistency puts you in the top 15% of all Gleuhr users this month." 
+      } 
+    });
   };
 
   const toggleTriggerFood = (food) => {

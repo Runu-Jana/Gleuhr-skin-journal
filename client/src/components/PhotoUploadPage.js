@@ -55,7 +55,7 @@ export default function PhotoUploadPage() {
     setWeeklyInsight(randomInsight);
   };
 
-  const handleFileUpload = (event) => {
+  const handleCameraCapture = (event) => {
     const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
@@ -66,25 +66,46 @@ export default function PhotoUploadPage() {
     }
   };
 
+  const handleUnlockProgress = () => {
+    // Try mobile camera first, fallback to PC file picker
+    const mobileInput = document.getElementById('camera-input');
+    const pcInput = document.getElementById('pc-camera-input');
+    
+    if (mobileInput) {
+      mobileInput.click();
+    }
+    
+    // Fallback for PC - if mobile doesn't work, try PC input after a delay
+    setTimeout(() => {
+      if (!capturedImage && pcInput) {
+        pcInput.click();
+      }
+    }, 1000);
+  };
+
   const handleRetake = () => {
     setCapturedImage(null);
     setShowSuccess(false);
+    // Trigger camera again
+    setTimeout(() => {
+      document.getElementById('camera-input').click();
+    }, 100);
   };
 
   const handleSubmit = async () => {
-    if (!capturedImage || !consentGiven) return;
+    if (!capturedImage) return;
     
     setIsSubmitting(true);
     
     try {
       const photoData = {
         patientPhone: patient?.phone || patient?.phoneNumber,
-        weekNumber: week,
+        weekNumber: weekNumber,
         photoData: capturedImage,
         photoUrl: '', // Will be set by server if needed
         skinScore: 0,
-        notes: `Week ${week} photo - ${weeklyInsight.substring(0, 100)}...`,
-        tags: [`week-${week}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
+        notes: `Week ${weekNumber} photo - ${weeklyInsight.substring(0, 100)}...`,
+        tags: [`week-${weekNumber}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
       };
 
       if (isOnline) {
@@ -108,7 +129,7 @@ export default function PhotoUploadPage() {
         await saveWeeklyPhoto({
           id: `photo-${Date.now()}`,
           patientEmail: patient?.email,
-          week,
+          week: weekNumber,
           photoData: capturedImage,
           synced: true,
           serverId: result.id,
@@ -127,7 +148,7 @@ export default function PhotoUploadPage() {
         await saveWeeklyPhoto({
           id: `photo-${Date.now()}`,
           patientEmail: patient?.email,
-          week,
+          week: weekNumber,
           photoData: capturedImage,
           synced: false,
           createdAt: new Date().toISOString()
@@ -146,7 +167,7 @@ export default function PhotoUploadPage() {
       await saveWeeklyPhoto({
         id: `photo-${Date.now()}`,
         patientEmail: patient?.email,
-        week,
+        week: weekNumber,
         photoData: capturedImage,
         synced: false,
         createdAt: new Date().toISOString()
@@ -162,15 +183,21 @@ export default function PhotoUploadPage() {
   };
 
   const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+  const isWeeklyPhotoDay = currentDay % 7 === 0;
+  const weekNumber = Math.ceil(currentDay / 7);
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
       {/* Header */}
       <div className="bg-[#1a1a1a] p-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-white text-lg font-semibold">Week {week} Photo</h1>
-          <div className="text-white/60 text-sm">
-            Day {currentDay} of 90
+          <div>
+            <h1 className="text-white text-lg font-semibold">Weekly Progress Check</h1>
+            <p className="text-white/60 text-sm mt-1">Week {weekNumber} • Day {currentDay}</p>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl mb-1">🎉</div>
+            <div className="text-white/60 text-xs">7-Day Streak Complete!</div>
           </div>
         </div>
       </div>
@@ -187,34 +214,59 @@ export default function PhotoUploadPage() {
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mb-4">
-                <Upload className="w-8 h-8 text-white/60" />
+                <div className="text-3xl">🔑</div>
               </div>
-              <p className="text-white/80 text-sm mb-4">Upload your week {week} photo</p>
-              <label className="bg-[#c44033] text-white px-6 py-3 rounded-xl cursor-pointer inline-flex items-center gap-2 hover:bg-[#a0352a] transition-colors">
+              <p className="text-white/80 text-sm mb-2">You've earned your weekly progress check!</p>
+              <p className="text-white/60 text-xs mb-4">Take your photo to unlock your progress comparison</p>
+              <button 
+                onClick={handleUnlockProgress}
+                className="bg-[#c44033] text-white px-6 py-3 rounded-xl cursor-pointer inline-flex items-center gap-2 hover:bg-[#a0352a] transition-colors"
+              >
                 <Camera className="w-5 h-5" />
-                <span>Choose Photo</span>
-              </label>
+                <span>Unlock Progress</span>
+              </button>
               <input
+                id="camera-input"
                 type="file"
                 accept="image/*"
-                onChange={handleFileUpload}
+                capture="environment"
+                onChange={handleCameraCapture}
+                className="hidden"
+              />
+              {/* PC fallback */}
+              <input
+                id="pc-camera-input"
+                type="file"
+                accept="image/*"
+                onChange={handleCameraCapture}
                 className="hidden"
               />
             </div>
           </div>
         )}
 
-        {/* Previous Photo Comparison */}
-        {previousPhoto && (
-          <div className="absolute bottom-4 left-4 right-4 bg-black/70 rounded-xl p-4 backdrop-blur-sm">
+        {/* Progress Comparison - The Reward */}
+        {capturedImage && previousPhoto && (
+          <div className="absolute bottom-4 left-4 right-4 bg-black/80 rounded-xl p-4 backdrop-blur-sm border border-[#c44033]/30">
+            <div className="text-center mb-3">
+              <div className="text-2xl mb-1">✨</div>
+              <p className="text-white font-semibold text-sm">Your Progress Comparison</p>
+              <p className="text-white/60 text-xs">You've unlocked your weekly transformation!</p>
+            </div>
             <div className="flex items-center justify-between text-white">
-              <div>
+              <div className="text-center">
                 <p className="text-xs text-gray-400">Week {previousPhoto.week}</p>
                 <p className="font-semibold">Before</p>
+                <div className="w-12 h-12 rounded-lg bg-white/10 mt-1 overflow-hidden">
+                  <img src={previousPhoto.photoData} alt="Before" className="w-full h-full object-cover" />
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-gray-400">Week {week}</p>
+              <div className="text-center">
+                <p className="text-xs text-gray-400">Week {weekNumber}</p>
                 <p className="font-semibold">Now</p>
+                <div className="w-12 h-12 rounded-lg bg-white/10 mt-1 overflow-hidden">
+                  <img src={capturedImage} alt="Now" className="w-full h-full object-cover" />
+                </div>
               </div>
             </div>
           </div>
@@ -230,7 +282,7 @@ export default function PhotoUploadPage() {
           <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${consentGiven ? 'bg-[#c44033]' : 'bg-white/20'}`}>
             {consentGiven && <Check className="w-4 h-4 text-white" />}
           </div>
-          <span className="text-white text-sm">Allow Gleuhr to use my photos for analysis</span>
+          <span className="text-white text-sm">I'd like to share my photos to help improve Gleuhr's analysis</span>
         </button>
 
         <div className="flex gap-3">
@@ -242,7 +294,7 @@ export default function PhotoUploadPage() {
           </button>
           <button 
             onClick={handleSubmit} 
-            disabled={isSubmitting || !capturedImage || !consentGiven}
+            disabled={isSubmitting || !capturedImage}
             className="flex-1 py-3 px-4 rounded-xl bg-[#c44033] text-white font-medium flex items-center justify-center gap-2 hover:bg-[#a0352a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Check className="w-5 h-5" /> {isSubmitting ? 'Saving...' : 'Save'}

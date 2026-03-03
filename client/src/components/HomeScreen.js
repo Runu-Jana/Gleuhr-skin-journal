@@ -336,11 +336,15 @@ export default function HomeScreen() {
                 dayData?.status === 'partial' ? 'bg-[#d4a017] opacity-60' :
                 dayData?.status === 'current' ? 'bg-[#1a8a4a] opacity-80 shadow-[#c44033]_0px_0px_0px_2px' :
                 dayData?.isFuture ? 'bg-[#ede9e5] opacity-30' :
-                'bg-[#ede9e5] opacity-30'
+                'bg-[#dc2626] opacity-40' // Red for missed days
               }`}
             >
               <span className={`text-xs font-medium ${
-                dayData?.status === 'current' ? 'text-white' : 'text-[#a39e95]'
+                dayData?.status === 'done' ? 'text-white' :
+                dayData?.status === 'partial' ? 'text-white' :
+                dayData?.status === 'current' ? 'text-white' :
+                dayData?.isFuture ? 'text-[#a39e95]' :
+                'text-white' // White text on red missed days
               }`}>
                 {dayData?.day}
               </span>

@@ -20,6 +20,8 @@ import SkinScoreScreen from './components/SkinScoreScreen';
 import SkinScoreResults from './components/SkinScoreResults';
 import WeeklyPhotoScreen from './components/WeeklyPhotoScreen';
 import PhotoUploadPage from './components/PhotoUploadPage';
+import WeeklyPhotoPopup from './components/WeeklyPhotoPopup';
+import CheckInSuccessPage from './components/CheckInSuccessPage';
 import TransformationPage from './components/TransformationPage';
 import BottomNavigation from './components/BottomNavigation';
 import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
@@ -70,6 +72,24 @@ function App() {
 
 function AppRoutes() {
   const { isAuthenticated, patient, isLoading } = useAuth();
+  const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
+
+  // Check if today is a weekly photo day (7, 14, 21, 28, etc.)
+  useEffect(() => {
+    if (isAuthenticated && patient) {
+      const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+      const isWeeklyPhotoDay = currentDay % 7 === 0;
+      
+      // Show popup on weekly photo days
+      if (isWeeklyPhotoDay) {
+        setShowWeeklyPhotoPopup(true);
+      }
+    }
+  }, [isAuthenticated, patient]);
+
+  const handleCloseWeeklyPhotoPopup = () => {
+    setShowWeeklyPhotoPopup(false);
+  };
 
   console.log('AppRoutes - isAuthenticated:', isAuthenticated);
   console.log('AppRoutes - patient:', patient);
@@ -140,10 +160,19 @@ function AppRoutes() {
             element={!isAuthenticated ? <Navigate to="/login" replace /> : <JourneyScreen />} 
           />
           <Route 
+            path="/photo-upload" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <PhotoUploadPage />} 
+          />
+          <Route 
+            path="/checkin-success" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <CheckInSuccessPage />} 
+          />
+          <Route 
             path="/" 
             element={!isAuthenticated ? <Navigate to="/login" replace /> : <MainApp />} 
           />
         </Routes>
+        
       </main>
     </div>
   );
@@ -151,6 +180,24 @@ function AppRoutes() {
 
 function MainApp() {
   const { patient, streak: streakData } = useAuth();
+  const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
+
+  // Check if today is a weekly photo day (7, 14, 21, 28, etc.)
+  useEffect(() => {
+    if (patient) {
+      const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+      const isWeeklyPhotoDay = currentDay % 7 === 0;
+      
+      // Show popup on weekly photo days
+      if (isWeeklyPhotoDay) {
+        setShowWeeklyPhotoPopup(true);
+      }
+    }
+  }, [patient]);
+
+  const handleCloseWeeklyPhotoPopup = () => {
+    setShowWeeklyPhotoPopup(false);
+  };
 
   return (
     <>
@@ -165,6 +212,7 @@ function MainApp() {
           <Route path="/skin-score-results" element={<SkinScoreResults />} />
           <Route path="/weekly-photo" element={<WeeklyPhotoScreen />} />
           <Route path="/photo-upload" element={<PhotoUploadPage />} />
+          <Route path="/checkin-success" element={<CheckInSuccessPage />} />
           <Route path="/transformation" element={<TransformationPage />} />
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/onboarding" element={<OnboardingScreen />} />
@@ -173,6 +221,13 @@ function MainApp() {
       </AnimatePresence>
       <BottomNavigation />
       <GleuhrInsider />
+      
+      {/* Weekly Photo Popup */}
+      <WeeklyPhotoPopup 
+        isVisible={showWeeklyPhotoPopup}
+        onClose={handleCloseWeeklyPhotoPopup}
+        patient={patient}
+      />
     </>
   );
 }
