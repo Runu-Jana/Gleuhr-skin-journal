@@ -43,7 +43,7 @@ export function calculateShields(streak) {
 }
 
 export function isMilestoneDay(day) {
-  return day === 1 || day === 28 || day === 56 || day === 84;
+  return day === 7 || day === 28 || day === 56 || day === 84;
 }
 
 export function isWeeklyPhotoDay(startDate) {

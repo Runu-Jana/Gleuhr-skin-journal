@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/mongodb');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Trust proxy (needed for rate limiting behind proxy)
 app.set('trust proxy', 1);
@@ -14,12 +14,13 @@ app.set('trust proxy', 1);
 // Rate limiting - skip for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // limit each IP to 1000 requests per windowMs (increased for testing)
   skip: (req) => process.env.NODE_ENV === 'development', // Skip in dev
   keyGenerator: (req) => req.ip // Use IP for rate limiting
 });
 
-app.use(limiter);
+// Temporarily disable rate limiting for testing
+// app.use(limiter);
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -60,6 +61,7 @@ const startServer = async () => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Local: http://localhost:${PORT}`);
   });
 };
 

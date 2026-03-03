@@ -13,13 +13,8 @@ router.post('/send-verification', async (req, res) => {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
-    // Check if patient exists
-    const patient = await Patient.findOne({
-      $or: [{ phoneNumber }, { phone: phoneNumber }]
-    });
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found. Please contact your coach.' });
-    }
+    // Allow any phone number - patient will be created on first login
+    console.log(`📱 Sending verification code to: ${phoneNumber}`);
 
     // Generate 6-digit verification code
     const verificationCode = await whatsappService.generateVerificationCode();
@@ -97,13 +92,28 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: verificationResult.error });
     }
 
-    // Find patient by phone number
-    const patient = await Patient.findOne({
+    // Find patient by phone number, or create new one if not found
+    let patient = await Patient.findOne({
       $or: [{ phoneNumber }, { phone: phoneNumber }]
     });
 
     if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+      // Auto-create patient for first-time login
+      patient = new Patient({
+        fullName: 'Customer', // Default name, can be updated later
+        name: 'Customer',
+        phoneNumber,
+        phone: phoneNumber,
+        planType: 'Basic',
+        startDate: new Date(),
+        hasCommitted: false,
+        isActive: true,
+        currentDay: 1,
+        isNewUser: true
+      });
+      
+      await patient.save();
+      console.log(`✅ Auto-created new patient for phone: ${phoneNumber}`);
     }
 
     // Generate persistent auth token (90 days)
@@ -139,7 +149,8 @@ router.post('/register', async (req, res) => {
         level: updatedPatient.level,
         achievements: updatedPatient.achievements,
         products: updatedPatient.products || [],
-        dietPlan: updatedPatient.dietPlan
+        dietPlan: updatedPatient.dietPlan,
+        isNewUser: updatedPatient.isNewUser || false
       }
     });
   } catch (error) {

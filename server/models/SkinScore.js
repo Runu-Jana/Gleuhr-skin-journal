@@ -22,74 +22,38 @@ const skinScoreSchema = new mongoose.Schema({
     max: 90
   },
   
-  // Skin assessment metrics (0-10 scale)
+  // Skin assessment metrics (1-5 scale for new 4-question format)
+  darkest_patch: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 3
+  },
+  skin_tone: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 3
+  },
   texture: {
     type: Number,
-    min: 0,
-    max: 10,
-    default: 5
-  },
-  pigmentation: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: 5
-  },
-  brightness: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: 5
-  },
-  breakouts: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: 5
+    min: 1,
+    max: 5,
+    default: 3
   },
   confidence: {
     type: Number,
-    min: 0,
-    max: 10,
-    default: 5
-  },
-  hydration: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: 5
-  },
-  smoothness: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: 5
-  },
-  evenness: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: 5
-  },
-  firmness: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: 5
-  },
-  glow: {
-    type: Number,
-    min: 0,
-    max: 10,
-    default: 5
+    min: 1,
+    max: 5,
+    default: 3
   },
   
-  // Calculated total score (0-100)
+  // Calculated total score (4-20 for new format)
   totalScore: {
     type: Number,
-    min: 0,
-    max: 100,
-    default: 50
+    min: 4,
+    max: 20,
+    default: 12
   },
   
   // Photo evidence
@@ -125,19 +89,13 @@ const skinScoreSchema = new mongoose.Schema({
 // Calculate total score before saving
 skinScoreSchema.pre('save', function(next) {
   const metrics = [
-    this.texture,
-    this.pigmentation,
-    this.brightness,
-    this.breakouts,
-    this.confidence,
-    this.hydration,
-    this.smoothness,
-    this.evenness,
-    this.firmness,
-    this.glow
+    this.darkest_patch || 3,
+    this.skin_tone || 3,
+    this.texture || 3,
+    this.confidence || 3
   ];
   
-  this.totalScore = Math.round(metrics.reduce((sum, val) => sum + val, 0) / metrics.length * 10);
+  this.totalScore = metrics.reduce((sum, val) => sum + val, 0);
   this.updatedAt = Date.now();
   next();
 });

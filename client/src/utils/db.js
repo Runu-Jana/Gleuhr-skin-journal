@@ -23,6 +23,7 @@ export async function initDB() {
         const scoreStore = db.createObjectStore('skinScores', { keyPath: 'id' });
         scoreStore.createIndex('by-day', 'day');
         scoreStore.createIndex('by-email', 'patientEmail');
+        scoreStore.createIndex('by-phone', 'patientPhone');
       }
       
       // Weekly photos store
@@ -83,6 +84,16 @@ export async function getSkinScores(email) {
   return database.getAll('skinScores');
 }
 
+// Get latest skin score for a patient
+export async function getLatestSkinScore(email) {
+  const database = await initDB();
+  const scores = await database.getAllFromIndex('skinScores', 'by-email', email);
+  if (scores.length === 0) return null;
+  
+  // Sort by date descending and get the latest
+  return scores.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+}
+
 // Weekly Photo operations
 export async function saveWeeklyPhoto(photo) {
   const database = await initDB();
@@ -95,6 +106,21 @@ export async function getWeeklyPhotos(email) {
     return database.getAllFromIndex('weeklyPhotos', 'by-email', email);
   }
   return database.getAll('weeklyPhotos');
+}
+
+// Fetch photos from MongoDB API
+export async function fetchWeeklyPhotosFromServer(patientPhone) {
+  try {
+    const response = await fetch(`/api/photo/${patientPhone}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch photos from server');
+    }
+    const photos = await response.json();
+    return photos;
+  } catch (error) {
+    console.error('Error fetching photos from server:', error);
+    return [];
+  }
 }
 
 // Sync Queue operations

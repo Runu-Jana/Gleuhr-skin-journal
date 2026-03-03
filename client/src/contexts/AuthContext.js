@@ -85,8 +85,13 @@ export function AuthProvider({ children }) {
       setStreak(streakRes.data);
 
       // Load skin scores using phone
-      const scoresRes = await axios.get(`/api/skinscore/${phone}`);
-      setSkinScores(scoresRes.data);
+      try {
+        const scoresRes = await axios.get(`/api/skinscore/${phone}`);
+        setSkinScores(scoresRes.data);
+      } catch (skinScoreError) {
+        console.error('Skin score API not available:', skinScoreError);
+        setSkinScores([]); // Set empty array as fallback
+      }
 
       // Load weekly photos using phone
       const photosRes = await axios.get(`/api/photo/${phone}`);

@@ -133,6 +133,13 @@ class WhatsAppService {
   async storeVerificationCode(phoneNumber, code) {
     const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     
+    // Log verification code prominently for development
+    console.log('\n🔔 VERIFICATION CODE FOR TESTING:');
+    console.log('📱 Phone:', phoneNumber);
+    console.log('🔢 Code:', code);
+    console.log('⏰ Expires:', expiryTime.toLocaleTimeString());
+    console.log('⚠️  This code will expire in 10 minutes\n');
+    
     // In production, store in Redis or database
     // For now, store in memory (not recommended for production)
     if (!global.verificationCodes) {
