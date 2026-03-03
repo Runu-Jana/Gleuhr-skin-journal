@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { saveCheckIn, getTodayCheckIn } from '../utils/db';
+import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient, savePatient } from '../utils/db';
 import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId } from '../utils/helpers';
 import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
@@ -127,14 +127,69 @@ export default function AMPage() {
     setIsSubmitting(true);
     
     try {
-      // Get today's existing check-in data
-      const existingCheckIn = await getTodayCheckIn(patient?.phoneNumber);
+      // Try both phone field names
+      const phoneNumber = patient?.phoneNumber || patient?.phone;
       
+      if (!phoneNumber) {
+        alert('No phone number found. Please check your patient data.');
+        return;
+      }
+      
+      // Get patient record to get patientId
+      const patientRecord = await getPatient(phoneNumber);
+      
+      let patientId;
+      let existingCheckIn;
+      
+      if (!patientRecord) {
+        // Save patient from AuthContext to local database
+        try {
+          await savePatient({
+            id: patient.id,
+            name: patient.name,
+            firstName: patient.name?.split(' ')[0] || patient.firstName,
+            phone: patient.phone,
+            phoneNumber: patient.phone,
+            email: patient.email || null,
+            startDate: patient.startDate || new Date().toISOString().split('T')[0],
+            hasCommitted: patient.hasCommitted || false,
+            skinType: patient.skinType,
+            skinConcern: patient.skinConcern,
+            goals: patient.goals,
+            planType: patient.planType,
+            age: patient.age,
+            gender: patient.gender,
+            assignedDietician: patient.assignedDietician || null,
+            dieticianName: patient.dieticianName || null,
+            createdAt: new Date().toISOString()
+          });
+          
+          // Try to get the patient record again
+          const retryPatientRecord = await getPatient(phoneNumber);
+          if (!retryPatientRecord) {
+            alert('Patient record not found. Please contact support.');
+            return;
+          }
+          
+          patientId = retryPatientRecord.id;
+          
+        } catch (saveError) {
+          alert('Patient record not found. Please contact support.');
+          return;
+        }
+      } else {
+        patientId = patientRecord.id;
+      }
+      
+      // Get today's existing check-in data (common for both paths)
+      existingCheckIn = await getTodayCheckIn(patientId);
+      
+      const todayDate = new Date().toISOString().split('T')[0];
       const checkInData = {
         id: existingCheckIn?.id || generateId(),
-        patientId: patient?.id,
-        patientPhone: patient?.phoneNumber,
-        date: new Date().toISOString().split('T')[0],
+        patientId: patientId,
+        patientPhone: phoneNumber,
+        date: todayDate,
         day,
         amRoutine: amRoutine,
         sunscreen: sunscreen,
@@ -146,6 +201,9 @@ export default function AMPage() {
         skinMood: existingCheckIn?.skinMood || '',
         synced: false
       };
+      
+      console.log('📅 Today check-in data:', checkInData);
+      console.log('📅 Today date:', todayDate);
 
       console.log('Submitting AM check-in data:', checkInData);
 

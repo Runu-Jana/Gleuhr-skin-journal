@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getSkinScores } from '../utils/db';
+import { getSkinScores, getPatient } from '../utils/db';
 
 export default function SkinScoreResults() {
   const { patient } = useAuth();
@@ -16,8 +16,22 @@ export default function SkinScoreResults() {
 
   const loadScores = async () => {
     try {
-      const allScores = await getSkinScores(patient?.email);
+      // Get patient record to get patientId
+      const patientRecord = await getPatient(patient?.phone);
+      if (!patientRecord) {
+        console.error('Patient not found for skin scores');
+        setScores([]);
+        return;
+      }
+      
+      const allScores = await getSkinScores(patientRecord.id);
       setScores(allScores || []);
+      
+      // Trigger HomeScreen refresh by emitting a custom event
+      window.dispatchEvent(new CustomEvent('skinScoreUpdated', {
+        detail: { scores: allScores, latestScore: allScores[0] }
+      }));
+      
     } catch (error) {
       console.error('Error loading scores:', error);
     } finally {

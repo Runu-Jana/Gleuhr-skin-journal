@@ -5,7 +5,7 @@ import { Shield, Frown, Meh, Smile } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
-import { saveCheckIn, getTodayCheckIn } from '../utils/db';
+import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
 import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId } from '../utils/helpers';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
 
@@ -351,13 +351,29 @@ export default function PMPage() {
     
     setIsSubmitting(true);
     
+    // Get patient record to get patientId
+    const phoneNumber = patient?.phoneNumber || patient?.phone;
+    
+    if (!phoneNumber) {
+      alert('No phone number found. Please check your patient data.');
+      return;
+    }
+    
+    const patientRecord = await getPatient(phoneNumber);
+    if (!patientRecord) {
+      alert('Patient record not found. Please contact support.');
+      return;
+    }
+    
+    const patientId = patientRecord.id;
+    
     // Get today's existing check-in data
-    const existingCheckIn = await getTodayCheckIn(patient?.phoneNumber);
+    const existingCheckIn = await getTodayCheckIn(patientId);
     
     const checkInData = {
       id: existingCheckIn?.id || generateId(),
-      patientId: patient?.id,
-      patientPhone: patient?.phoneNumber,
+      patientId: patientId,
+      patientPhone: phoneNumber,
       date: new Date().toISOString().split('T')[0],
       day,
       // Preserve existing AM data if any

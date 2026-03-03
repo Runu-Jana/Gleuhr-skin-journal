@@ -203,7 +203,7 @@ function MainApp() {
     <>
       <AnimatePresence mode="wait">
         <Routes>
-          <Route path="/" element={<HomeScreen />} />
+          <Route path="*" element={<HomeScreen />} />
           <Route path="/home" element={<HomeScreen />} />
           <Route path="/amPage" element={<AMPage />} />
           <Route path="/pmPage" element={<PMPage />} />
@@ -216,7 +216,6 @@ function MainApp() {
           <Route path="/transformation" element={<TransformationPage />} />
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/onboarding" element={<OnboardingScreen />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
       <BottomNavigation />

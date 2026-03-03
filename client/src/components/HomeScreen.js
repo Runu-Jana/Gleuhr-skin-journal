@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos } from '../utils/db';
+import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
 import { calculateDay, calculateStreak, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
 import { Flame, Shield, Sun, Moon, Droplets, Utensils, Frown, Meh, Smile, Home, Map, User, Camera, Edit3 } from 'lucide-react';
@@ -50,10 +50,22 @@ export default function HomeScreen() {
     
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(year, month, i);
-      const dateStr = date.toISOString().split('T')[0];
+      // Use UTC date to avoid timezone issues
+      const dateStr = new Date(Date.UTC(year, month, i)).toISOString().split('T')[0];
       const isToday = i === now.getDate();
       const isPast = i < now.getDate();
       const isFuture = i > now.getDate();
+      
+      // Debug: Log today's date and current day being checked
+      if (i === now.getDate()) {
+        console.log('📅 Today check:', {
+          today: now.getDate(),
+          todayDateStr: new Date().toISOString().split('T')[0],
+          calendarDate: i,
+          calendarDateStr: dateStr,
+          isToday
+        });
+      }
       
       // Check if this day has check-in data
       let status = 'missed';
@@ -70,6 +82,25 @@ export default function HomeScreen() {
             status = 'done'; // Both AM and PM completed
           } else if (hasAM || hasPM) {
             status = 'partial'; // Only one routine completed
+          }
+          
+          // Debug: Log found check-in for today
+          if (i === now.getDate()) {
+            console.log('📝 Today check-in found:', {
+              date: dateStr,
+              hasAM,
+              hasPM,
+              status,
+              dayCheckIn
+            });
+          }
+        } else {
+          // Debug: Log no check-in found for today
+          if (i === now.getDate()) {
+            console.log('❌ No check-in found for today:', {
+              todayDateStr: dateStr,
+              availableCheckIns: checkIns.map(c => ({ date: c.date, amRoutine: c.amRoutine, pmRoutine: c.pmRoutine }))
+            });
           }
         }
       }
@@ -94,22 +125,38 @@ export default function HomeScreen() {
   // Fetch latest skin score and calculate consistency
   useEffect(() => {
     const fetchData = async () => {
-      if (patient?.phone && patient?.startDate) {
+      // Try both phone field names
+      const phoneNumber = patient?.phoneNumber || patient?.phone;
+      
+      if (phoneNumber && patient?.startDate) {
         try {
+          // Get patient record to get patientId
+          const patientRecord = await getPatient(phoneNumber);
+          
+          if (!patientRecord) {
+            return;
+          }
+          
+          const patientId = patientRecord.id;
+          
           // Fetch latest skin score
-          const latestScore = await getLatestSkinScore(patient.phone);
+          const latestScore = await getLatestSkinScore(patientId);
+          console.log('🏠 HomeScreen - Latest skin score fetched:', latestScore);
           if (latestScore && latestScore.totalScore) {
             setCurrentSkinScore(latestScore.totalScore);
+            console.log('✅ HomeScreen - Skin score updated to:', latestScore.totalScore);
+          } else {
+            console.log('❌ HomeScreen - No skin score found');
           }
 
           // Fetch check-ins and calculate consistency
-          const checkIns = await getCheckIns(patient.phone);
+          const checkIns = await getCheckIns(patientId);
           const calculatedConsistency = calculateConsistency(checkIns, patient.startDate);
           setConsistency(calculatedConsistency);
           setCheckIns(checkIns);
 
           // Fetch weekly photos count
-          const photos = await getWeeklyPhotos(patient.email);
+          const photos = await getWeeklyPhotos(patientId);
           setPhotosCount(photos.length);
         } catch (error) {
           console.error('Error fetching data:', error);
@@ -118,6 +165,21 @@ export default function HomeScreen() {
     };
     
     fetchData();
+    
+    // Listen for skin score updates from other components
+    const handleSkinScoreUpdate = (event) => {
+      console.log('🏠 HomeScreen received skin score update event:', event.detail);
+      if (event.detail && event.detail.latestScore) {
+        setCurrentSkinScore(event.detail.latestScore.totalScore);
+        console.log('✅ HomeScreen updated skin score from event:', event.detail.latestScore.totalScore);
+      }
+    };
+    
+    window.addEventListener('skinScoreUpdated', handleSkinScoreUpdate);
+    
+    return () => {
+      window.removeEventListener('skinScoreUpdated', handleSkinScoreUpdate);
+    };
   }, [patient]);
 
   const calendarData = getCalendarData(checkIns);

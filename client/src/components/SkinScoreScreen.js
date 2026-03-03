@@ -66,7 +66,6 @@ export default function SkinScoreScreen() {
       
       const scoreData = {
         id: generateId(),
-        patientEmail: patient?.email,
         patientName: patient?.name,
         patientPhone: patient?.phone,
         date: new Date().toISOString(),
@@ -87,8 +86,10 @@ export default function SkinScoreScreen() {
       
       // Try to save to MongoDB directly
       try {
+        console.log('🏠 Sending skin score to API:', scoreData);
         const response = await axios.post('/api/skinscore', scoreData);
-        console.log('MongoDB save response:', response.data);
+        console.log('📡 API response:', response.data);
+        console.log('📊 Response status:', response.status);
         
         // Update local record as synced
         scoreData.synced = true;

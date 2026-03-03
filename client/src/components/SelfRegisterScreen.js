@@ -5,6 +5,7 @@ import { User, Mail, Phone, Calendar, Target, Sparkles, ArrowRight, Loader2, Eye
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useGamification } from '../contexts/GamificationContext';
+import { savePatient } from '../utils/db';
 
 export default function SelfRegisterScreen() {
   const [step, setStep] = useState('details');
@@ -15,7 +16,6 @@ export default function SelfRegisterScreen() {
   // Form states
   const [formData, setFormData] = useState({
     fullName: '',
-    email: '',
     phoneNumber: '',
     countryCode: '+91',
     age: '',
@@ -50,7 +50,6 @@ export default function SelfRegisterScreen() {
           phoneNumber: fullPhone,
           countryCode: formData.countryCode.replace('+', ''),
           fullName: formData.fullName.trim(),
-          email: formData.email.trim()
         })
       });
       
@@ -103,7 +102,45 @@ export default function SelfRegisterScreen() {
         // Login the user
         const loginResult = await loginWithWhatsApp(fullPhone, verificationCode.trim());
         
+        console.log('🔍 Registration result:', data);
+        console.log('🔍 Login result:', loginResult);
+        console.log('🔍 Patient data from server:', data.patient);
+        console.log('🔍 Patient data from login:', loginResult.patient);
+        
         if (loginResult.success) {
+          // Save patient to local database with new structure
+          const patientData = data.patient || loginResult.patient;
+          if (patientData) {
+            try {
+              console.log('🔍 Saving patient data:', patientData);
+              await savePatient({
+                id: patientData.id || patientData._id,
+                name: patientData.fullName || patientData.name,
+                firstName: patientData.fullName?.split(' ')[0] || patientData.firstName,
+                phone: patientData.phoneNumber,
+                phoneNumber: patientData.phoneNumber,
+                startDate: patientData.startDate || new Date().toISOString().split('T')[0],
+                hasCommitted: patientData.hasCommitted || false,
+                skinType: patientData.skinType,
+                skinConcern: patientData.skinConcern,
+                goals: patientData.goals,
+                planType: patientData.planType,
+                age: patientData.age,
+                gender: patientData.gender,
+                // Add default dietician assignment (you can customize this)
+                assignedDietician: null, // Will be assigned later via admin dashboard
+                dieticianName: null,
+                createdAt: new Date().toISOString()
+              });
+              console.log('Patient saved to local database');
+            } catch (dbError) {
+              console.error('Error saving patient to local database:', dbError);
+              // Don't fail the registration, just log the error
+            }
+          } else {
+            console.error('❌ No patient data found in registration response');
+          }
+          
           if (data.patient.isNewUser) {
             navigate('/onboarding');
           } else {
@@ -134,7 +171,6 @@ export default function SelfRegisterScreen() {
           phoneNumber: fullPhone,
           countryCode: formData.countryCode.replace('+', ''),
           fullName: formData.fullName.trim(),
-          email: formData.email.trim()
         })
       });
       

@@ -41,7 +41,14 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       console.error('Token verification error:', error);
-      localStorage.removeItem('gleuhrAuthToken');
+      // If server error (500), don't remove token - might be temporary server issue
+      if (error.response?.status === 500) {
+        console.warn('Server error during token verification, keeping token for retry');
+        // Don't remove token on server error, user can try again
+      } else {
+        // For other errors (401, 403, etc.), remove token
+        localStorage.removeItem('gleuhrAuthToken');
+      }
     } finally {
       setIsLoading(false);
     }
