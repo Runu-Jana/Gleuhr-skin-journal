@@ -6,7 +6,8 @@ import { useOffline } from '../contexts/OfflineContext';
 import { saveSkinScore } from '../utils/db';
 import { Camera, ChevronLeft, TrendingUp } from 'lucide-react';
 import { calculateDay, generateId } from '../utils/helpers';
-import axios from 'axios';
+import { ChevronLeft, Camera, TrendingUp } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const QUESTIONS = [
   { 
@@ -32,7 +33,7 @@ const QUESTIONS = [
 ];
 
 export default function SkinScoreScreen() {
-  const { patient } = useAuth();
+  const { patient, refreshSkinScores } = useAuth();
   const { isOnline, queueForSync } = useOffline();
   const navigate = useNavigate();
   const [answers, setAnswers] = useState({});
@@ -60,59 +61,32 @@ export default function SkinScoreScreen() {
     }
 
     setIsSubmitting(true);
-    
-    try {
-      const totalScore = calculateTotalScore();
-      
-      const scoreData = {
-        id: generateId(),
-        patientName: patient?.name,
-        patientPhone: patient?.phone,
-        date: new Date().toISOString(),
-        day: day,
-        assessmentType: 'skin-score',
-        totalScore,
-        maxScore: 20,
-        individualScores: answers,
-        pigmentation: answers.darkest_patch || 0,
-        toneEvenness: answers.skin_tone || 0,
-        texture: answers.texture || 0,
-        confidence: answers.confidence || 0,
-        synced: false
-      };
-
-      // Save to IndexedDB
-      await saveSkinScore(scoreData);
-      
-      // Try to save to MongoDB directly
-      try {
-        console.log('🏠 Sending skin score to API:', scoreData);
-        const response = await axios.post('/api/skinscore', scoreData);
-        console.log('📡 API response:', response.data);
-        console.log('📊 Response status:', response.status);
-        
-        // Update local record as synced
-        scoreData.synced = true;
-        scoreData.id = response.data.id;
-        await saveSkinScore(scoreData);
-        console.log('Skin score saved to MongoDB successfully!');
-      } catch (apiError) {
-        console.error('Skin score API not available, data saved locally:', apiError);
-        // Keep data in IndexedDB for later sync
-      }
-      
-      console.log('Skin score assessment completed:', scoreData);
-      
-      // Navigate to results page after successful submission
-      navigate('/skin-score-results');
-      
-    } catch (error) {
-      console.error('Error saving skin score:', error);
-      alert('Failed to save assessment. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    const total = calculateTotal();
+    const scoreData = {
+      id: generateId(),
+      patientId: patient?.id,
+      patientEmail: patient?.email,
+      date: new Date().toISOString(),
+      day,
+      ...answers,
+      totalScore: total,
+      synced: false,
+    };
+    await saveSkinScore(scoreData);
+    if (isOnline) queueForSync('skinScore', scoreData);
+    setIsSubmitting(false);
+    navigate('/');
   };
+
+  if (showResults) {
+    return (
+      <ResultsScreen
+        answers={answers}
+        totalScore={calculateTotal()}
+        onRetake={() => setShowResults(false)}
+      />
+    );
+  }
 
   return (
     <div className="h-screen bg-white flex flex-col">
@@ -180,31 +154,100 @@ export default function SkinScoreScreen() {
                       <span className="text-xs text-[#7a756d] font-['Outfit'] leading-tight text-center whitespace-pre-line font-normal">
                         {option}
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-4 mt-8">
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex-1 bg-[#c44033] text-white py-4 px-6 rounded-xl font-semibold hover:bg-[#a03328] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="w-5 h-5" />
+                    <span>Save Results</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+// Results Screen Component
+const ResultsScreen = ({ answers, totalScore, onRetake }) => {
+  const navigate = useNavigate();
+
+  const getScoreLabel = (score) => {
+    if (score >= 16) return 'Excellent';
+    if (score >= 12) return 'Good';
+    if (score >= 8) return 'Fair';
+    return 'Needs Improvement';
+  };
+
+  const getScoreColor = (score) => {
+    if (score === null || score === undefined) return 'text-gray-400';
+    if (score >= 2) return 'text-green-600';
+    if (score >= 1) return 'text-blue-600';
+    return 'text-red-600';
+  };
+
+  const formatKey = (key) => {
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, (str) => str.toUpperCase())
+      .trim();
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f0f4ea]/5 to-[#faf8f5] px-6 py-8">
+      <div className="max-w-2xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8"
+        >
+          <div className="text-center mb-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-[#c44033]/20 to-[#a03328]/80 flex flex-col items-center justify-center text-white shadow-xl"
+            >
+              <span className="text-4xl font-bold">{totalScore}</span>
+              <span className="text-sm mt-2">{getScoreLabel(totalScore)}</span>
             </motion.div>
           ))}
         </div>
       </div>
 
-      {/* Submit Button */}
-      <div className="px-6 py-7">
-        <button
-          onClick={handleSubmit}
-          disabled={!allQuestionsAnswered || isSubmitting}
-          className={`w-full py-[18px] rounded-2xl font-semibold transition-all duration-250 font-['Outfit'] text-base ${
-            allQuestionsAnswered && !isSubmitting
-              ? 'bg-[#c44033] text-white shadow-lg hover:bg-[#b33a2e]'
-              : 'bg-[#e0ddd7] text-[#a39e95] cursor-default'
-          }`}
-          style={{
-            boxShadow: allQuestionsAnswered && !isSubmitting ? '0 4px 12px rgba(196, 64, 51, 0.3)' : 'none'
-          }}
-        >
-          {isSubmitting ? 'Saving...' : 'See My Score →'}
-        </button>
+          <div className="flex gap-4">
+            <button
+              onClick={onRetake}
+              className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+            >
+              Retake Assessment
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="flex-1 bg-[#c44033] text-white py-3 px-6 rounded-xl font-semibold hover:bg-[#a03328] transition-colors shadow-lg"
+            >
+              Continue to Home
+            </button>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
