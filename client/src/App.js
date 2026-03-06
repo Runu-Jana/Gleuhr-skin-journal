@@ -24,6 +24,7 @@ import InstallPrompt from './components/InstallPrompt';
 import GleuhrInsider from './components/GleuhrInsider';
 import AccessibilityMenu from './components/AccessibilityMenu';
 import AchievementPopup from './components/AchievementPopup';
+import AdminDietDashboard from './components/AdminDietDashboard';
 
 // Utils
 import { initDB } from './utils/db';
@@ -93,10 +94,11 @@ function AppRoutes() {
             path="/register" 
             element={isAuthenticated ? <Navigate to="/" replace /> : <SelfRegisterScreen />} 
           />
-          <Route 
-            path="/login" 
-            element={isAuthenticated ? <Navigate to="/" replace /> : <LoginScreen />} 
+          <Route
+            path="/login"
+            element={isAuthenticated ? <Navigate to="/" replace /> : <LoginScreen />}
           />
+          <Route path="/admin/diet-plans" element={<AdminDietDashboard />} />
           <Route 
             path="/onboarding" 
             element={!isAuthenticated ? <Navigate to="/login" replace /> : patient?.hasCommitted ? <Navigate to="/" replace /> : <OnboardingScreen />} 
