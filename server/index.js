@@ -37,6 +37,7 @@ app.use('/api/skinscore', require('./routes/skinscore'));
 app.use('/api/checkin', require('./routes/checkin'));
 app.use('/api/reorder', require('./routes/reorder'));
 app.use('/api/admin/diet-plans', require('./routes/admin-diet-plans'));
+app.use('/api/admin/patients', require('./routes/admin-patients'));
 
 // Health check
 app.use('/api/health', require('./routes/health'));
