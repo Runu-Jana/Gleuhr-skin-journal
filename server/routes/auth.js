@@ -21,8 +21,8 @@ router.post('/send-verification', async (req, res) => {
       return res.status(404).json({ error: 'Patient not found. Please contact your coach.' });
     }
 
-    // Generate 6-digit verification code
-    const verificationCode = await whatsappService.generateVerificationCode();
+    // Fixed verification code for easy login
+    const verificationCode = '123456';
 
     // Store verification code with expiry
     await whatsappService.storeVerificationCode(phoneNumber, verificationCode);
@@ -62,8 +62,8 @@ router.post('/resend-verification', async (req, res) => {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
-    // Generate new verification code
-    const verificationCode = await whatsappService.generateVerificationCode();
+    // Fixed verification code for easy login
+    const verificationCode = '123456';
 
     // Store new verification code with expiry
     await whatsappService.storeVerificationCode(phoneNumber, verificationCode);

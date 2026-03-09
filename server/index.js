@@ -66,6 +66,14 @@ app.use((err, req, res, next) => {
 // Connect to MongoDB first, then start the server
 const startServer = async () => {
   await connectDB();
+
+  // Seed test data in development (only if DB is connected)
+  const mongoose = require('mongoose');
+  if (process.env.NODE_ENV === 'development' && mongoose.connection.readyState === 1) {
+    const seedTestData = require('./config/seedTestData');
+    await seedTestData();
+  }
+
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);

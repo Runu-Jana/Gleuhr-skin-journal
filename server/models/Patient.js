@@ -26,7 +26,6 @@ const patientSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true,
     trim: true
   },
   skinConcern: {
@@ -160,6 +159,16 @@ const patientSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+});
+
+// Keep phone and phoneNumber in sync
+patientSchema.pre('save', function(next) {
+  if (this.phoneNumber && !this.phone) {
+    this.phone = this.phoneNumber;
+  } else if (this.phone && !this.phoneNumber) {
+    this.phoneNumber = this.phone;
+  }
+  next();
 });
 
 // Virtuals
