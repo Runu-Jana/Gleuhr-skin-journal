@@ -8,6 +8,7 @@ import { useGamification } from '../contexts/GamificationContext';
 import { savePatient } from '../utils/db';
 
 export default function SelfRegisterScreen() {
+  const { loginWithWhatsApp } = useAuth();
   const [step, setStep] = useState('details');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
