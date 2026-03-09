@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getSkinScores, getPatient } from '../utils/db';
+import { getSkinScores, getPatient, saveSkinScore } from '../utils/db';
 
 export default function SkinScoreResults() {
   const { patient } = useAuth();
@@ -24,7 +24,47 @@ export default function SkinScoreResults() {
         return;
       }
       
-      const allScores = await getSkinScores(patientRecord.id);
+      // First try to get from IndexedDB
+      let allScores = await getSkinScores(patientRecord.id);
+      console.log('📊 Local scores from IndexedDB:', allScores);
+      
+      // Also try to get latest from server to ensure we have the most recent data
+      try {
+        const response = await fetch(`/api/skinscore/${patient?.phone}`, {
+          headers: {
+            'Authorization': `Bearer ${patient?.token}`
+          }
+        });
+        
+        if (response.ok) {
+          const serverScores = await response.json();
+          console.log('🌐 Server scores:', serverScores);
+          
+          // Merge server scores with local scores, preferring server data for latest
+          if (serverScores.length > 0) {
+            // Sort server scores by date (newest first)
+            serverScores.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            // Check if server has newer score than local
+            const latestServerScore = serverScores[0];
+            const latestLocalScore = allScores[0];
+            
+            if (!latestLocalScore || new Date(latestServerScore.date) > new Date(latestLocalScore.date)) {
+              console.log('🔄 Using server data (newer)');
+              allScores = serverScores;
+            }
+          }
+        }
+      } catch (serverError) {
+        console.log('⚠️ Server fetch failed, using local scores:', serverError);
+      }
+      
+      console.log('✅ Final scores to display:', allScores);
+      
+      // Sort scores by date (newest first) to ensure latest score is at index 0
+      allScores.sort((a, b) => new Date(b.date) - new Date(a.date));
+      console.log('📅 Scores after sorting by date (newest first):', allScores);
+      
       setScores(allScores || []);
       
       // Trigger HomeScreen refresh by emitting a custom event
@@ -77,15 +117,77 @@ export default function SkinScoreResults() {
 
   const getBaselineScore = () => {
     if (scores.length === 0) return 8; // Default baseline
-    const sortedScores = [...scores].sort((a, b) => a.day - b.day);
-    return sortedScores[0]?.totalScore || 8;
+    if (scores.length === 1) return scores[0]?.totalScore || 8; // If only one score, use it as baseline
+    
+    // Use the second most recent score (scores[1]) as baseline for improvement calculation
+    // This shows improvement from the previous assessment to the current one
+    const baselineScore = scores[1]?.totalScore || 8;
+    console.log('📈 Baseline calculation (using previous assessment):', {
+      currentScore: scores[0]?.totalScore,
+      previousScore: scores[1]?.totalScore,
+      baselineValue: baselineScore,
+      totalScores: scores.length
+    });
+    return baselineScore;
   };
 
   const getImprovement = () => {
     if (scores.length === 0) return 0;
+    if (scores.length === 1) return 0;
+    
     const latestScore = scores[0]?.totalScore || 0;
-    const baseline = getBaselineScore();
-    return latestScore - baseline;
+    const baseline = scores[1]?.totalScore || 0;
+    const improvement = latestScore - baseline;
+    
+    console.log('📊 Improvement calculation:', {
+      latestScore,
+      baseline,
+      improvement
+    });
+    
+    return improvement;
+  };
+
+  const handleSaveScore = async () => {
+    try {
+      // Check if there are scores to save
+      if (!scores || scores.length === 0) {
+        console.error('No scores available to save');
+        alert('No scores available to save');
+        return;
+      }
+
+      // Get patient record to get patientId
+      const patientRecord = await getPatient(patient?.phone);
+      if (!patientRecord) {
+        console.error('Patient not found for saving skin score');
+        return;
+      }
+      
+      // Update the latest score with current timestamp
+      const updatedScore = {
+        ...scores[0],
+        patientId: patientRecord.id,
+        patientName: patient?.name,
+        patientPhone: patient?.phone,
+        date: new Date().toISOString(),
+        synced: false
+      };
+      
+      await saveSkinScore(updatedScore);
+      
+      // Emit update event
+      window.dispatchEvent(new CustomEvent('skinScoreUpdated', {
+        detail: { scores: [updatedScore, ...scores.slice(1)], latestScore: updatedScore }
+      }));
+      
+      console.log('✅ Skin score saved successfully:', updatedScore);
+      alert('Skin score saved successfully!');
+      
+    } catch (error) {
+      console.error('❌ Error saving skin score:', error);
+      alert('Error saving skin score. Please try again.');
+    }
   };
 
   if (loading) {
@@ -97,6 +199,12 @@ export default function SkinScoreResults() {
   }
 
   const latestScore = scores[0];
+  
+  // Debug logging
+  console.log('🔍 Score Debug Info:');
+  console.log('All scores:', scores);
+  console.log('Latest score (scores[0]):', scores[0]);
+  console.log('Latest totalScore:', latestScore?.totalScore);
 
   return (
     <div className="h-screen bg-white flex flex-col">
@@ -170,10 +278,10 @@ export default function SkinScoreResults() {
                   Pigmentation
                 </span>
                 <div className="flex gap-1">
-                  {renderScoreDots(latestScore.pigmentation || 0)}
+                  {renderScoreDots(latestScore.darkest_patch || 0)}
                 </div>
                 <span className="text-sm font-bold text-[#191716] font-['Playfair_Display'] ml-2.5 w-5 text-right">
-                  {latestScore.pigmentation || 0}
+                  {latestScore.darkest_patch || 0}
                 </span>
               </div>
 
@@ -182,10 +290,10 @@ export default function SkinScoreResults() {
                   Tone evenness
                 </span>
                 <div className="flex gap-1">
-                  {renderScoreDots(latestScore.toneEvenness || 0)}
+                  {renderScoreDots(latestScore.skin_tone || 0)}
                 </div>
                 <span className="text-sm font-bold text-[#191716] font-['Playfair_Display'] ml-2.5 w-5 text-right">
-                  {latestScore.toneEvenness || 0}
+                  {latestScore.skin_tone || 0}
                 </span>
               </div>
 
@@ -219,18 +327,15 @@ export default function SkinScoreResults() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="w-full p-4 bg-[rgba(196, 64, 51, 0.03)] rounded-2xl border border-[rgba(196, 64, 51, 0.06)] mb-6"
+              className="w-full p-4 bg-[rgba(196, 64, 51, 0.03)] rounded-2xl border border-[rgba(175, 58, 47, 0.06)] mb-6 bg-red-50"
             >
-              <div className="flex justify-between items-center">
-                <div className="text-left">
-                  <p className="text-xs font-bold text-[#c44033] font-['Outfit'] mb-0 uppercase tracking-wider">
-                    Since Day 1
-                  </p>
-                  <p className="text-sm text-[#5c574f] font-['Outfit'] mt-1 mb-0">
-                    Baseline: {getBaselineScore()}/20
-                  </p>
-                </div>
-                <div className="text-right">
+              <div className="flex justify-between ">
+                <p className="text-sm text-red-600 font-bold font-['Outfit']">
+                  Since Day 1
+                  <p className="text-sm text-[#5c574f] mt-2 font-['Outfit']">Baseline: {getBaselineScore()}</p>
+                </p>
+                <div className="text-center">
+                  
                   <span 
                     className="text-2xl font-bold font-['Playfair_Display']"
                     style={{
@@ -240,30 +345,40 @@ export default function SkinScoreResults() {
                     {getImprovement() >= 0 ? '+' : ''}{getImprovement()}
                   </span>
                   <p 
-                    className="text-xs font-['Outfit'] mb-0 font-semibold"
+                    className="text-sm font-['Outfit'] mb-0 font-semibold"
                     style={{
                       color: getImprovement() >= 0 ? '#16a34a' : '#dc2626'
                     }}
                   >
-                    {getImprovement() >= 0 ? 'Improving ↑' : 'Declining ↓'}
+                    {getImprovement() >= 0 ? 'Improving ↑' : 'Worsening ↓'}
                   </p>
                 </div>
               </div>
             </motion.div>
 
-            {/* Continue Button */}
-            <motion.button
+            {/* Action Buttons */}
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              onClick={() => navigate('/')}
-              className="w-full py-[18px] rounded-2xl bg-[#c44033] text-white border-none font-semibold text-base font-['Outfit'] cursor-pointer shadow-lg"
-              style={{
-                boxShadow: 'rgba(196, 64, 51, 0.208) 0px 6px 20px'
-              }}
+              className="flex gap-3 w-full"
             >
-              Continue →
-            </motion.button>
+              
+              
+              {/* Continue Button */}
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                onClick={() => navigate('/')}
+                className="flex-1 py-[15px] px-[15px] rounded-2xl bg-[#c44033] text-white border-none font-semibold text-base font-['Outfit'] cursor-pointer shadow-lg"
+                style={{
+                  boxShadow: 'rgba(196, 64, 51, 0.208) 0px 6px 20px'
+                }}
+              >
+                Continue
+              </motion.button>
+            </motion.div>
           </>
         ) : (
           <motion.div

@@ -115,8 +115,9 @@ export default function PMPage() {
       if (amRoutine) awardPoints('am_routine');
       if (pmRoutine) awardPoints('am_routine');
       
-      // Refresh streak
+      // Refresh streak with small delay to ensure server update is complete
       try {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for server to update
         await refreshStreak();
       } catch (streakError) {
         console.error('Error refreshing streak in quick log:', streakError);
@@ -430,8 +431,9 @@ export default function PMPage() {
       awardPoints('complete_day');
     }
     
-    // Refresh streak
+    // Refresh streak with small delay to ensure server update is complete
     try {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for server to update
       await refreshStreak();
     } catch (streakError) {
       console.error('Error refreshing streak:', streakError);
@@ -476,66 +478,61 @@ export default function PMPage() {
       <div className="flex flex-col h-screen">
         {/* Header */}
         <div className="flex-shrink-0">
-          <div className="px-5 py-4">
+          <div className="px-4 py-3 sm:px-5 sm:py-4">
             <p className="text-xs text-red-600 font-bold uppercase tracking-wider m-0">Evening Check-in</p>
-            <h2 className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'Playfair Display, serif', margin: '6px 0 0' }}>Day {day}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900" style={{ fontFamily: 'Playfair Display, serif', margin: '4px 0 0' }}>Day {day}</h2>
           </div>
 
           {/* Streak Card */}
-          <div className="mx-5 mb-4 px-4 py-3.5 rounded-2xl border border-red-100" style={{ background: 'linear-gradient(135deg, rgba(196, 64, 51, 0.04) 0%, rgba(196, 64, 51, 0.01) 100%)' }}>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.125) 0%, rgba(220, 38, 38, 0.03) 100%)' }}>
-                  <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+          <div className="mx-4 mb-3 sm:mx-5 sm:mb-4 px-3 py-2.5 sm:px-4 sm:py-3.5 rounded-2xl border border-red-100" style={{ background: 'linear-gradient(135deg, rgba(196, 64, 51, 0.04) 0%, rgba(196, 64, 51, 0.01) 100%)' }}>
+            <div className="flex justify-between items-start sm:items-center">
+              <div className="flex items-center gap-2 sm:gap-2.5">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.125) 0%, rgba(220, 38, 38, 0.03) 100%)' }}>
+                  <svg width="18" height="18" className="sm:w-5 sm:h-5" viewBox="0 0 20 20" fill="none">
                     <path d="M10 18c-3.87 0-6.5-2.42-6.5-5.6 0-2 1.2-4 2.4-5.2.4-.4 1.2-.4 1.2.4 0 1.2.4 2.4 1.6 3.2.4.4.8.4 1.2 0 .4-.4.4-1.2 0-2.4-.4-1.2-.4-2.8.8-4.4.8-1.2 1.6-2 2.4-2.8.4-.4 1.2-.4 1.2.4 0 1.6.8 2.8 2 4 .8.8 1.6 2 1.6 3.6 0 3.2-2.42 5.6-6.5 5.6z" fill="#dc2626"></path>
                   </svg>
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-gray-900 tracking-tight">
-                    Your best streak <span className="text-red-600" style={{ fontFamily: 'Playfair Display, serif', fontSize: '20px', fontWeight: '700', marginLeft: '4px' }}>{streakData?.longestStreak || 0}</span> <span className="text-xs text-gray-500 font-normal">days</span>
+                    Your best streak <span className="text-red-600" style={{ fontFamily: 'Playfair Display, serif', fontSize: '16px sm:20px', fontWeight: '700', marginLeft: '2px' }}>{streakData?.longestStreak || 0}</span> <span className="text-xs text-gray-600 font-normal">days</span>
                   </div>
-                  <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
-                    <span>Red Hot flame</span>
-                    <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                  <div className="text-xs text-gray-600 mt-1 flex items-center gap-1.5">
+                    <span className="xs:inline">Red Hot flame</span>
+                    <span className="xs:inline">⚆</span>
+                    <span className="w-1 h-1 rounded-full bg-gray-300 hidden xs:inline"></span>
                     <span>{Math.round(progress)}% consistent</span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(196, 64, 51, 0.05)' }}>
-                <Shield className={`w-4 h-4 ${getShieldColor(availableShields)}`} />
-                <span className={`text-sm font-bold ${availableShields >= 3 ? 'text-green-700' : availableShields === 2 ? 'text-yellow-700' : availableShields === 1 ? 'text-red-700' : 'text-gray-700'}`}>{streakData?.restorationShields?.available}</span>
-                <span className={`text-xs ${availableShields >= 3 ? 'text-green-600' : availableShields === 2 ? 'text-yellow-600' : availableShields === 1 ? 'text-red-600' : 'text-gray-600'}`}>shields</span>
-                <button 
-                  onClick={() => setShowShieldRestore(true)}
-                  className={`ml-1 ${availableShields >= 3 ? 'text-green-600 hover:text-green-700' : availableShields === 2 ? 'text-yellow-600 hover:text-yellow-700' : availableShields === 1 ? 'text-red-600 hover:text-red-700' : 'text-gray-600 hover:text-gray-700'}`}
-                  title="Use shield to restore streak"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </button>
+              <div className="flex items-center gap-2 px-5 py-2.5 sm:px-2 sm:py-1 rounded-lg flex-shrink-0 mb-3 sm:mb-0 border border-red-100" style={{ background: 'rgba(196, 64, 51, 0.05)' }}>
+                <Shield className={`w-3 h-3 sm:w-4 sm:h-4 ${getShieldColor(availableShields)}`} />
+                <span className={`text-xs sm:text-sm font-bold ${availableShields >= 3 ? 'text-green-700' : availableShields === 2 ? 'text-yellow-700' : availableShields === 1 ? 'text-red-700' : 'text-gray-700'}`}>{streakData?.restorationShields?.available}</span>
+                <span className={`text-xs ${availableShields >= 3 ? 'text-green-600' : availableShields === 2 ? 'text-yellow-600' : availableShields === 1 ? 'text-red-600' : 'text-gray-600'} hidden sm:inline py-2 `}>shields</span>
+                {streakData?.streak === 0 && availableShields > 0 && (
+                  <button 
+                    onClick={() => setShowShieldRestore(true)}
+                    className={`ml-1 ${availableShields >= 3 ? 'text-green-600 hover:text-green-700' : availableShields === 2 ? 'text-yellow-600 hover:text-yellow-700' : availableShields === 1 ? 'text-red-600 hover:text-red-700' : 'text-gray-600 hover:text-gray-700'}`}
+                    title="Use shield to restore streak"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </button>
+                )}
               </div>
-            
-            {streakData?.longestStreak > 0 && (
-              <div className="flex items-center gap-1 bg-purple-50 px-3 py-1.5 rounded-full">
-                <span className="font-bold text-purple-700">{streakData?.longestStreak}</span>
-                <span className="text-xs text-purple-600">best</span>
-              </div>
-            )}
+              
             </div>
           </div>
 
-          <div className="h-4"></div>
-
-          {/* Quick Log - Only show if AM routine is missing for today */}
           {!hasAMRoutineToday && (
             <div 
               onClick={() => setShowQuickLogDrawer(true)}
-              className="mx-5 mb-3 px-4 py-2.5 bg-gray-50 rounded-xl flex justify-between items-center cursor-pointer border border-gray-200"
+              className="mx-4 mb-3 sm:mx-5 sm:mb-3 px-3 py-2 sm:px-4 sm:py-2.5 bg-gray-50 rounded-xl flex justify-between items-center cursor-pointer border border-gray-200"
             >
-              <span className="text-sm text-gray-500">Tough day? <span className="font-semibold text-gray-700">Quick log</span></span>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M5 3l4 4-4 4" stroke="#a39e95" strokeWidth="1.5" strokeLinecap="round"></path>
+              <span className="text-xs sm:text-sm text-gray-500">Tough day? <span className="font-semibold text-gray-700">Quick log</span></span>
+              <svg width="12" height="12" className="sm:w-14 sm:h-14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 13C10.3137 13 13 10.3137 13 7C13 3.68629 10.3137 1 7 1C3.68629 1 1 3.68629 1 7C1 10.3137 3.68629 13 7 13Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
           )}
@@ -543,25 +540,25 @@ export default function PMPage() {
 
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
-          <div className="px-5 flex flex-col gap-3.5">
+          <div className="px-4 sm:px-5 flex flex-col gap-3 sm:gap-3.5">
             {/* AM Routine Status - Only show if not already logged today */}
             {!hasAMRoutineToday && (
-              <div style={{ padding: '12px 16px', background: 'rgba(212, 160, 23, 0.08)', borderRadius: '14px', border: '1px solid rgba(212, 160, 23, 0.15)' }}>
-                <label className="flex items-center gap-2.5 cursor-pointer">
+              <div style={{ padding: '10px 12px', background: 'rgba(212, 160, 23, 0.08)', borderRadius: '12px', border: '1px solid rgba(212, 160, 23, 0.15)' }}>
+                <label className="flex items-center gap-2 cursor-pointer">
                   <div 
                     onClick={() => {
                       setAmRoutine(!amRoutine);
                       setSunscreen(!amRoutine); // Toggle both AM routine and sunscreen together
                     }}
-                    style={{ width: '22px', height: '22px', borderRadius: '6px', border: '1.5px solid rgb(204, 200, 192)', background: 'rgb(255, 255, 255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
+                    style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204, 200, 192)', background: 'rgb(255, 255, 255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
                   >
                     {amRoutine && (
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                         <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
                       </svg>
                     )}
                   </div>
-                  <span style={{ fontSize: '13px', color: 'rgb(61, 57, 53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Completed AM routine this morning?</span>
+                  <span style={{ fontSize: '12px', color: 'rgb(61, 57, 53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Completed AM routine this morning?</span>
                 </label>
               </div>
             )}
@@ -569,11 +566,11 @@ export default function PMPage() {
             {/* PM Routine Toggle */}
             <button 
               onClick={() => setPmRoutine(!pmRoutine)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '18px 20px', background: 'rgb(255, 255, 255)', border: '1.5px solid rgb(224, 221, 215)', borderRadius: '16px', cursor: 'pointer', transition: '0.25s' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '14px 16px', background: 'rgb(255, 255, 255)', border: '1.5px solid rgb(224, 221, 215)', borderRadius: '14px', cursor: 'pointer', transition: '0.25s' }}
             >
-              <span style={{ fontSize: '15px', fontWeight: '500', color: 'rgb(25, 23, 22)', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.2px' }}>PM Routine Completed</span>
-              <div style={{ width: '50px', height: '30px', borderRadius: '15px', padding: '3px', background: pmRoutine ? '#10b981' : 'rgb(204, 200, 192)', transition: 'background 0.25s', display: 'flex', alignItems: 'center' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '12px', background: 'rgb(255, 255, 255)', boxShadow: 'rgba(0, 0, 0, 0.18) 0px 1px 4px', transform: pmRoutine ? 'translateX(20px)' : 'translateX(0px)', transition: 'transform 0.25s' }}></div>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: 'rgb(25, 23, 22)', fontFamily: 'crimson, sans-serif', letterSpacing: '-0.2px' }}>PM Routine Completed</span>
+              <div style={{ width: '44px', height: '26px', borderRadius: '13px', padding: '2px', background: pmRoutine ? '#10b981' : 'rgb(204, 200, 192)', transition: 'background 0.25s', display: 'flex', alignItems: 'center' }}>
+                <div style={{ width: '22px', height: '22px', borderRadius: '11px', background: 'rgb(255, 255, 255)', boxShadow: 'rgba(0, 0, 0, 0.18) 0px 1px 4px', transform: pmRoutine ? 'translateX(18px)' : 'translateX(0px)', transition: 'transform 0.25s' }}></div>
               </div>
             </button>
 
@@ -581,12 +578,12 @@ export default function PMPage() {
             {!isQuickLogMode && (
               <div>
                 <p className="text-sm font-semibold text-gray-900 mb-2">Followed diet plan?</p>
-              <div className="flex gap-2">
-                {['Yes ✓', 'Mostly', 'Not today'].map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => setDietFollowed(option)}
-                    className={`flex-1 px-1.5 py-3.5 rounded-xl border cursor-pointer text-sm transition-all ${
+                <div className="flex gap-1.5 sm:gap-2 mb-3">
+                  {['Yes ✓', 'Mostly', 'Not today'].map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => setDietFollowed(option)}
+                      className={`flex-1 px-2 py-2.5 sm:px-3 sm:py-3.5 rounded-xl border cursor-pointer text-xs sm:text-sm transition-all ${
                       dietFollowed === option 
                         ? 'bg-green-50 border-green-300 text-green-700 font-medium' 
                         : 'bg-white border-gray-300 text-gray-500'
@@ -603,7 +600,7 @@ export default function PMPage() {
             {!isQuickLogMode && (
               <div>
                 <p className="text-sm font-semibold text-gray-900 mb-2">Water intake</p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-3">
                 {[
                   { value: 1, label: '< 1L', height: '25%' },
                   { value: 2, label: '1-2L', height: '50%' },
@@ -638,7 +635,7 @@ export default function PMPage() {
             {/* Skin Feeling */}
             <div>
               <p className="text-sm font-semibold text-gray-900 mb-2">Skin feeling</p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-3">
                 {[
                   { emoji: '😊', label: 'Good', value: 'good' },
                   { emoji: '😐', label: 'Okay', value: 'okay' },
@@ -683,7 +680,6 @@ export default function PMPage() {
             )}
           </div>
         </div>
-      </div>
 
       {/* Celebration */}
       {showCelebration && (
@@ -922,6 +918,7 @@ export default function PMPage() {
           />
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

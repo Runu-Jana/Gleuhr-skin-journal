@@ -40,7 +40,10 @@ export default function HomeScreen() {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
+    // Get first day of month and adjust for Monday-first calendar (0 = Monday, 6 = Sunday)
+    let firstDay = new Date(year, month, 1).getDay();
+    // Convert from Sunday-first (0=Sunday) to Monday-first (0=Monday)
+    firstDay = firstDay === 0 ? 6 : firstDay - 1;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
     const calendar = [];
@@ -158,6 +161,9 @@ export default function HomeScreen() {
           // Fetch weekly photos count
           const photos = await getWeeklyPhotos(patientId);
           setPhotosCount(photos.length);
+          
+          // Refresh streak data from server
+          await refreshStreak();
         } catch (error) {
           console.error('Error fetching data:', error);
         }
@@ -177,8 +183,16 @@ export default function HomeScreen() {
     
     window.addEventListener('skinScoreUpdated', handleSkinScoreUpdate);
     
+    // Refresh streak when page gets focus (user returns from other pages)
+    const handlePageFocus = () => {
+      refreshStreak();
+    };
+    
+    window.addEventListener('focus', handlePageFocus);
+    
     return () => {
       window.removeEventListener('skinScoreUpdated', handleSkinScoreUpdate);
+      window.removeEventListener('focus', handlePageFocus);
     };
   }, [patient]);
 
@@ -253,18 +267,18 @@ export default function HomeScreen() {
           <p className="text-xs text-[#a39e95] font-outfit font-medium uppercase tracking-[0.5px]">
             Good {isMorning ? 'morning' : 'evening'}
           </p>
-          <h2 className="text-2xl font-bold text-[#191716] font-playfair leading-tight tracking-[-0.5px]">
+          <h2 className="text-2xl font-bold text-[#191716] font-crimson leading-tight tracking-[-0.5px]">
             {patient?.firstName || 'Priya'}
           </h2>
         </div>
         <div className="flex items-center gap-2.5">
           <div className="px-3 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.03)] border border-[rgba(196,64,51,0.08)] cursor-pointer flex items-center gap-1.5">
             <span className="text-xs font-semibold text-[#7a756d] font-outfit">Score</span>
-            <span className="text-base font-bold text-[#c44033] font-playfair">{currentSkinScore}</span>
+            <span className="text-base font-bold text-[#c44033] font-crimson">{currentSkinScore}</span>
             <span className="text-xs text-[#a39e95] font-outfit">/20</span>
           </div>
           <div className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center">
-            <span className="text-base font-semibold text-[#c44033] font-outfit">P</span>
+            <span className="text-base font-semibold text-[#c44033] font-crimson">P</span>
           </div>
         </div>
       </div>
@@ -276,8 +290,11 @@ export default function HomeScreen() {
             <Flame className="w-5.5 h-5.5 text-[#dc2626]" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-[#191716] font-outfit tracking-[-0.2px]">
-              Your best streak <span className="text-[#c44033] font-playfair text-xl font-bold ml-1">{streakData?.longestStreak || 0}</span> <span className="text-xs text-[#7a756d] font-normal">days</span>
+            <div className="text-sm font-semibold text-[#191716] font-crimson tracking-[-0.2px]">
+              Current streak <span className="text-[#c44033] font-crimson text-xl font-bold ml-1">{streakData?.streak || 0}</span> <span className="text-xs text-[#7a756d] font-crimson">days</span>
+            </div>
+            <div className="text-xs text-[#a39e95] font-crimson mt-0.5 mb-0.5">
+              Best: <span className="font-semibold text-[#191716]">{streakData?.longestStreak || 0}</span> days
             </div>
             <div className="text-xs text-[#a39e95] font-outfit mt-0.5 flex items-center gap-1.5">
               <span>Red Hot flame</span>
@@ -295,16 +312,16 @@ export default function HomeScreen() {
       {/* Main CTA Button */}
       <div 
         onClick={handleRoutineClick}
-        className="mx-5 my-3 p-4.5 rounded-[18px] bg-[#c44033] cursor-pointer relative overflow-hidden shadow-[rgba(196,64,51,0.208)_0px_8px_24px]"
+        className="mx-5 my-3 p-5 rounded-[18px] bg-[#c44033] cursor-pointer relative overflow-hidden shadow-[rgba(196,64,51,0.208)_0px_8px_24px]"
       >
-        <div className="absolute -top-7.5 -right-7.5 w-20 h-20 rounded-[40px] bg-[rgba(255,255,255,0.08)]"></div>
+        <div className="absolute -top-0.15 -right-5 w-20 h-20 rounded-[40px] bg-[rgba(255,255,255,0.08)]"></div>
         <div className="flex items-center justify-between relative">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-[14px] bg-[rgba(255,255,255,0.15)] flex items-center justify-center">
               <span className="text-xl">{isMorning ? '☀️' : '🌙'}</span>
             </div>
             <div>
-              <p className="text-base font-semibold text-white font-outfit">
+              <p className="text-base font-semibold text-white font-crimson">
                 Log {isMorning ? 'AM' : 'PM'} routine
               </p>
               <p className="text-xs text-[rgba(255,255,255,0.65)] font-outfit mt-0.5">
@@ -321,7 +338,7 @@ export default function HomeScreen() {
       </div>
 
       {/* Progress Section */}
-      <div className="px-5 py-5 flex gap-4.5 items-center">
+      <div className="px-5 py-5 flex gap-5 items-center">
         <div className="relative w-19 h-19 flex-shrink-0">
           <svg width="76" height="76" viewBox="0 0 76 76">
             <circle cx="38" cy="38" r="32" fill="none" stroke="#f4f2ef" strokeWidth="5" />
@@ -344,7 +361,7 @@ export default function HomeScreen() {
         </div>
         <div className="flex-1">
           <p className="text-xs text-[#c44033] font-semibold font-outfit mb-1 uppercase tracking-[0.8px]">Day {day}</p>
-          <p className="text-sm text-[#3d3935] font-outfit leading-[1.55]">
+          <p className="text-sm text-[#3d3935] font-crimson leading-[1.55]">
             {day === 28 ? (
               <>One full skin cycle complete. Your Glutathione is at peak efficacy now — most women see visible tone changes right around this point.</>
             ) : (
@@ -546,6 +563,27 @@ export default function HomeScreen() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0" />
         </svg>
       </button>
+
+      {/* Gamification Panel */}
+      {showGamification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <GamificationPanel onClose={() => setShowGamification(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Achievement Popup */}
+      {newAchievement && (
+        <AchievementPopup 
+          achievement={newAchievement}
+          onClose={() => setNewAchievement(null)}
+          onShare={(achievement) => {
+            // Share achievement logic (can be implemented later)
+            console.log('Sharing achievement:', achievement);
+          }}
+        />
+      )}
     </div>
   );
 }

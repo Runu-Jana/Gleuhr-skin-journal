@@ -29,12 +29,14 @@ import InstallPrompt from './components/InstallPrompt';
 import GleuhrInsider from './components/GleuhrInsider';
 import AccessibilityMenu from './components/AccessibilityMenu';
 import AchievementPopup from './components/AchievementPopup';
+import AdminDashboard from './components/AdminDashboard';
 
 // Utils
 import { initDB } from './utils/db';
 import AMPage from './components/amPage';
 import PMPage from './components/pmPage';
 import { getTimeOfDay } from './utils/timeUtils';
+import SkinScoreAssessment from './components/SkinScoreAssessment';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -137,7 +139,7 @@ function AppRoutes() {
           />
           <Route 
             path="/skin-score-results" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <SkinScoreResults />} 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <SkinScoreResults/>} 
           />
           <Route 
             path="/weekly-photo" 
@@ -166,6 +168,10 @@ function AppRoutes() {
           <Route 
             path="/checkin-success" 
             element={!isAuthenticated ? <Navigate to="/login" replace /> : <CheckInSuccessPage />} 
+          />
+          <Route 
+            path="/admin" 
+            element={<AdminDashboard />} 
           />
           <Route 
             path="/" 

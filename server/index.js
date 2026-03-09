@@ -28,6 +28,9 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from React build
 app.use(express.static(path.join(__dirname, '../client/build')));
 
+// Serve PWA icons and manifest from public folder
+app.use(express.static(path.join(__dirname, '../client/public')));
+
 // Routes (All MongoDB-based)
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/self-register', require('./routes/self-register'));
@@ -37,6 +40,9 @@ app.use('/api/streak', require('./routes/streak'));
 app.use('/api/skinscore', require('./routes/skinscore'));
 app.use('/api/checkin', require('./routes/checkin'));
 app.use('/api/reorder', require('./routes/reorder'));
+
+// Admin routes
+app.use('/api/admin', require('./admin'));
 
 // Health check
 app.use('/api/health', require('./routes/health'));

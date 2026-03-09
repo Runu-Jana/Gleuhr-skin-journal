@@ -180,17 +180,28 @@ async function updateStreak(phoneNumber, currentDay, patientId = null) {
       const yesterdayStr = yesterday.toISOString().split('T')[0];
       
       let newStreak = currentStreak;
+      let newLongestStreak = streak.longestStreak || 0;
+      
       if (lastCheckin === yesterdayStr) {
+        // Consecutive day - increment streak
         newStreak = currentStreak + 1;
       } else if (lastCheckin !== today) {
+        // Gap in days or first check-in - reset to 1
         newStreak = 1;
       }
+      // If lastCheckin === today, streak stays the same (already logged today)
+      
+      // Update longest streak if current streak exceeds it
+      if (newStreak > newLongestStreak) {
+        newLongestStreak = newStreak;
+      }
 
-      // Update or create streak record
+      // Update streak record
       try {
         if (streak) {
           await Streak.findByIdAndUpdate(streak._id, {
             currentStreak: newStreak,
+            longestStreak: newLongestStreak,
             lastCheckinDate: today,
             day: currentDay
           });
@@ -200,6 +211,7 @@ async function updateStreak(phoneNumber, currentDay, patientId = null) {
             patientId: patientId,
             patientPhone: phoneNumber,
             currentStreak: 1,
+            longestStreak: 1,
             lastCheckinDate: today,
             day: currentDay
           });
@@ -215,6 +227,7 @@ async function updateStreak(phoneNumber, currentDay, patientId = null) {
         patientId: patientId,
         patientPhone: phoneNumber,
         currentStreak: 1,
+        longestStreak: 1,
         lastCheckinDate: today,
         day: currentDay
       });

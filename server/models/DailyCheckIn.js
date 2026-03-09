@@ -33,7 +33,7 @@ const dailyCheckInSchema = new mongoose.Schema({
   },
   dietFollowed: {
     type: String,
-    enum: ['Yes', 'No', 'Partial'],
+    enum: ['Yes', 'No', 'Partial', 'skipped'],
     default: 'No'
   },
   triggerFoods: [{

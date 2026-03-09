@@ -61,8 +61,34 @@ export default function JourneyScreen() {
   useEffect(() => {
     const loadScores = async () => {
       try {
-        const scores = await getSkinScores(patient?.email);
-        setSkinScores(scores || []);
+        // First try to get from IndexedDB (offline data)
+        const localScores = await getSkinScores(patient?.id);
+        
+        // Also try to get latest scores from server using phone number
+        try {
+          const response = await fetch(`/api/skinscore/${patient?.phone}`, {
+            headers: {
+              'Authorization': `Bearer ${patient?.token}`
+            }
+          });
+          
+          if (response.ok) {
+            const serverScores = await response.json();
+            // Merge server scores with local scores, preferring server data
+            const mergedScores = serverScores.map(serverScore => ({
+              ...serverScore,
+              id: serverScore._id || serverScore.id
+            }));
+            setSkinScores(mergedScores);
+          } else {
+            // Fallback to local scores if server fails
+            setSkinScores(localScores || []);
+          }
+        } catch (serverError) {
+          // Fallback to local scores if server fails
+          console.log('Server fetch failed, using local scores:', serverError);
+          setSkinScores(localScores || []);
+        }
       } catch (error) {
         console.error('Error loading skin scores:', error);
         setSkinScores([]);
@@ -71,7 +97,7 @@ export default function JourneyScreen() {
       }
     };
     
-    if (patient?.email) {
+    if (patient?.phone) {
       loadScores();
     } else {
       setLoading(false);
@@ -236,8 +262,8 @@ export default function JourneyScreen() {
             <div className="text-center">
               <div className="text-2xl font-bold text-[#c44033]">
                 {skinScores.length > 0 
-                  ? Math.round(skinScores.reduce((a, b) => a + (b.totalScore || 0), 0) / skinScores.length)
-                  : '-'
+                  ? (skinScores.reduce((sum, score) => sum + (score.totalScore || 0), 0) / skinScores.length).toFixed(1)
+                  : '0'
                 }
               </div>
               <div className="text-xs text-gray-500">Avg Score</div>

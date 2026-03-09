@@ -20,13 +20,19 @@ export default function AMPage() {
   const { awardPoints, checkAchievements } = useGamification();
   const { showStreakWarning } = useNotifications();
   const navigate = useNavigate();
-  
+
   const day = calculateDay(patient?.startDate);
   const progress = (day / 90) * 100;
   const shields = calculateShields(streakData?.streak || 0);
   const availableShields = streakData?.restorationShields?.available || shields || 0;
-  
-  // Determine shield color based on remaining count
+
+  // Debug logging
+  console.log('🗓️ Date Debug Info:');
+  console.log('Start Date:', patient?.startDate);
+  console.log('Today:', new Date().toISOString());
+  console.log('Calculated Day:', day);
+  console.log('Day of Week:', new Date().toLocaleDateString('en-US', { weekday: 'long' }));
+
   const getShieldColor = (count) => {
     if (count >= 3) return 'text-green-600 fill-green-600';
     if (count === 2) return 'text-yellow-600 fill-yellow-600';
@@ -46,10 +52,9 @@ export default function AMPage() {
   const [shieldRestoreData, setShieldRestoreData] = useState(null);
   const [showCheckinSuccess, setShowCheckinSuccess] = useState(false);
 
-  // Restore streak using shield
   const restoreStreakWithShield = async () => {
     if (!patient?.phone) return;
-    
+
     try {
       const response = await fetch('/api/streak/restore', {
         method: 'POST',
@@ -60,15 +65,14 @@ export default function AMPage() {
           phoneNumber: patient.phone
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         console.log('Streak restored with shield:', result);
         await refreshStreak();
         setShowShieldRestore(false);
-        
-        // Show success animation instead of alert
+
         setShieldRestoreData({
           streakRestored: true,
           shieldsRemaining: result.shieldsRemaining,
@@ -86,7 +90,6 @@ export default function AMPage() {
   };
 
   useEffect(() => {
-    // Check for milestone prompts
     if (isMilestoneDay(day)) {
       navigate('/skin-score');
     } else if (isWeeklyPhotoDay(patient?.startDate)) {
@@ -95,54 +98,65 @@ export default function AMPage() {
   }, [day, patient, navigate]);
 
   useEffect(() => {
-    // Load today's AM check-in if exists
     const loadToday = async () => {
-      const today = await getTodayCheckIn(patient?.phoneNumber);
-      if (today && today.amRoutine) {
-        setAmRoutine(today.amRoutine);
-        setSunscreen(today.sunscreen);
-        setHasSubmitted(true);
+      try {
+        const today = await getTodayCheckIn(patient?.phoneNumber || patient?.phone);
+
+        if (today && today.date === new Date().toISOString().split('T')[0]) {
+          if (today.amRoutine !== undefined) {
+            setAmRoutine(today.amRoutine);
+          }
+          if (today.sunscreen !== undefined) {
+            setSunscreen(today.sunscreen);
+          }
+
+          if (today.amRoutine === true && today.sunscreen === true) {
+            setHasSubmitted(true);
+          }
+        } else {
+          setAmRoutine(false);
+          setSunscreen(false);
+          setHasSubmitted(false);
+        }
+      } catch (error) {
+        console.error('Error loading today check-in:', error);
+        setAmRoutine(false);
+        setSunscreen(false);
+        setHasSubmitted(false);
       }
     };
-    loadToday();
+
+    if (patient) {
+      loadToday();
+    }
   }, [patient]);
 
   const handleAMRoutineToggle = async () => {
     const newAmRoutine = !amRoutine;
     setAmRoutine(newAmRoutine);
-    
-    // Don't auto-save when toggling AM routine anymore
-    // Just update the state, submission will happen via the submit button
   };
 
   const handleSunscreenToggle = async () => {
     const newSunscreen = !sunscreen;
     setSunscreen(newSunscreen);
-    
-    // Don't auto-save when toggling sunscreen anymore
-    // Just update the state, submission will happen via the submit button
   };
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    
+
     try {
-      // Try both phone field names
       const phoneNumber = patient?.phoneNumber || patient?.phone;
-      
+
       if (!phoneNumber) {
         alert('No phone number found. Please check your patient data.');
         return;
       }
-      
-      // Get patient record to get patientId
       const patientRecord = await getPatient(phoneNumber);
-      
+
       let patientId;
       let existingCheckIn;
-      
+
       if (!patientRecord) {
-        // Save patient from AuthContext to local database
         try {
           await savePatient({
             id: patient.id,
@@ -163,16 +177,15 @@ export default function AMPage() {
             dieticianName: patient.dieticianName || null,
             createdAt: new Date().toISOString()
           });
-          
-          // Try to get the patient record again
+
           const retryPatientRecord = await getPatient(phoneNumber);
           if (!retryPatientRecord) {
             alert('Patient record not found. Please contact support.');
             return;
           }
-          
+
           patientId = retryPatientRecord.id;
-          
+
         } catch (saveError) {
           alert('Patient record not found. Please contact support.');
           return;
@@ -180,10 +193,9 @@ export default function AMPage() {
       } else {
         patientId = patientRecord.id;
       }
-      
-      // Get today's existing check-in data (common for both paths)
+
       existingCheckIn = await getTodayCheckIn(patientId);
-      
+
       const todayDate = new Date().toISOString().split('T')[0];
       const checkInData = {
         id: existingCheckIn?.id || generateId(),
@@ -193,7 +205,6 @@ export default function AMPage() {
         day,
         amRoutine: amRoutine,
         sunscreen: sunscreen,
-        // Preserve existing PM data if any
         pmRoutine: existingCheckIn?.pmRoutine || false,
         dietFollowed: existingCheckIn?.dietFollowed || '',
         triggerFoods: existingCheckIn?.triggerFoods || [],
@@ -201,16 +212,11 @@ export default function AMPage() {
         skinMood: existingCheckIn?.skinMood || '',
         synced: false
       };
-      
-      console.log('📅 Today check-in data:', checkInData);
-      console.log('📅 Today date:', todayDate);
 
       console.log('Submitting AM check-in data:', checkInData);
 
-      // Save to IndexedDB
       await saveCheckIn(checkInData);
 
-      // Try to save to MongoDB directly
       try {
         const response = await fetch('/api/checkin', {
           method: 'POST',
@@ -219,17 +225,15 @@ export default function AMPage() {
           },
           body: JSON.stringify(checkInData)
         });
-        
-        // Check if response is ok before parsing JSON
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const result = await response.json();
         console.log('MongoDB AM check-in save response:', result);
-        
+
         if (result.success) {
-          // Update local record as synced
           checkInData.synced = true;
           checkInData.id = result.id;
           await saveCheckIn(checkInData);
@@ -237,36 +241,31 @@ export default function AMPage() {
         }
       } catch (apiError) {
         console.error('Failed to save AM check-in to MongoDB, queuing for sync:', apiError);
-        
-        // Queue for sync if API fails
+
         if (isOnline) {
           queueForSync('checkin', checkInData);
         }
       }
 
-      // Award points for AM routine (only if at least one item is completed)
       if (amRoutine || sunscreen) {
         awardPoints('am_routine');
       }
-      
-      // Refresh streak
+
       try {
         await refreshStreak();
       } catch (streakError) {
         console.error('Error refreshing streak in AM page:', streakError);
-        // Don't fail the entire submission if streak refresh fails
       }
 
       setHasSubmitted(true);
-      
-      // Navigate to success page
-      navigate('/checkin-success', { 
-        state: { 
-          streak: day, 
-          message: "Your consistency puts you in the top 15% of all Gleuhr users this month." 
-        } 
+
+      navigate('/checkin-success', {
+        state: {
+          streak: day,
+          message: "Your consistency puts you in the top 15% of all Gleuhr users this month."
+        }
       });
-      
+
     } catch (error) {
       console.error('Error submitting AM check-in:', error);
       alert('Failed to save AM check-in. Please try again.');
@@ -304,7 +303,7 @@ export default function AMPage() {
                 <Shield className={`w-4 h-4 ${getShieldColor(availableShields)}`} />
                 <span className={`font-bold ${availableShields >= 3 ? 'text-green-700' : availableShields === 2 ? 'text-yellow-700' : availableShields === 1 ? 'text-red-700' : 'text-gray-700'}`}>{streakData?.restorationShields?.available}</span>
                 <span className={`text-xs ${availableShields >= 3 ? 'text-green-600' : availableShields === 2 ? 'text-yellow-600' : availableShields === 1 ? 'text-red-600' : 'text-gray-600'}`}>shields</span>
-                <button 
+                <button
                   onClick={() => setShowShieldRestore(true)}
                   className={`ml-1 ${availableShields >= 3 ? 'text-green-600 hover:text-green-700' : availableShields === 2 ? 'text-yellow-600 hover:text-yellow-700' : availableShields === 1 ? 'text-red-600 hover:text-red-700' : 'text-gray-600 hover:text-gray-700'}`}
                   title="Use shield to restore streak"
@@ -317,14 +316,13 @@ export default function AMPage() {
             )}
             <div className="flex items-center gap-1">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Shield 
-                  key={i} 
+                <Shield
+                  key={i}
                   className={`w-5 h-5 ${i < availableShields ? getShieldColor(availableShields) : 'text-gray-300'}`}
                 />
               ))}
             </div>
           </div>
-          <div className="text-sm text-gray-500">Day {day}/90</div>
         </div>
       </div>
 
@@ -370,30 +368,28 @@ export default function AMPage() {
         </div>
       </div>
 
-      {/* AM Check-in Form */}
-      <div className="px-4 py-6">
-        <div className="max-w-md mx-auto">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-            <Sun className="w-6 h-6 inline mr-2" />
-            AM Routine
-          </h2>
+      <div className="max-w-md mx-auto">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+          <Sun className="w-6 h-6 inline mr-2" />
+          AM Routine
+        </h2>
 
           {/* AM Routine Card */}
           <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Morning Routine</h3>
-            
+
             <div className="space-y-4">
               <div className="flex items-center justify-between py-4 border-b border-gray-100">
                 <span className="text-gray-700 font-medium">AM Routine</span>
                 <div className="flex items-center gap-3">
-                  <button 
-                    onClick={handleAMRoutineToggle}
-                    className={`w-16 h-8 rounded-full transition-colors cursor-pointer ${
+                  <button
+                    onClick={handleAMRoutineToggle} 
+                    className={`w-14 h-7 rounded-full transition-colors duration-200 cursor-pointer flex items-center px-1 ${
                       amRoutine ? 'bg-green-500' : 'bg-gray-300'
                     }`}
                   >
-                    <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${
-                      amRoutine ? 'translate-x-8' : 'translate-x-2'
+                    <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${
+                      amRoutine ? 'translate-x-7' : 'translate-x-0'
                     }`} />
                   </button>
                   <span className={`text-sm font-medium ${
@@ -407,19 +403,17 @@ export default function AMPage() {
               <div className="flex items-center justify-between py-4 border-b border-gray-100">
                 <span className="text-gray-700 font-medium">Sunscreen</span>
                 <div className="flex items-center gap-3">
-                  <button 
+                  <button
                     onClick={handleSunscreenToggle}
-                    className={`w-16 h-8 rounded-full transition-colors cursor-pointer ${
+                    className={`w-14 h-7 rounded-full transition-colors duration-200 cursor-pointer flex items-center px-1 ${
                       sunscreen ? 'bg-orange-500' : 'bg-gray-300'
                     }`}
                   >
-                    <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${
-                      sunscreen ? 'translate-x-8' : 'translate-x-2'
+                    <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${
+                      sunscreen ? 'translate-x-7' : 'translate-x-0'
                     }`} />
                   </button>
-                  <span className={`text-sm font-medium ${
-                    sunscreen ? 'text-orange-600' : 'text-gray-500'
-                  }`}>
+                  <span className={`text-sm font-medium ${sunscreen ? 'text-orange-600' : 'text-gray-500'}`}>
                     {sunscreen ? 'Applied' : 'Not Applied'}
                   </span>
                 </div>
@@ -428,12 +422,12 @@ export default function AMPage() {
           </div>
 
           {/* Submit Button */}
-          <button 
-            onClick={handleSubmit} 
-            disabled={isSubmitting || hasSubmitted || !sunscreen} 
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || hasSubmitted || !sunscreen}
             className={`w-full py-4 rounded-xl font-semibold text-white transition-all ${
               hasSubmitted || !sunscreen
-                ? 'bg-gray-400 cursor-not-allowed' 
+                ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-blue-500 hover:bg-blue-600 active:scale-105'
             }`}
           >
@@ -464,20 +458,8 @@ export default function AMPage() {
             )}
           </button>
 
-          {/* Return to Home Button */}
-          <button 
-            onClick={() => navigate('/')} 
-            className="w-full py-3 rounded-xl font-semibold text-[#c44033] bg-white border-2 border-[#c44033] hover:bg-[#c44033] hover:text-white transition-all active:scale-105 mt-4"
-          >
-            <span className="flex items-center justify-center">
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              Return to Home
-            </span>
-          </button>
-        </div>
       </div>
+      
 
       {/* Reorder Banner (Day 25+) */}
       {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
@@ -495,9 +477,9 @@ export default function AMPage() {
 
       {/* Check-in Success Message */}
       {showCheckinSuccess && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }} 
-          animate={{ opacity: 1, y: 0 }} 
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2"
         >
@@ -534,16 +516,17 @@ export default function AMPage() {
           </motion.div>
         </motion.div>
       )}
-      
+
       {/* Shield Success Animation */}
       <AnimatePresence>
-        {showShieldSuccess && shieldRestoreData && (
-          <ShieldSuccessAnimation
+         {showShieldSuccess && shieldRestoreData && (
+                    <ShieldSuccessAnimation
             streakRestored={shieldRestoreData.streakRestored}
             shieldsRemaining={shieldRestoreData.shieldsRemaining}
             previousStreak={shieldRestoreData.previousStreak}
             newStreak={shieldRestoreData.newStreak}
           />
+        
         )}
       </AnimatePresence>
     </div>

@@ -80,7 +80,7 @@ export default function SkinScoreAssessment() {
   };
 
   const calculateTotalScore = () => {
-    return Object.values(scores).reduce((sum, score) => sum + score, 0);
+    return Object.values(scores).reduce((sum, score) => sum + score, 1);
   };
 
   const allQuestionsAnswered = Object.values(scores).every(score => score > 0);
@@ -91,6 +91,12 @@ export default function SkinScoreAssessment() {
       return;
     }
 
+    // Validate patient data exists
+    if (!patient?.id) {
+      alert('Patient information not found. Please log in again.');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -98,18 +104,19 @@ export default function SkinScoreAssessment() {
       
       const scoreData = {
         id: generateId(),
-        patientEmail: patient?.email,
+        patientId: patient?.id,
         patientName: patient?.name,
+        patientPhone: patient?.phone,
         date: new Date().toISOString(),
         day: patient?.day || 1,
         assessmentType: 'skin-score',
         totalScore,
         maxScore: 20,
         individualScores: scores,
-        pigmentation: scores.pigmentation,
-        toneEvenness: scores.toneEvenness,
-        texture: scores.texture,
-        confidence: scores.confidence,
+        darkest_patch: scores.pigmentation ?? 0,
+        skin_tone: scores.toneEvenness ?? 0,
+        texture: scores.texture ?? 0,
+        confidence: scores.confidence ?? 0,
         synced: false
       };
 

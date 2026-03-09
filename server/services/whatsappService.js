@@ -16,6 +16,8 @@ class WhatsAppService {
       // Use provided country code (default to India if not specified)
       const formattedPhone = cleanPhone.startsWith(countryCode) ? cleanPhone : `${countryCode}${cleanPhone}`;
       
+      console.log(`Sending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode}): ${otp}`);
+      
       // Interakt API payload for WhatsApp template message
       const payload = {
         phoneNumber: cleanPhone, // Send phone number without country code
@@ -31,8 +33,6 @@ class WhatsAppService {
           ]
         }
       };
-
-      console.log(`Sending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode}): ${otp}`);
 
       const response = await axios.post(`${this.baseUrl}`, payload, {
         headers: {
@@ -57,7 +57,6 @@ class WhatsAppService {
       // Fallback to console log in case of WhatsApp failure
       console.log(`FALLBACK - OTP for ${phoneNumber}: ${otp}`);
       
-      // Return success to avoid breaking the flow, but log the error
       return {
         success: true,
         fallback: true,

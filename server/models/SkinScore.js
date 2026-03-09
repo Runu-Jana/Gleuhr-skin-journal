@@ -25,33 +25,33 @@ const skinScoreSchema = new mongoose.Schema({
   // Skin assessment metrics (1-5 scale for new 4-question format)
   darkest_patch: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 5,
     default: 3
   },
   skin_tone: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 5,
     default: 3
   },
   texture: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 5,
     default: 3
   },
   confidence: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 5,
     default: 3
   },
   
-  // Calculated total score (4-20 for new format)
+  // Calculated total score (0-20 for new format)
   totalScore: {
     type: Number,
-    min: 4,
+    min: 0,
     max: 20,
     default: 12
   },
@@ -88,11 +88,17 @@ const skinScoreSchema = new mongoose.Schema({
 
 // Calculate total score before saving
 skinScoreSchema.pre('save', function(next) {
+  // Ensure next is a function
+  if (typeof next !== 'function') {
+    console.error('Pre-save hook: next is not a function');
+    return;
+  }
+  
   const metrics = [
-    this.darkest_patch || 3,
-    this.skin_tone || 3,
-    this.texture || 3,
-    this.confidence || 3
+    this.darkest_patch || 0,
+    this.skin_tone || 0,
+    this.texture || 0,
+    this.confidence || 0
   ];
   
   this.totalScore = metrics.reduce((sum, val) => sum + val, 0);

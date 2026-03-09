@@ -25,15 +25,22 @@ router.post('/send-verification', async (req, res) => {
     // Send WhatsApp message
     const result = await whatsappService.sendOTP(phoneNumber, verificationCode, countryCode || '91');
 
+    console.log('WhatsApp service result:', result);
+
     if (result.success) {
       res.json({
         success: true,
         messageId: result.messageId,
-        // In development, return the code for testing
+        fallback: result.fallback || false,
+        // In development, always return the code for testing
         ...(process.env.NODE_ENV === 'development' && { code: verificationCode })
       });
     } else {
-      res.status(500).json({ error: 'Failed to send verification code' });
+      console.error('WhatsApp OTP sending failed:', result.error || 'Unknown error');
+      res.status(500).json({ 
+        error: 'Failed to send verification code', 
+        details: result.error || 'Unknown error'
+      });
     }
   } catch (error) {
     console.error('Send verification error:', error);
@@ -168,17 +175,19 @@ router.post('/verify-token', async (req, res) => {
       return res.status(400).json({ error: 'Auth token is required' });
     }
 
+    console.log(`🔑 Verifying token: ${authToken.substring(0, 10)}...`);
+
     // Find patient by auth token
-    const patient = await Patient.findOne({ authToken })
-      .populate('dietPlan')
-      .populate('products');
+    const patient = await Patient.findOne({ authToken });
 
     if (!patient) {
+      console.log('❌ Patient not found for token:', authToken);
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
     // Optional: Verify device fingerprint matches
     if (deviceFingerprint && patient.deviceFingerprint !== deviceFingerprint) {
+      console.log('❌ Device fingerprint mismatch');
       return res.status(401).json({ error: 'Device verification failed' });
     }
 
@@ -186,6 +195,8 @@ router.post('/verify-token', async (req, res) => {
     await Patient.findByIdAndUpdate(patient._id, {
       lastLogin: new Date()
     });
+
+    console.log('✅ Token verification successful for:', patient.name || patient.fullName);
 
     res.json({
       success: true,
@@ -204,12 +215,13 @@ router.post('/verify-token', async (req, res) => {
         level: patient.level,
         achievements: patient.achievements,
         products: patient.products || [],
-        dietPlan: patient.dietPlan
+        dietPlan: patient.dietPlan || null
       }
     });
   } catch (error) {
     console.error('Token verification error:', error);
-    res.status(500).json({ error: 'Authentication failed' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Authentication failed', details: error.message });
   }
 });
 

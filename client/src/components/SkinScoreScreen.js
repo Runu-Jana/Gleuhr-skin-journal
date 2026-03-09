@@ -4,36 +4,58 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { saveSkinScore } from '../utils/db';
-import { Camera, ChevronLeft, TrendingUp } from 'lucide-react';
+import { ChevronLeft, TrendingUp } from 'lucide-react';
 import { calculateDay, generateId } from '../utils/helpers';
-import { ChevronLeft, Camera, TrendingUp } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 const QUESTIONS = [
   { 
-    key: 'darkest_patch', 
+    key: 'pigmentation', 
     question: 'Look at the darkest patch on your face. Compared to when you started, it is...',
-    options: ['Much darker', 'Slightly darker', 'Same', 'Somewhat lighter', 'Much lighter']
+    options: [
+      { value: 1, label: 'Much darker', color: 'bg-red-600' },
+      { value: 2, label: 'Slightly darker', color: 'bg-orange-600' },
+      { value: 3, label: 'Same', color: 'bg-yellow-600' },
+      { value: 4, label: 'Somewhat lighter', color: 'bg-green-400' },
+      { value: 5, label: 'Much lighter', color: 'bg-green-600' }
+    ]
   },
   { 
-    key: 'skin_tone', 
+    key: 'toneEvenness', 
     question: 'How even does your overall skin tone look?',
-    options: ['Very uneven', 'Quite uneven', 'Somewhat', 'Mostly even', 'Very even']
+    options: [
+      { value: 1, label: 'Much less even', color: 'bg-red-600' },
+      { value: 2, label: 'Less even', color: 'bg-orange-600' },
+      { value: 3, label: 'Same', color: 'bg-yellow-600' },
+      { value: 4, label: 'More even', color: 'bg-green-400' },
+      { value: 5, label: 'Much more even', color: 'bg-green-600' }
+    ]
   },
   { 
     key: 'texture', 
     question: 'How does your skin texture feel?',
-    options: ['Very rough', 'Rough places', 'Average', 'Mostly smooth', 'Smooth healthy']
+    options: [
+      { value: 1, label: 'Very rough', color: 'bg-red-600' },
+      { value: 2, label: 'Rough', color: 'bg-orange-600' },
+      { value: 3, label: 'Normal', color: 'bg-yellow-600' },
+      { value: 4, label: 'Smooth', color: 'bg-green-400' },
+      { value: 5, label: 'Very smooth', color: 'bg-green-600' }
+    ]
   },
   { 
     key: 'confidence', 
     question: 'How confident do you feel about your skin right now?',
-    options: ['Very self-conscious', 'Somewhat', 'Neutral', 'Fairly confident', 'Very confident']
-  },
+    options: [
+      { value: 1, label: 'Not confident at all', color: 'bg-red-500' },
+      { value: 2, label: 'Not very confident', color: 'bg-orange-500' },
+      { value: 3, label: 'Somewhat confident', color: 'bg-yellow-500' },
+      { value: 4, label: 'Mostly confident', color: 'bg-blue-500' },
+      { value: 5, label: 'Very confident', color: 'bg-green-500' }
+    ]
+  }
 ];
 
 export default function SkinScoreScreen() {
-  const { patient, refreshSkinScores } = useAuth();
+  const { patient } = useAuth();
   const { isOnline, queueForSync } = useOffline();
   const navigate = useNavigate();
   const [answers, setAnswers] = useState({});
@@ -42,17 +64,14 @@ export default function SkinScoreScreen() {
   const day = calculateDay(patient?.startDate);
 
   const handleAnswer = (questionKey, value) => {
-    console.log('Answer selected:', value, 'for question:', questionKey);
-    
-    const newAnswers = { ...answers, [questionKey]: value };
-    setAnswers(newAnswers);
+    setAnswers({ ...answers, [questionKey]: value });
   };
 
   const calculateTotalScore = () => {
-    return Object.values(answers).reduce((sum, answer) => sum + answer, 0);
+    return Object.values(answers).reduce((sum, score) => sum + score, 0);
   };
 
-  const allQuestionsAnswered = Object.keys(answers).length === QUESTIONS.length;
+  const allQuestionsAnswered = Object.values(answers).every(score => score > 0);
 
   const handleSubmit = async () => {
     if (!allQuestionsAnswered) {
@@ -60,37 +79,68 @@ export default function SkinScoreScreen() {
       return;
     }
 
+    // Validate patient data exists
+    if (!patient?.id) {
+      alert('Patient information not found. Please log in again.');
+      return;
+    }
+
     setIsSubmitting(true);
-    const total = calculateTotal();
-    const scoreData = {
-      id: generateId(),
-      patientId: patient?.id,
-      patientEmail: patient?.email,
-      date: new Date().toISOString(),
-      day,
-      ...answers,
-      totalScore: total,
-      synced: false,
-    };
-    await saveSkinScore(scoreData);
-    if (isOnline) queueForSync('skinScore', scoreData);
-    setIsSubmitting(false);
-    navigate('/');
+    
+    try {
+      const totalScore = calculateTotalScore();
+      
+      const scoreData = {
+        id: generateId(),
+        patientId: patient?.id,
+        patientName: patient?.name,
+        patientPhone: patient?.phone,
+        date: new Date().toISOString(),
+        day: day || 1,
+        assessmentType: 'skin-score',
+        totalScore,
+        maxScore: 20,
+        individualScores: answers,
+        darkest_patch: answers.pigmentation ?? 0,
+        skin_tone: answers.toneEvenness ?? 0,
+        texture: answers.texture ?? 0,
+        confidence: answers.confidence ?? 0,
+        synced: false
+      };
+
+      await saveSkinScore(scoreData);
+      
+      if (isOnline) {
+        // Only send the fields the API expects
+        const apiData = {
+          patientId: patient?.id,
+          patientPhone: patient?.phone,
+          date: scoreData.date,
+          day: scoreData.day,
+          darkest_patch: scoreData.darkest_patch,
+          skin_tone: scoreData.skin_tone,
+          texture: scoreData.texture,
+          confidence: scoreData.confidence,
+          totalScore: scoreData.totalScore
+        };
+        queueForSync('skinScore', apiData);
+      }
+      
+      console.log('Skin score assessment completed:', scoreData);
+      
+      navigate('/skin-score-results');
+      
+    } catch (error) {
+      console.error('Error saving skin score:', error);
+      alert('Failed to save assessment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (showResults) {
-    return (
-      <ResultsScreen
-        answers={answers}
-        totalScore={calculateTotal()}
-        onRetake={() => setShowResults(false)}
-      />
-    );
-  }
-
   return (
-    <div className="h-screen bg-white flex flex-col">
-      <div className="flex-1 overflow-auto">
+    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f0f4ea]/5 to-[#faf8f5] px-6 py-8">
+      <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
           <p className="text-xs text-[#c44033] font-bold uppercase tracking-wider mb-0">
@@ -132,7 +182,7 @@ export default function SkinScoreScreen() {
               {/* Options */}
               <div className="flex gap-1.5">
                 {question.options.map((option, optionIndex) => {
-                  const value = optionIndex + 1;
+                  const value = option.value;
                   return (
                     <button
                       key={value}
@@ -152,115 +202,34 @@ export default function SkinScoreScreen() {
                         {value}
                       </span>
                       <span className="text-xs text-[#7a756d] font-['Outfit'] leading-tight text-center whitespace-pre-line font-normal">
-                        {option}
+                        {option.label}
                       </span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex-1 bg-[#c44033] text-white py-4 px-6 rounded-xl font-semibold hover:bg-[#a03328] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <TrendingUp className="w-5 h-5" />
-                    <span>Save Results</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
-
-// Results Screen Component
-const ResultsScreen = ({ answers, totalScore, onRetake }) => {
-  const navigate = useNavigate();
-
-  const getScoreLabel = (score) => {
-    if (score >= 16) return 'Excellent';
-    if (score >= 12) return 'Good';
-    if (score >= 8) return 'Fair';
-    return 'Needs Improvement';
-  };
-
-  const getScoreColor = (score) => {
-    if (score === null || score === undefined) return 'text-gray-400';
-    if (score >= 2) return 'text-green-600';
-    if (score >= 1) return 'text-blue-600';
-    return 'text-red-600';
-  };
-
-  const formatKey = (key) => {
-    return key
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, (str) => str.toUpperCase())
-      .trim();
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f0f4ea]/5 to-[#faf8f5] px-6 py-8">
-      <div className="max-w-2xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8"
-        >
-          <div className="text-center mb-8">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-[#c44033]/20 to-[#a03328]/80 flex flex-col items-center justify-center text-white shadow-xl"
-            >
-              <span className="text-4xl font-bold">{totalScore}</span>
-              <span className="text-sm mt-2">{getScoreLabel(totalScore)}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </motion.div>
           ))}
         </div>
       </div>
 
-          <div className="flex gap-4">
-            <button
-              onClick={onRetake}
-              className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
-            >
-              Retake Assessment
-            </button>
-            <button
-              onClick={() => navigate('/')}
-              className="flex-1 bg-[#c44033] text-white py-3 px-6 rounded-xl font-semibold hover:bg-[#a03328] transition-colors shadow-lg"
-            >
-              Continue to Home
-            </button>
-          </div>
-        </motion.div>
+      {/* Submit Button */}
+      <div className="px-6 py-7">
+        <button
+          onClick={handleSubmit}
+          disabled={!allQuestionsAnswered || isSubmitting}
+          className={`w-full py-[18px] rounded-2xl font-semibold transition-all duration-250 font-['Outfit'] text-base ${
+            allQuestionsAnswered && !isSubmitting
+              ? 'bg-[#c44033] text-white shadow-lg hover:bg-[#b33a2e]'
+              : 'bg-[#e0ddd7] text-[#a39e95] cursor-default'
+          }`}
+          style={{
+            boxShadow: allQuestionsAnswered && !isSubmitting ? '0 4px 12px rgba(196, 64, 51, 0.3)' : 'none'
+          }}
+        >
+          {isSubmitting ? 'Saving...' : 'See My Score →'}
+        </button>
       </div>
     </div>
   );
-
-  // Helper function to get color based on score value
-  function getScoreColor(value) {
-    switch (value) {
-      case 5: return 'bg-green-500';
-      case 4: return 'bg-green-400';
-      case 3: return 'bg-yellow-500';
-      case 2: return 'bg-orange-500';
-      case 1: return 'bg-red-500';
-      default: return 'bg-gray-300';
-    }
-  }
 }

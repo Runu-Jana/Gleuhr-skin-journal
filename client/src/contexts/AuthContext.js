@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { savePatient } from '../utils/db';
 
 const AuthContext = createContext();
 
@@ -34,6 +35,8 @@ export function AuthProvider({ children }) {
       if (response.data.success) {
         setPatient(response.data.patient);
         setIsAuthenticated(true);
+        // Save patient to IndexedDB for offline use
+        await savePatient(response.data.patient);
         loadPatientData(response.data.patient.phone);
       } else {
         // Token invalid, remove it
@@ -71,6 +74,9 @@ export function AuthProvider({ children }) {
         
         setPatient(patient);
         setIsAuthenticated(true);
+        
+        // Save patient to IndexedDB for offline use
+        await savePatient(patient);
         
         // Load additional data
         await loadPatientData(patient.phone);
