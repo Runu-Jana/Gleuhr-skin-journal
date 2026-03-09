@@ -4,6 +4,7 @@ const Patient = require('../models/Patient');
 const Streak = require('../models/Streak');
 const DailyCheckIn = require('../models/DailyCheckIn');
 const SkinScore = require('../models/SkinScore');
+const ReorderEvent = require('../models/ReorderEvent');
 const { fetchDietPlans } = require('../services/airtableService');
 
 // GET /api/admin/patients - List all patients from MongoDB
@@ -37,12 +38,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/admin/patients/:phone/details - Full patient detail with Airtable diet plan + streaks + check-ins + skin scores
+// GET /api/admin/patients/:phone/details - Full patient detail
 router.get('/:phone/details', async (req, res) => {
   try {
     const { phone } = req.params;
 
-    // Fetch all data in parallel: patient, streak, check-ins, skin scores, Airtable diet plan
     const [patient, streak, checkIns, skinScores, airtablePlans] = await Promise.all([
       Patient.findOne({
         $or: [{ phoneNumber: phone }, { phone: phone }]
@@ -54,11 +54,11 @@ router.get('/:phone/details', async (req, res) => {
 
       DailyCheckIn.find({
         $or: [{ patientPhone: phone }, { patientId: phone }]
-      }).sort({ date: -1 }).limit(30),
+      }).sort({ date: -1 }).limit(90),
 
       SkinScore.find({
         $or: [{ phoneNumber: phone }]
-      }).sort({ date: -1 }).limit(30),
+      }).sort({ date: -1 }).limit(90),
 
       fetchDietPlans({ customerPhone: phone }).catch(() => [])
     ]);
@@ -67,10 +67,86 @@ router.get('/:phone/details', async (req, res) => {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
+    // Fetch reorder events
+    let reorderEvents = [];
+    try {
+      reorderEvents = await ReorderEvent.find({
+        $or: [
+          { patientId: patient._id.toString() },
+          { patientEmail: patient.email || '__none__' }
+        ]
+      }).sort({ timestamp: -1 }).limit(10);
+    } catch (e) { /* ignore */ }
+
+    const currentStreak = streak?.currentStreak || 0;
+    const shields = Math.min(3, Math.floor(currentStreak / 7));
+
+    // Days absent
+    let daysAbsent = 0;
+    if (streak?.lastCheckIn) {
+      daysAbsent = Math.floor((new Date() - new Date(streak.lastCheckIn)) / (1000 * 60 * 60 * 24));
+    }
+
+    // Consistency
+    const completedCheckIns = checkIns.filter(c => c.completed).length;
+    const maxDay = patient.currentDay || 1;
+    const overallConsistency = maxDay > 0 ? Math.round((completedCheckIns / maxDay) * 100) : 0;
+
+    // Plan end date
+    let planEndDate = null;
+    let daysRemaining = 0;
+    if (patient.startDate) {
+      const end = new Date(patient.startDate);
+      end.setDate(end.getDate() + 90);
+      planEndDate = end.toISOString().split('T')[0];
+      daysRemaining = Math.max(0, Math.ceil((end - new Date()) / (1000 * 60 * 60 * 24)));
+    }
+
+    // Weekly grid (Mon-Sun of current week)
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + mondayOffset + i);
+      d.setHours(0, 0, 0, 0);
+      const dStr = d.toISOString().split('T')[0];
+      const dayCheckIn = checkIns.find(c => {
+        const cDate = new Date(c.date).toISOString().split('T')[0];
+        return cDate === dStr;
+      });
+      weekDays.push({
+        date: dStr,
+        dayLabel: ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i],
+        completed: dayCheckIn ? dayCheckIn.completed : null,
+        mood: dayCheckIn ? dayCheckIn.mood : null,
+        isFuture: d > now
+      });
+    }
+
+    // Skin score trajectory at key days
+    const trajectoryDays = [1, 28, 56, 84];
+    const skinTrajectory = trajectoryDays.map(day => {
+      const score = skinScores.find(s => s.day === day);
+      return { day, totalScore: score ? score.totalScore : null };
+    });
+
+    // Last 7 days moods
+    const last7Moods = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const dStr = d.toISOString().split('T')[0];
+      const ci = checkIns.find(c => new Date(c.date).toISOString().split('T')[0] === dStr);
+      last7Moods.push(ci ? ci.mood : null);
+    }
+
+    const bannerClicked = reorderEvents.length > 0;
+
     res.json({
       success: true,
       data: {
-        // Patient profile from MongoDB
         patient: {
           id: patient._id,
           name: patient.name || patient.fullName,
@@ -87,27 +163,38 @@ router.get('/:phone/details', async (req, res) => {
           achievements: patient.achievements || [],
           coachName: patient.coachName || '',
           coachWhatsApp: patient.coachWhatsApp || '',
-          products: (patient.products || []).map((pr) => ({
+          products: (patient.products || []).map(pr => ({
             id: pr._id,
             name: pr.name,
             category: pr.category,
             instructions: pr.instructions
           }))
         },
-
-        // Airtable diet plan (matched by phone)
         dietPlan: airtablePlans.length > 0 ? airtablePlans[0] : null,
-
-        // Streak from MongoDB
-        streak: streak ? {
-          currentStreak: streak.currentStreak || 0,
-          longestStreak: streak.longestStreak || 0,
-          lastCheckIn: streak.lastCheckIn || null,
-          totalCheckIns: (streak.checkInDates || []).filter((d) => d.completed).length
-        } : { currentStreak: 0, longestStreak: 0, lastCheckIn: null, totalCheckIns: 0 },
-
-        // Recent check-ins from MongoDB
-        checkIns: checkIns.map((c) => ({
+        streak: {
+          currentStreak,
+          longestStreak: streak?.longestStreak || 0,
+          lastCheckIn: streak?.lastCheckIn || null,
+          totalCheckIns: completedCheckIns,
+          shields,
+          daysAbsent
+        },
+        consistency: {
+          overall: overallConsistency,
+          sunscreen: 0,
+          diet: 0
+        },
+        reorder: {
+          planEndDate,
+          daysRemaining,
+          bannerShown: maxDay >= 60,
+          bannerClicked,
+          newTreatmentPlan: false
+        },
+        weekGrid: weekDays,
+        skinTrajectory,
+        last7Moods,
+        checkIns: checkIns.map(c => ({
           id: c._id,
           date: c.date,
           dayOfJourney: c.dayOfJourney,
@@ -116,21 +203,14 @@ router.get('/:phone/details', async (req, res) => {
           energy: c.energy,
           sleep: c.sleep,
           waterIntake: c.waterIntake,
-          completed: c.completed
+          completed: c.completed,
+          notes: c.notes || ''
         })),
-
-        // Recent skin scores from MongoDB
-        skinScores: skinScores.map((s) => ({
+        skinScores: skinScores.map(s => ({
           id: s._id,
           date: s.date,
           day: s.day,
-          totalScore: s.totalScore,
-          texture: s.texture,
-          pigmentation: s.pigmentation,
-          brightness: s.brightness,
-          breakouts: s.breakouts,
-          hydration: s.hydration,
-          glow: s.glow
+          totalScore: s.totalScore
         }))
       }
     });

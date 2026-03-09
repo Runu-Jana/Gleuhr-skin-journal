@@ -1,0 +1,550 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Phone as PhoneIcon, ArrowLeft, RefreshCw, Activity, Star, TrendingUp } from 'lucide-react';
+import axios from 'axios';
+import './AdminDashboard.css';
+
+const MOOD_MAP = {
+  excellent: '\uD83D\uDE04',
+  good: '\uD83D\uDE42',
+  fair: '\uD83D\uDE10',
+  poor: '\uD83D\uDE1E'
+};
+
+function getInitials(name) {
+  if (!name) return '??';
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+export default function AdminDashboard() {
+  const [currentTab, setCurrentTab] = useState('today');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [patients, setPatients] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Selected patient detail
+  const [selectedPhone, setSelectedPhone] = useState(null);
+  const [details, setDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState('overview');
+
+  // Sidebar user — populated from Airtable dietPlan of first loaded patient or selected patient
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  // Load patients
+  const fetchPatients = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await axios.get('/api/admin/patients');
+      setPatients(data.data || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load patients');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPatients();
+  }, [fetchPatients]);
+
+  // Load patient detail
+  const openPatientDetails = async (phone) => {
+    setSelectedPhone(phone);
+    setDetailsLoading(true);
+    setDetails(null);
+    setActiveDetailTab('overview');
+    try {
+      const { data } = await axios.get(`/api/admin/patients/${encodeURIComponent(phone)}/details`);
+      setDetails(data.data);
+      // Set sidebar user from Airtable dietPlan dietician
+      if (data.data.dietPlan) {
+        setSelectedUser({
+          name: data.data.dietPlan.dieticianName || 'Unknown',
+          initials: getInitials(data.data.dietPlan.dieticianName),
+          role: 'Dietician',
+          type: 'dietitian',
+          phone: data.data.dietPlan.dieticianPhone || '',
+          planCategory: data.data.dietPlan.planCategory || ''
+        });
+      }
+    } catch (err) {
+      setDetails(null);
+      setError(err.response?.data?.error || 'Failed to load patient details');
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const goBack = () => {
+    setSelectedPhone(null);
+    setDetails(null);
+  };
+
+  const filtered = patients.filter((p) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      (p.name || '').toLowerCase().includes(term) ||
+      (p.phone || '').includes(term) ||
+      (p.skinConcern || '').toLowerCase().includes(term)
+    );
+  });
+
+  // ─── PATIENT DETAIL VIEW ─────────────────────────────────────
+  if (selectedPhone) {
+    return (
+      <div className="admin-layout">
+        {/* Sidebar */}
+        <aside className="admin-sidebar">
+          <div className="admin-sidebar-logo">
+            <h2>GLEUHR</h2>
+            <p>Skin Journal</p>
+          </div>
+          <nav className="admin-sidebar-nav">
+            {/* Coach from MongoDB */}
+            <button className="admin-sidebar-item active">
+              <div className="admin-sidebar-avatar" style={{ background: '#c44033' }}>
+                {details?.patient?.coachName ? getInitials(details.patient.coachName) : 'CO'}
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Coach</div>
+                <div style={{ fontSize: 11, opacity: 0.6 }}>{details?.patient?.coachName || '—'}</div>
+              </div>
+            </button>
+
+            {/* Dietician from Airtable */}
+            {selectedUser && (
+              <button className="admin-sidebar-item">
+                <div className="admin-sidebar-avatar" style={{ background: '#8B5CF6' }}>
+                  {selectedUser.initials}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Dietician</div>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>{selectedUser.name}</div>
+                </div>
+              </button>
+            )}
+          </nav>
+          <div className="admin-sidebar-footer">
+            <div>Airtable Sync: Live</div>
+            <div>Last updated: {new Date().toISOString().split('T')[0]}</div>
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <div className="admin-main">
+          {detailsLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+              <div className="w-8 h-8 border-4 border-[#c44033] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : !details ? (
+            <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>
+              <button onClick={goBack} style={{ color: '#c44033', fontWeight: 600, marginBottom: 16, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>
+                &larr; Back to patients
+              </button>
+              <p>Could not load details</p>
+            </div>
+          ) : (
+            <>
+              {/* Header */}
+              <div className="admin-header">
+                <div className="admin-header-left">
+                  <button onClick={goBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c44033', fontSize: 18, marginRight: 4 }}>
+                    &larr;
+                  </button>
+                  <div className="admin-header-avatar">
+                    {getInitials(details.patient.name)}
+                  </div>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{details.patient.name}</h2>
+                    <div className="admin-header-meta">
+                      <span>{details.patient.phone}</span>
+                      <span>Day {details.patient.currentDay}/90</span>
+                      <span>{details.patient.skinConcern}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="admin-header-right">
+                  {details.streak.daysAbsent > 0 && (
+                    <span className="absent-badge">{details.streak.daysAbsent} Days Absent</span>
+                  )}
+                  <button className="log-call-btn">
+                    <PhoneIcon size={14} /> Log Call
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="admin-tabs">
+                {['overview', 'diet', 'photos', 'calls'].map(tab => (
+                  <button
+                    key={tab}
+                    className={`admin-tab ${activeDetailTab === tab ? 'active' : ''}`}
+                    onClick={() => setActiveDetailTab(tab)}
+                  >
+                    {{ overview: 'Overview', diet: 'Diet & Compliance', photos: 'Photos & Ratings', calls: 'Call History' }[tab]}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="admin-content">
+                {activeDetailTab === 'overview' && <OverviewTab details={details} />}
+                {activeDetailTab === 'diet' && <DietTab details={details} />}
+                {activeDetailTab === 'photos' && <PhotosTab details={details} />}
+                {activeDetailTab === 'calls' && <CallsTab />}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PATIENT LIST VIEW ────────────────────────────────────────
+  return (
+    <div className="patient-list-container">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+          <span style={{ color: '#c44033' }}>GLEUHR</span> Admin Dashboard
+        </h1>
+        <button
+          onClick={fetchPatients}
+          disabled={loading}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#c44033', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: loading ? 0.5 : 1 }}
+        >
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+        </button>
+      </div>
+
+      {/* Search */}
+      <div style={{ position: 'relative', marginBottom: 16 }}>
+        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
+        <input
+          type="text"
+          placeholder="Search by name, phone, or skin concern..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid #ddd', borderRadius: 8, fontSize: 13, outline: 'none' }}
+        />
+      </div>
+
+      {error && (
+        <div style={{ background: '#FEF2F2', color: '#c44033', padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{error}</div>
+      )}
+
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <div className="w-8 h-8 border-4 border-[#c44033] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 60, color: '#999' }}>No patients found</div>
+      ) : (
+        filtered.map((p) => (
+          <div key={p.id} className="patient-card" onClick={() => openPatientDetails(p.phone)}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#c44033', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>
+                  {getInitials(p.name)}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
+                  <div style={{ fontSize: 12, color: '#888' }}>{p.phone} &middot; Day {p.currentDay}/90 &middot; {p.skinConcern || '—'}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, background: p.isActive ? '#DCFCE7' : '#F3F4F6', color: p.isActive ? '#16A34A' : '#666', fontWeight: 600 }}>
+                  {p.isActive ? 'Active' : 'Inactive'}
+                </span>
+                <button
+                  style={{ padding: '6px 14px', background: '#c44033', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); openPatientDetails(p.phone); }}
+                >
+                  View Details
+                </button>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ─── OVERVIEW TAB ──────────────────────────────────────────────
+function OverviewTab({ details }) {
+  const { patient, streak, consistency, reorder, weekGrid, skinTrajectory, last7Moods } = details;
+
+  return (
+    <>
+      <div className="admin-grid-2">
+        {/* Streak & Shields */}
+        <div className="admin-card">
+          <h4>Streak & Shields</h4>
+          <div className="streak-row">
+            <div className="streak-item">
+              <span style={{ fontSize: 24 }}>{'\uD83D\uDD25'}</span>
+              <span className="streak-num">{streak.currentStreak}</span>
+              <span className="streak-label">Current</span>
+            </div>
+            <div className="streak-item">
+              <span className="streak-num" style={{ fontSize: 20 }}>{streak.longestStreak}</span>
+              <span className="streak-label">Best</span>
+            </div>
+            <div className="streak-item">
+              <span style={{ fontSize: 20 }}>{'\uD83D\uDEE1\uFE0F'}</span>
+              <span className="streak-num" style={{ fontSize: 20 }}>{streak.shields}</span>
+              <span className="streak-label">Shields</span>
+            </div>
+          </div>
+          <button className="restore-btn">{'\uD83D\uDEE1\uFE0F'} Restore Shield</button>
+        </div>
+
+        {/* Consistency Breakdown */}
+        <div className="admin-card">
+          <h4>Consistency Breakdown</h4>
+          {[
+            { label: 'Overall', value: consistency.overall },
+            { label: 'Sunscreen', value: consistency.sunscreen },
+            { label: 'Diet', value: consistency.diet }
+          ].map(item => (
+            <div className="consistency-row" key={item.label}>
+              <span className="consistency-label">{item.label}</span>
+              <div className="consistency-bar-bg">
+                <div className="consistency-bar" style={{ width: `${item.value}%` }} />
+              </div>
+              <span className="consistency-pct">{item.value}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="admin-grid-2">
+        {/* Skin Score Trajectory */}
+        <div className="admin-card">
+          <h4>Skin Score Trajectory</h4>
+          <div className="trajectory-row">
+            {skinTrajectory.map(s => (
+              <div className="trajectory-col" key={s.day}>
+                {s.totalScore != null ? (
+                  <>
+                    <span className="trajectory-score">{s.totalScore}</span>
+                    <div className="trajectory-bar-container">
+                      <div className="trajectory-bar" style={{ height: `${Math.max(s.totalScore, 5)}%` }} />
+                    </div>
+                  </>
+                ) : (
+                  <span style={{ color: '#ccc', fontSize: 20 }}>&mdash;</span>
+                )}
+                <span className="trajectory-day">Day {s.day}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Reorder Status */}
+        <div className="admin-card">
+          <h4>Reorder Status (Auto-Detected)</h4>
+          <div
+            className="reorder-status-badge"
+            style={{ background: reorder.daysRemaining > 14 ? '#DCFCE7' : '#FEF2F2', color: reorder.daysRemaining > 14 ? '#16A34A' : '#c44033' }}
+          >
+            {reorder.daysRemaining > 14 ? 'On Track' : 'Attention Needed'}
+          </div>
+          <div className="reorder-row">
+            <span>Plan ends</span>
+            <span className="reorder-val">{reorder.planEndDate || '—'}</span>
+          </div>
+          <div className="reorder-row">
+            <span>Days remaining</span>
+            <span className="reorder-val" style={{ color: reorder.daysRemaining <= 14 ? '#c44033' : '#16A34A' }}>{reorder.daysRemaining} days</span>
+          </div>
+          <div className="reorder-row">
+            <span>Banner shown in app</span>
+            <span>{reorder.bannerShown ? '\u2705' : '\u274C'}</span>
+          </div>
+          <div className="reorder-row">
+            <span>Banner clicked</span>
+            <span>{reorder.bannerClicked ? 'Yes' : 'No'}</span>
+          </div>
+          <div className="reorder-row">
+            <span>New Treatment Plan (Airtable)</span>
+            <span style={{ color: reorder.newTreatmentPlan ? '#16A34A' : '#c44033', fontWeight: 600 }}>
+              {reorder.newTreatmentPlan ? '\u2705 Ready' : '\u274C Not yet'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="admin-grid-2">
+        {/* This Week */}
+        <div className="admin-card">
+          <h4>This Week</h4>
+          <div className="week-grid">
+            <table>
+              <thead>
+                <tr>
+                  <th></th>
+                  {weekGrid.map((d, i) => <th key={i}>{d.dayLabel}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ fontWeight: 600, fontSize: 12 }}>AM</td>
+                  {weekGrid.map((d, i) => (
+                    <td key={i}>
+                      {d.isFuture ? '\u2014' : d.completed === true ? '\u2705' : d.completed === false ? '\u274C' : '\u2014'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: 600, fontSize: 12 }}>PM</td>
+                  {weekGrid.map((d, i) => (
+                    <td key={i}>
+                      {d.isFuture ? '\u2014' : d.completed === true ? '\u2705' : d.completed === false ? '\u274C' : '\u2014'}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <h4 style={{ marginTop: 16 }}>Skin Mood (7 Days)</h4>
+          <div className="mood-row">
+            {(last7Moods || []).map((m, i) => (
+              <span key={i} className="mood-emoji">{m ? (MOOD_MAP[m] || '\u2014') : '\u2014'}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Products */}
+        <div className="admin-card">
+          <h4>Products</h4>
+          <div className="products-list">
+            {patient.products && patient.products.length > 0 ? (
+              patient.products.map(pr => (
+                <span key={pr.id} className="product-chip">{pr.name}</span>
+              ))
+            ) : (
+              <span style={{ color: '#999', fontSize: 13 }}>No products assigned</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Coach Notes */}
+      <div className="admin-card" style={{ marginBottom: 16 }}>
+        <h4>Coach Notes</h4>
+        <textarea
+          className="coach-notes-area"
+          placeholder="Add notes about this patient..."
+          defaultValue={details.checkIns?.[0]?.notes || ''}
+          readOnly
+        />
+      </div>
+    </>
+  );
+}
+
+// ─── DIET TAB ──────────────────────────────────────────────────
+function DietTab({ details }) {
+  const { dietPlan } = details;
+
+  if (!dietPlan) {
+    return (
+      <div className="admin-card" style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+        No diet plan found in Airtable for this customer phone number
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="admin-card">
+        <h4>Diet Plan Details (from Airtable)</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13 }}>
+          <div>
+            <span style={{ color: '#888' }}>Category</span>
+            <p style={{ fontWeight: 600, margin: '4px 0 0' }}>{dietPlan.planCategory || '—'}</p>
+          </div>
+          <div>
+            <span style={{ color: '#888' }}>Status</span>
+            <p style={{ margin: '4px 0 0' }}>
+              <span style={{ padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: dietPlan.status === 'Active' ? '#DCFCE7' : '#F3F4F6', color: dietPlan.status === 'Active' ? '#16A34A' : '#666' }}>
+                {dietPlan.status}
+              </span>
+            </p>
+          </div>
+          <div>
+            <span style={{ color: '#888' }}>Dietician</span>
+            <p style={{ fontWeight: 600, margin: '4px 0 0' }}>{dietPlan.dieticianName || '—'}</p>
+          </div>
+          <div>
+            <span style={{ color: '#888' }}>Dietician Phone</span>
+            <p style={{ fontWeight: 600, margin: '4px 0 0' }}>{dietPlan.dieticianPhone || '—'}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="admin-card">
+        <h4>Restrictions</h4>
+        {Array.isArray(dietPlan.restrictions) && dietPlan.restrictions.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {dietPlan.restrictions.map((r, i) => (
+              <span key={i} style={{ padding: '4px 12px', background: '#FEF2F2', color: '#c44033', borderRadius: 16, fontSize: 12, fontWeight: 500 }}>{r}</span>
+            ))}
+          </div>
+        ) : (
+          <span style={{ color: '#999', fontSize: 13 }}>None specified</span>
+        )}
+      </div>
+
+      <div className="admin-card">
+        <h4>Recommendations</h4>
+        <p style={{ fontSize: 13, color: '#333', whiteSpace: 'pre-wrap', background: '#FAF8F5', padding: 12, borderRadius: 8 }}>
+          {dietPlan.recommendations || '—'}
+        </p>
+      </div>
+
+      {dietPlan.notes && (
+        <div className="admin-card">
+          <h4>Notes</h4>
+          <p style={{ fontSize: 13, color: '#333', whiteSpace: 'pre-wrap' }}>{dietPlan.notes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PHOTOS TAB (placeholder) ──────────────────────────────────
+function PhotosTab({ details }) {
+  return (
+    <div className="admin-card" style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+      <h4>Photos & Ratings</h4>
+      <p>Weekly photos and skin score ratings will appear here.</p>
+      {details.skinScores && details.skinScores.length > 0 && (
+        <div style={{ marginTop: 16, textAlign: 'left' }}>
+          <h4 style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#555', marginBottom: 12 }}>Skin Score History</h4>
+          {details.skinScores.slice(0, 10).map(s => (
+            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}>
+              <span style={{ color: '#888' }}>{s.date ? new Date(s.date).toLocaleDateString() : '—'} (Day {s.day})</span>
+              <span style={{ fontWeight: 700, color: s.totalScore >= 70 ? '#16A34A' : s.totalScore >= 40 ? '#CA8A04' : '#c44033' }}>
+                {s.totalScore}/100
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CALLS TAB (placeholder) ───────────────────────────────────
+function CallsTab() {
+  return (
+    <div className="admin-card" style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+      <h4>Call History</h4>
+      <p>Call logs will appear here once logged.</p>
+    </div>
+  );
+}
