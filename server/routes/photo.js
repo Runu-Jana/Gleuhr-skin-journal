@@ -49,22 +49,32 @@ router.post('/', async (req, res) => {
     }
 
     const dayOfJourney = day || patient.currentDay || 1;
+    const pid = patient._id.toString();
+    const pPhone = patient.phone || patient.phoneNumber;
 
-    // Create weekly photo record matching WeeklyPhoto model schema
-    const weeklyPhoto = new WeeklyPhoto({
-      patientId: patient._id.toString(),
-      patientPhone: patient.phone || patient.phoneNumber,
-      weekNumber: weekNum,
-      photoUrl: photoUrl || '',
-      photoData: photoData || '',
-      uploadDate: date ? new Date(date) : new Date(),
-      dayOfJourney,
-      skinScore: skinScore || 0,
-      notes: notes || '',
-      tags: tags || []
-    });
-
-    await weeklyPhoto.save();
+    // Upsert: update if photo for this week already exists, otherwise create
+    const weeklyPhoto = await WeeklyPhoto.findOneAndUpdate(
+      { patientId: pid, weekNumber: weekNum },
+      {
+        $set: {
+          patientPhone: pPhone,
+          photoUrl: photoUrl || '',
+          photoData: photoData || '',
+          uploadDate: date ? new Date(date) : new Date(),
+          dayOfJourney,
+          skinScore: skinScore || 0,
+          notes: notes || '',
+          tags: tags || [],
+          updatedAt: new Date()
+        },
+        $setOnInsert: {
+          patientId: pid,
+          weekNumber: weekNum,
+          createdAt: new Date()
+        }
+      },
+      { upsert: true, new: true }
+    );
 
     res.json({
       success: true,
@@ -107,6 +117,7 @@ router.get('/:phone', async (req, res) => {
       week: photo.weekNumber,
       date: photo.uploadDate,
       photoUrl: photo.photoUrl,
+      photoData: photo.photoData,
       dayOfJourney: photo.dayOfJourney,
       skinScore: photo.skinScore,
       notes: photo.notes

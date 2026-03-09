@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { getWeeklyPhotos, fetchWeeklyPhotosFromServer, saveWeeklyPhoto } from '../utils/db';
@@ -10,11 +8,9 @@ import BottomNavigation from './BottomNavigation';
 export default function TransformationPage() {
   const { patient } = useAuth();
   const { isOnline } = useOffline();
-  const navigate = useNavigate();
 
   const [photos, setPhotos] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState(null);
-  const [compareWeek, setCompareWeek] = useState(1);
   const [weeklyInsight, setWeeklyInsight] = useState('');
 
   const patientPhone = patient?.phone || patient?.phoneNumber;
@@ -84,12 +80,9 @@ export default function TransformationPage() {
       const allPhotos = Object.values(byWeek).sort((a, b) => (a.week || 0) - (b.week || 0));
       setPhotos(allPhotos);
 
-      // Set initial selected week to latest photo week
-      if (allPhotos.length > 0 && !selectedWeek) {
-        const latestWeek = allPhotos[allPhotos.length - 1].week;
-        setSelectedWeek(latestWeek);
-        // Default compare to week 1 if available, otherwise earliest
-        setCompareWeek(allPhotos[0].week || 1);
+      // Default selected week to customer's current week
+      if (!selectedWeek) {
+        setSelectedWeek(actualWeek);
       }
     } catch (error) {
       console.error('Error loading photos:', error);
@@ -103,24 +96,19 @@ export default function TransformationPage() {
   };
 
   const handleWeekSelect = (week) => {
-    const photo = getPhotoForWeek(week);
-    if (photo) {
-      // If tapping a week with a photo, set it as the comparison target
-      if (selectedWeek && week !== selectedWeek) {
-        setCompareWeek(selectedWeek);
-      }
-      setSelectedWeek(week);
-    }
+    setSelectedWeek(week);
     setWeeklyInsight(getWeeklyInsight(week));
   };
 
   const weeksWithPhotos = new Set(photos.map(p => p.week || p.weekNumber));
   const weeks = Array.from({ length: 13 }, (_, i) => i + 1);
 
-  const leftPhoto = getPhotoForWeek(compareWeek);
-  const rightPhoto = getPhotoForWeek(selectedWeek);
-  const leftPhotoImage = leftPhoto?.photoData || leftPhoto?.photoUrl;
-  const rightPhotoImage = rightPhoto?.photoData || rightPhoto?.photoUrl;
+  // Left side is always Week 1 baseline; right side is the selected week
+  const baselinePhoto = getPhotoForWeek(1);
+  const currentPhoto = getPhotoForWeek(selectedWeek || actualWeek);
+  const baselineImage = baselinePhoto?.photoData || baselinePhoto?.photoUrl;
+  const currentImage = currentPhoto?.photoData || currentPhoto?.photoUrl;
+  const displayWeek = selectedWeek || actualWeek;
 
   return (
     <div className="min-h-screen bg-white pb-24">
@@ -131,42 +119,44 @@ export default function TransformationPage() {
       </div>
 
       <div className="px-5">
-        {/* Photo Comparison - Side by Side */}
+        {/* Photo Comparison - Side by Side: Week 1 vs Selected Week */}
         <div className="flex gap-2.5 mb-3.5">
-          {/* Left: Compare Week (baseline/earlier) */}
+          {/* Left: Always Week 1 Baseline */}
           <div className="flex-1 aspect-[3/4] rounded-[18px] bg-[#f4f2ef] border overflow-hidden relative">
-            {leftPhotoImage ? (
+            {baselineImage ? (
               <>
-                <img src={leftPhotoImage} alt={`Week ${compareWeek}`} className="w-full h-full object-cover" />
+                <img src={baselineImage} alt="Week 1 Baseline" className="w-full h-full object-cover" />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3">
-                  <span className="text-sm font-semibold text-white font-outfit">Week {compareWeek}</span>
-                  {leftPhoto?.day && <span className="text-xs text-white/70 font-outfit ml-1">Day {leftPhoto.day}</span>}
+                  <span className="text-sm font-semibold text-white font-outfit">Week 1</span>
+                  {baselinePhoto?.day && <span className="text-xs text-white/70 font-outfit ml-1">Day {baselinePhoto.day}</span>}
+                  <span className="block text-xs text-white/60 font-outfit">Baseline</span>
                 </div>
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-1.5">
                 <Camera className="w-6 h-6 text-[#5c5757]" />
-                <span className="text-sm font-semibold text-[#5c5757] font-outfit">Week {compareWeek}</span>
-                <span className="text-xs text-[#a39e95] font-outfit">No photo yet</span>
+                <span className="text-sm font-semibold text-[#5c5757] font-outfit">Week 1</span>
+                <span className="text-xs text-[#a39e95] font-outfit">Baseline</span>
               </div>
             )}
           </div>
 
-          {/* Right: Selected Week (current/later) */}
+          {/* Right: Selected Week (defaults to current week) */}
           <div className="flex-1 aspect-[3/4] rounded-[18px] bg-white border-2 border-dashed border-[rgba(196,64,51,0.19)] overflow-hidden relative">
-            {rightPhotoImage ? (
+            {currentImage ? (
               <>
-                <img src={rightPhotoImage} alt={`Week ${selectedWeek}`} className="w-full h-full object-cover" />
+                <img src={currentImage} alt={`Week ${displayWeek}`} className="w-full h-full object-cover" />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3">
-                  <span className="text-sm font-semibold text-white font-outfit">Week {selectedWeek}</span>
-                  {rightPhoto?.day && <span className="text-xs text-white/70 font-outfit ml-1">Day {rightPhoto.day}</span>}
+                  <span className="text-sm font-semibold text-white font-outfit">Week {displayWeek}</span>
+                  {currentPhoto?.day && <span className="text-xs text-white/70 font-outfit ml-1">Day {currentPhoto.day}</span>}
+                  <span className="block text-xs text-white/60 font-outfit">{displayWeek === actualWeek ? 'Current' : `Week ${displayWeek}`}</span>
                 </div>
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-1.5">
                 <Camera className="w-6 h-6 text-[#c44033]" />
-                <span className="text-sm font-semibold text-[#c44033] font-outfit">Week {selectedWeek || actualWeek}</span>
-                <span className="text-xs text-[#7a756d] font-outfit">No photo yet</span>
+                <span className="text-sm font-semibold text-[#c44033] font-outfit">Week {displayWeek}</span>
+                <span className="text-xs text-[#7a756d] font-outfit">{displayWeek === actualWeek ? 'Current' : 'No photo yet'}</span>
               </div>
             )}
           </div>

@@ -96,11 +96,13 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
     }, 100);
   };
 
+  const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+
   const handleSubmit = async () => {
     if (!capturedImage) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
       const photoId = `photo-${Date.now()}`;
       const patientPhone = patient?.phone || patient?.phoneNumber;
@@ -165,8 +167,6 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
       setIsSubmitting(false);
     }
   };
-
-  const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
 
   if (!isVisible) return null;
 
