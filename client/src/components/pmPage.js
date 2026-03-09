@@ -179,12 +179,23 @@ export default function PMPage() {
   };
 
   useEffect(() => {
-    // Check for milestone prompts
-    if (isMilestoneDay(day)) {
-      navigate('/skin-score');
-    } else if (isWeeklyPhotoDay(patient?.startDate)) {
-      navigate('/weekly-photo');
-    }
+    const checkMilestone = async () => {
+      // Only redirect to skin-score on milestone days if not already completed
+      const latestScore = await getLatestSkinScore(patient?.phoneNumber || patient?.phone);
+      const today = new Date().toISOString().split('T')[0];
+      const alreadyScoredToday = latestScore && latestScore.date === today;
+
+      if (isMilestoneDay(day) && !alreadyScoredToday) {
+        navigate('/skin-score');
+      } else if (isWeeklyPhotoDay(patient?.startDate)) {
+        const photos = await getWeeklyPhotos(patient?.phoneNumber || patient?.phone);
+        const alreadyPhotoed = photos?.some(p => p.date === today);
+        if (!alreadyPhotoed) {
+          navigate('/weekly-photo');
+        }
+      }
+    };
+    if (patient) checkMilestone();
   }, [day, patient, navigate]);
 
   useEffect(() => {
