@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 
 import { useAuth } from './contexts/AuthContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -17,8 +17,13 @@ import HomeScreen from './components/HomeScreen';
 import JourneyScreen from './components/JourneyScreen';
 import ProfileScreen from './components/ProfileScreen';
 import SkinScoreScreen from './components/SkinScoreScreen';
+import SkinScoreResults from './components/SkinScoreResults';
 import WeeklyPhotoScreen from './components/WeeklyPhotoScreen';
-import BottomNav from './components/BottomNav';
+import PhotoUploadPage from './components/PhotoUploadPage';
+import WeeklyPhotoPopup from './components/WeeklyPhotoPopup';
+import CheckInSuccessPage from './components/CheckInSuccessPage';
+import TransformationPage from './components/TransformationPage';
+import BottomNavigation from './components/BottomNavigation';
 import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
 import GleuhrInsider from './components/GleuhrInsider';
@@ -29,6 +34,10 @@ import AdminDashboard from './components/AdminDashboard';
 
 // Utils
 import { initDB } from './utils/db';
+import AMPage from './components/amPage';
+import PMPage from './components/pmPage';
+import { getTimeOfDay } from './utils/timeUtils';
+import SkinScoreAssessment from './components/SkinScoreAssessment';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -66,6 +75,28 @@ function App() {
 
 function AppRoutes() {
   const { isAuthenticated, patient, isLoading } = useAuth();
+  const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
+
+  // Check if today is a weekly photo day (7, 14, 21, 28, etc.)
+  useEffect(() => {
+    if (isAuthenticated && patient) {
+      const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+      const isWeeklyPhotoDay = currentDay % 7 === 0;
+      
+      // Show popup on weekly photo days
+      if (isWeeklyPhotoDay) {
+        setShowWeeklyPhotoPopup(true);
+      }
+    }
+  }, [isAuthenticated, patient]);
+
+  const handleCloseWeeklyPhotoPopup = () => {
+    setShowWeeklyPhotoPopup(false);
+  };
+
+  console.log('AppRoutes - isAuthenticated:', isAuthenticated);
+  console.log('AppRoutes - patient:', patient);
+  console.log('AppRoutes - isLoading:', isLoading);
 
   if (isLoading) {
     return (
@@ -91,9 +122,9 @@ function AppRoutes() {
       
       <main id="main-content" tabIndex="-1">
         <Routes>
-          <Route 
-            path="/register" 
-            element={isAuthenticated ? <Navigate to="/" replace /> : <SelfRegisterScreen />} 
+          <Route
+            path="/register"
+            element={<Navigate to="/login" replace />}
           />
           <Route
             path="/login"
@@ -110,61 +141,101 @@ function AppRoutes() {
             element={!isAuthenticated ? <Navigate to="/login" replace /> : <SkinScoreScreen />} 
           />
           <Route 
+            path="/skin-score-results" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <SkinScoreResults/>} 
+          />
+          <Route 
             path="/weekly-photo" 
             element={!isAuthenticated ? <Navigate to="/login" replace /> : <WeeklyPhotoScreen />} 
+          />
+          <Route 
+            path="/amPage" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <AMPage />} 
+          />
+          <Route 
+            path="/pmPage" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <PMPage />} 
+          />
+          <Route 
+            path="/transformation" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <TransformationPage />} 
+          />
+          <Route 
+            path="/journey" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <JourneyScreen />} 
+          />
+          <Route 
+            path="/photo-upload" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <PhotoUploadPage />} 
+          />
+          <Route 
+            path="/checkin-success" 
+            element={!isAuthenticated ? <Navigate to="/login" replace /> : <CheckInSuccessPage />} 
+          />
+          <Route 
+            path="/admin" 
+            element={<AdminDashboard />} 
           />
           <Route 
             path="/" 
             element={!isAuthenticated ? <Navigate to="/login" replace /> : <MainApp />} 
           />
         </Routes>
+        
       </main>
     </div>
   );
 }
 
 function MainApp() {
-  const [activeTab, setActiveTab] = useState('home');
+  const { patient, streak: streakData } = useAuth();
+  const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
+
+  // Check if today is a weekly photo day (7, 14, 21, 28, etc.)
+  useEffect(() => {
+    if (patient) {
+      const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+      const isWeeklyPhotoDay = currentDay % 7 === 0;
+      
+      // Show popup on weekly photo days
+      if (isWeeklyPhotoDay) {
+        setShowWeeklyPhotoPopup(true);
+      }
+    }
+  }, [patient]);
+
+  const handleCloseWeeklyPhotoPopup = () => {
+    setShowWeeklyPhotoPopup(false);
+  };
 
   return (
     <>
       <AnimatePresence mode="wait">
-        {activeTab === 'home' && (
-          <motion.div
-            key="home"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <HomeScreen />
-          </motion.div>
-        )}
-
-        {activeTab === 'journey' && (
-          <motion.div
-            key="journey"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <JourneyScreen />
-          </motion.div>
-        )}
-
-        {activeTab === 'profile' && (
-          <motion.div
-            key="profile"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <ProfileScreen />
-          </motion.div>
-        )}
+        <Routes>
+          <Route path="*" element={<HomeScreen />} />
+          <Route path="/home" element={<HomeScreen />} />
+          <Route path="/amPage" element={<AMPage />} />
+          <Route path="/pmPage" element={<PMPage />} />
+          <Route path="/journey" element={<JourneyScreen />} />
+          <Route path="/skin-score" element={<SkinScoreScreen />} />
+          <Route path="/skin-score-results" element={<SkinScoreResults />} />
+          <Route path="/weekly-photo" element={<WeeklyPhotoScreen />} />
+          <Route path="/photo-upload" element={<PhotoUploadPage />} />
+          <Route path="/checkin-success" element={<CheckInSuccessPage />} />
+          <Route path="/transformation" element={<TransformationPage />} />
+          <Route path="/login" element={<LoginScreen />} />
+          <Route path="/onboarding" element={<OnboardingScreen />} />
+        </Routes>
       </AnimatePresence>
-
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNavigation />
       <GleuhrInsider />
+      
+      {/* Weekly Photo Popup */}
+      <WeeklyPhotoPopup 
+        isVisible={showWeeklyPhotoPopup}
+        onClose={handleCloseWeeklyPhotoPopup}
+        patient={patient}
+      />
     </>
   );
 }

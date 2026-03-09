@@ -8,11 +8,12 @@ import {
   Crown, 
   Award,
   TrendingUp,
-  Share2
+  Share2,
+  X
 } from 'lucide-react';
 import { useGamification } from '../contexts/GamificationContext';
 
-export default function GamificationPanel() {
+export default function GamificationPanel({ onClose }) {
   const { 
     points, 
     level, 
@@ -37,9 +38,18 @@ export default function GamificationPanel() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-gray-900">Your Progress</h2>
-        <div className="flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-yellow-500" />
-          <span className="text-2xl font-bold text-gray-900">{points}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-yellow-500" />
+            <span className="text-2xl font-bold text-gray-900">{points}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Close panel"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
         </div>
       </div>
 

@@ -2,14 +2,14 @@ const mongoose = require('mongoose');
 
 const patientSchema = new mongoose.Schema({
   // Basic Information
-  fullName: {
+  name: {
     type: String,
     required: true,
     trim: true
   },
-  name: {
+  // Alternative name field for compatibility
+  fullName: {
     type: String,
-    required: true,
     trim: true
   },
   email: {
@@ -27,10 +27,14 @@ const patientSchema = new mongoose.Schema({
   phone: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   skinConcern: {
+    type: String,
+    trim: true
+  },
+  // Alias for compatibility with frontend
+  concern: {
     type: String,
     trim: true
   },
@@ -156,11 +160,6 @@ const patientSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
-});
-
-patientSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
 });
 
 // Virtuals

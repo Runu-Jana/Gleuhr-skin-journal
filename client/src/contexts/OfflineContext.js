@@ -78,8 +78,13 @@ export function OfflineProvider({ children }) {
             await axios.post('/api/checkin', item.data);
             success = true;
           } else if (item.type === 'skinScore') {
-            await axios.post('/api/skinscore', item.data);
-            success = true;
+            try {
+              await axios.post('/api/skinscore', item.data);
+              success = true;
+            } catch (skinScoreError) {
+              console.error('Skin score API not available, data saved locally:', skinScoreError);
+              // Keep in sync queue for later, but don't fail the sync process
+            }
           } else if (item.type === 'weeklyPhoto') {
             await axios.post('/api/photo', item.data);
             success = true;

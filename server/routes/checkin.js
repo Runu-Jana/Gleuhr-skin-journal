@@ -13,12 +13,18 @@ router.post('/', async (req, res) => {
       patientPhone,
       date,
       day,
+      amRoutine,
+      pmRoutine,
+      sunscreen,
+      dietFollowed,
+      triggerFoods,
+      waterIntake,
+      skinMood,
       skinScore,
       skinScores,
       mood,
       energy,
       sleep,
-      waterIntake,
       medications,
       notes,
       symptoms
@@ -51,29 +57,42 @@ router.post('/', async (req, res) => {
 
     const dayOfJourney = day || patient.currentDay || 1;
 
-    // Create check-in record matching DailyCheckIn model schema
-    const checkin = new DailyCheckIn({
+    // Create or update check-in record
+    let checkin;
+    const existingCheckin = await DailyCheckIn.findOne({
       patientId: patient._id.toString(),
-      patientPhone: patient.phone || patient.phoneNumber,
-      date,
-      dayOfJourney,
-      skinScore: skinScore || 0,
-      skinScores: skinScores || {},
-      mood: mood || 'good',
-      energy: energy || 'medium',
-      sleep: sleep || 8,
-      waterIntake: waterIntake || 8,
-      medications: medications || [],
-      notes: notes || '',
-      symptoms: symptoms || [],
-      completed: true,
-      completedAt: new Date()
+      date
     });
 
-    await checkin.save();
+    const checkinData = {
+      patientId: patient._id.toString(),
+      patientPhone: patient.phone || patient.phoneNumber,
+      dayOfJourney,
+      amRoutine: amRoutine || false,
+      pmRoutine: pmRoutine || false,
+      sunscreen: sunscreen || false,
+      dietFollowed: dietFollowed || 'No',
+      triggerFoods: triggerFoods || [],
+      waterIntake: waterIntake || 0,
+      skinMood: skinMood || 'Okay',
+      completed: true,
+      completedAt: new Date()
+    };
+
+    if (existingCheckin) {
+      // Update existing check-in
+      checkin = await DailyCheckIn.findByIdAndUpdate(existingCheckin._id, checkinData, { new: true });
+    } else {
+      // Create new check-in record
+      checkin = new DailyCheckIn({
+        ...checkinData,
+        date
+      });
+      await checkin.save();
+    }
 
     // Update streak
-    await updateStreak(patient.phone || patient.phoneNumber, dayOfJourney);
+    await updateStreak(patient.phone || patient.phoneNumber, dayOfJourney, patient._id.toString());
 
     // Update patient progress
     await Patient.findByIdAndUpdate(patient._id, {
@@ -140,44 +159,75 @@ router.get('/:phone', async (req, res) => {
 });
 
 // Helper to update streak
-async function updateStreak(phoneNumber, currentDay) {
+async function updateStreak(phoneNumber, currentDay, patientId = null) {
   try {
     // Find existing streak (support both field names)
     let streak = await Streak.findOne({
       $or: [
-        { phoneNumber: phoneNumber },
-        { phone: phoneNumber }
+        { phoneNumber },
+        { patientPhone: phoneNumber }
       ]
     });
-    
-    const today = new Date().toISOString().split('T')[0];
 
     if (streak) {
+      const today = new Date().toISOString().split('T')[0];
+      const lastCheckin = streak.lastCheckinDate?.toISOString().split('T')[0];
       const currentStreak = streak.currentStreak || 0;
-      const lastCheckin = streak.lastCheckinDate;
       
-      // Calculate if streak continues
+      // Calculate new streak
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
       
       let newStreak = currentStreak;
+      let newLongestStreak = streak.longestStreak || 0;
+      
       if (lastCheckin === yesterdayStr) {
+        // Consecutive day - increment streak
         newStreak = currentStreak + 1;
       } else if (lastCheckin !== today) {
+        // Gap in days or first check-in - reset to 1
         newStreak = 1;
       }
+      // If lastCheckin === today, streak stays the same (already logged today)
+      
+      // Update longest streak if current streak exceeds it
+      if (newStreak > newLongestStreak) {
+        newLongestStreak = newStreak;
+      }
 
-      await Streak.findByIdAndUpdate(streak._id, {
-        currentStreak: newStreak,
-        lastCheckinDate: today,
-        day: currentDay
-      });
+      // Update streak record
+      try {
+        if (streak) {
+          await Streak.findByIdAndUpdate(streak._id, {
+            currentStreak: newStreak,
+            longestStreak: newLongestStreak,
+            lastCheckinDate: today,
+            day: currentDay
+          });
+        } else {
+          // Create new streak record
+          streak = new Streak({
+            patientId: patientId,
+            patientPhone: phoneNumber,
+            currentStreak: 1,
+            longestStreak: 1,
+            lastCheckinDate: today,
+            day: currentDay
+          });
+          await streak.save();
+        }
+      } catch (error) {
+        console.error('Update streak error:', error);
+      }
     } else {
       // Create new streak record
+      const today = new Date().toISOString().split('T')[0];
       streak = new Streak({
-        phoneNumber,
+        patientId: patientId,
+        patientPhone: phoneNumber,
         currentStreak: 1,
+        longestStreak: 1,
         lastCheckinDate: today,
         day: currentDay
       });
