@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Phone, Calendar, Target, Sparkles, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,9 +29,23 @@ export default function SelfRegisterScreen() {
   const [verificationCode, setVerificationCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  const { loginWithWhatsApp } = useAuth();
+  const { loginWithToken } = useAuth();
   const { requestPermission } = useNotifications();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Pre-fill phone from login redirect
+  React.useEffect(() => {
+    if (location.state?.phoneNumber) {
+      const incoming = location.state.phoneNumber;
+      const code = location.state?.countryCode || '+91';
+      setFormData(prev => ({
+        ...prev,
+        countryCode: code,
+        phoneNumber: incoming.replace(code, '')
+      }));
+    }
+  }, [location.state]);
 
   const fullPhone = `${formData.countryCode}${formData.phoneNumber.replace(/\s/g, '')}`;
 
@@ -102,45 +116,7 @@ export default function SelfRegisterScreen() {
         // Login the user
         const loginResult = await loginWithWhatsApp(fullPhone, verificationCode.trim());
         
-        console.log('🔍 Registration result:', data);
-        console.log('🔍 Login result:', loginResult);
-        console.log('🔍 Patient data from server:', data.patient);
-        console.log('🔍 Patient data from login:', loginResult.patient);
-        
         if (loginResult.success) {
-          // Save patient to local database with new structure
-          const patientData = data.patient || loginResult.patient;
-          if (patientData) {
-            try {
-              console.log('🔍 Saving patient data:', patientData);
-              await savePatient({
-                id: patientData.id || patientData._id,
-                name: patientData.fullName || patientData.name,
-                firstName: patientData.fullName?.split(' ')[0] || patientData.firstName,
-                phone: patientData.phoneNumber,
-                phoneNumber: patientData.phoneNumber,
-                startDate: patientData.startDate || new Date().toISOString().split('T')[0],
-                hasCommitted: patientData.hasCommitted || false,
-                skinType: patientData.skinType,
-                skinConcern: patientData.skinConcern,
-                goals: patientData.goals,
-                planType: patientData.planType,
-                age: patientData.age,
-                gender: patientData.gender,
-                // Add default dietician assignment (you can customize this)
-                assignedDietician: null, // Will be assigned later via admin dashboard
-                dieticianName: null,
-                createdAt: new Date().toISOString()
-              });
-              console.log('Patient saved to local database');
-            } catch (dbError) {
-              console.error('Error saving patient to local database:', dbError);
-              // Don't fail the registration, just log the error
-            }
-          } else {
-            console.error('❌ No patient data found in registration response');
-          }
-          
           if (data.patient.isNewUser) {
             navigate('/onboarding');
           } else {
@@ -512,8 +488,21 @@ export default function SelfRegisterScreen() {
             )}
           </div>
 
-          {/* Help Text */}
+          {/* Login Link */}
           <div className="mt-6 text-center">
+            <p className="text-sm text-gray-500">
+              Already have an account?{' '}
+              <button
+                onClick={() => navigate('/login')}
+                className="text-[#c44033] font-medium hover:underline"
+              >
+                Login here
+              </button>
+            </p>
+          </div>
+
+          {/* Help Text */}
+          <div className="mt-3 text-center">
             <p className="text-sm text-gray-500">
               By registering, you agree to our Terms of Service and Privacy Policy
             </p>
