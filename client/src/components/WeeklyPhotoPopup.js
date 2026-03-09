@@ -44,7 +44,7 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
 
   const loadPreviousPhoto = async () => {
     try {
-      const userPhotos = await getWeeklyPhotos(patient?.email);
+      const userPhotos = await getWeeklyPhotos(patient?.phone || patient?.phoneNumber);
       if (userPhotos && userPhotos.length > 0) {
         const lastWeek = userPhotos[userPhotos.length - 1];
         setPreviousPhoto(lastWeek);

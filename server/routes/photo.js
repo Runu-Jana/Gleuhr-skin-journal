@@ -120,7 +120,8 @@ router.get('/:phone', async (req, res) => {
       photoData: photo.photoData,
       dayOfJourney: photo.dayOfJourney,
       skinScore: photo.skinScore,
-      notes: photo.notes
+      notes: photo.notes,
+      createdAt: photo.createdAt
     }));
 
     res.json(photoData);
