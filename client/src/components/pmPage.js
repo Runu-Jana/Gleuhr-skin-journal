@@ -507,7 +507,7 @@ export default function PMPage() {
               <div className="flex items-center gap-2 px-5 py-2.5 sm:px-2 sm:py-1 rounded-lg flex-shrink-0 mb-3 sm:mb-0 border border-red-100" style={{ background: 'rgba(196, 64, 51, 0.05)' }}>
                 <Shield className={`w-3 h-3 sm:w-4 sm:h-4 ${getShieldColor(availableShields)}`} />
                 <span className={`text-xs sm:text-sm font-bold ${availableShields >= 3 ? 'text-green-700' : availableShields === 2 ? 'text-yellow-700' : availableShields === 1 ? 'text-red-700' : 'text-gray-700'}`}>{streakData?.restorationShields?.available}</span>
-                <span className={`text-xs ${availableShields >= 3 ? 'text-green-600' : availableShields === 2 ? 'text-yellow-600' : availableShields === 1 ? 'text-red-600' : 'text-gray-600'} hidden sm:inline py-2 `}>shields</span>
+                <span className={`text-xs ${availableShields >= 3 ? 'text-green-600' : availableShields === 2 ? 'text-yellow-600' : availableShields === 1 ? 'text-red-600' : 'text-gray-600'} hidden sm:inline`}>shields</span>
                 {streakData?.streak === 0 && availableShields > 0 && (
                   <button 
                     onClick={() => setShowShieldRestore(true)}
@@ -530,7 +530,7 @@ export default function PMPage() {
               className="mx-4 mb-3 sm:mx-5 sm:mb-3 px-3 py-2 sm:px-4 sm:py-2.5 bg-gray-50 rounded-xl flex justify-between items-center cursor-pointer border border-gray-200"
             >
               <span className="text-xs sm:text-sm text-gray-500">Tough day? <span className="font-semibold text-gray-700">Quick log</span></span>
-              <svg width="12" height="12" className="sm:w-14 sm:h-14" viewBox="0 0 14 14" fill="none">
+              <svg width="12" height="12" className="w-3 h-3 sm:w-4 sm:h-4" viewBox="0 0 14 14" fill="none">
                 <path d="M7 13C10.3137 13 13 10.3137 13 7C13 3.68629 10.3137 1 7 1C3.68629 1 1 3.68629 1 7C1 10.3137 3.68629 13 7 13Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M7 4V7L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>

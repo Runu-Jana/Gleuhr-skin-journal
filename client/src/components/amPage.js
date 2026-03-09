@@ -519,14 +519,13 @@ export default function AMPage() {
 
       {/* Shield Success Animation */}
       <AnimatePresence>
-         {showShieldSuccess && shieldRestoreData && (
-                    <ShieldSuccessAnimation
+        {showShieldSuccess && shieldRestoreData && (
+          <ShieldSuccessAnimation
             streakRestored={shieldRestoreData.streakRestored}
             shieldsRemaining={shieldRestoreData.shieldsRemaining}
             previousStreak={shieldRestoreData.previousStreak}
             newStreak={shieldRestoreData.newStreak}
           />
-        
         )}
       </AnimatePresence>
     </div>
