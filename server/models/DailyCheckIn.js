@@ -18,9 +18,32 @@ const dailyCheckInSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  // AM/PM Routine Fields
+  amRoutine: {
+    type: Boolean,
+    default: false
+  },
+  sunscreen: {
+    type: Boolean,
+    default: false
+  },
+  pmRoutine: {
+    type: Boolean,
+    default: false
+  },
+  dietFollowed: {
+    type: String,
+    enum: ['Yes', 'No', 'Partial', 'skipped'],
+    default: 'No'
+  },
+  triggerFoods: [{
+    type: String
+  }],
+  
+  // Skin Assessment
   skinScore: {
     type: Number,
-    required: true,
+    required: false,
     min: 0,
     max: 20
   },
@@ -87,13 +110,14 @@ const dailyCheckInSchema = new mongoose.Schema({
   }
 });
 
-dailyCheckInSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
+// Pre-save middleware - temporarily disabled due to next() issue
+// dailyCheckInSchema.pre('save', function(next) {
+//   this.updatedAt = Date.now();
+//   next();
+// });
 
-// Index for efficient queries
-dailyCheckInSchema.index({ patientId: 1, date: 1 }, { unique: true });
+// Index for efficient queries - removed unique constraint to allow updates
+dailyCheckInSchema.index({ patientId: 1, date: 1 });
 dailyCheckInSchema.index({ patientId: 1, dayOfJourney: 1 });
 
 module.exports = mongoose.model('DailyCheckIn', dailyCheckInSchema);

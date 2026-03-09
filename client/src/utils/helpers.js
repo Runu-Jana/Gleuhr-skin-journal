@@ -3,9 +3,16 @@ export function calculateDay(startDate) {
   if (!startDate) return 1;
   const start = new Date(startDate);
   const today = new Date();
+  
+  // Set both times to midnight to avoid time zone issues
+  start.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  
   const diffTime = today - start;
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  return Math.max(1, Math.min(diffDays, 90));
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Day 1 is the start date, so add 1
+  return Math.max(1, Math.min(diffDays + 1, 90));
 }
 
 export function calculateStreak(checkIns) {
@@ -43,7 +50,7 @@ export function calculateShields(streak) {
 }
 
 export function isMilestoneDay(day) {
-  return day === 1 || day === 28 || day === 56 || day === 84;
+  return day === 7 || day === 28 || day === 56 || day === 84;
 }
 
 export function isWeeklyPhotoDay(startDate) {

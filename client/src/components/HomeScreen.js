@@ -5,9 +5,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { saveCheckIn, getTodayCheckIn, getCheckIns } from '../utils/db';
-import { calculateDay, calculateStreak, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId } from '../utils/helpers';
-import { Flame, Shield, Sun, Moon, Droplets, Utensils, Frown, Meh, Smile } from 'lucide-react';
+import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
+import { calculateDay, calculateStreak, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
+import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
+import { Flame, Shield, Sun, Moon, Droplets, Utensils, Frown, Meh, Smile, Home, Map, User, Camera, Edit3 } from 'lucide-react';
 import ReorderBanner from './ReorderBanner';
 import GamificationPanel from './GamificationPanel';
 import AchievementPopup from './AchievementPopup';
@@ -22,341 +23,535 @@ export default function HomeScreen() {
   const day = calculateDay(patient?.startDate);
   const progress = (day / 90) * 100;
   const shields = calculateShields(streakData?.streak || 0);
+  const availableShields = streakData?.restorationShields?.available || shields || 0;
+  
+  // Determine shield color based on remaining count
+  const getShieldColor = (count) => {
+    if (count >= 3) return 'text-green-500 fill-green-500';
+    if (count === 2) return 'text-yellow-500 fill-yellow-500';
+    if (count === 1) return 'text-red-500 fill-red-500';
+    return 'text-gray-300 fill-gray-300';
+  };
+  const timeOfDay = getTimeOfDay();
+  const isMorning = timeOfDay === 'AM';
 
-  const [amRoutine, setAmRoutine] = useState(false);
-  const [pmRoutine, setPmRoutine] = useState(false);
-  const [sunscreen, setSunscreen] = useState(false);
-  const [dietFollowed, setDietFollowed] = useState('Yes');
-  const [triggerFoods, setTriggerFoods] = useState([]);
-  const [waterIntake, setWaterIntake] = useState(2);
-  const [skinMood, setSkinMood] = useState('Okay');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  // Calculate calendar data from real check-ins
+  const getCalendarData = (checkIns) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    // Get first day of month and adjust for Monday-first calendar (0 = Monday, 6 = Sunday)
+    let firstDay = new Date(year, month, 1).getDay();
+    // Convert from Sunday-first (0=Sunday) to Monday-first (0=Monday)
+    firstDay = firstDay === 0 ? 6 : firstDay - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const calendar = [];
+    for (let i = 0; i < firstDay; i++) {
+      calendar.push(null);
+    }
+    
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = new Date(year, month, i);
+      // Use UTC date to avoid timezone issues
+      const dateStr = new Date(Date.UTC(year, month, i)).toISOString().split('T')[0];
+      const isToday = i === now.getDate();
+      const isPast = i < now.getDate();
+      const isFuture = i > now.getDate();
+      
+      // Debug: Log today's date and current day being checked
+      if (i === now.getDate()) {
+        console.log('📅 Today check:', {
+          today: now.getDate(),
+          todayDateStr: new Date().toISOString().split('T')[0],
+          calendarDate: i,
+          calendarDateStr: dateStr,
+          isToday
+        });
+      }
+      
+      // Check if this day has check-in data
+      let status = 'missed';
+      let hasAM = false;
+      let hasPM = false;
+      
+      if (checkIns && checkIns.length > 0) {
+        const dayCheckIn = checkIns.find(checkIn => checkIn.date === dateStr);
+        if (dayCheckIn) {
+          hasAM = dayCheckIn.amRoutine || false;
+          hasPM = dayCheckIn.pmRoutine || false;
+          
+          if (hasAM && hasPM) {
+            status = 'done'; // Both AM and PM completed
+          } else if (hasAM || hasPM) {
+            status = 'partial'; // Only one routine completed
+          }
+          
+          // Debug: Log found check-in for today
+          if (i === now.getDate()) {
+            console.log('📝 Today check-in found:', {
+              date: dateStr,
+              hasAM,
+              hasPM,
+              status,
+              dayCheckIn
+            });
+          }
+        } else {
+          // Debug: Log no check-in found for today
+          if (i === now.getDate()) {
+            console.log('❌ No check-in found for today:', {
+              todayDateStr: dateStr,
+              availableCheckIns: checkIns.map(c => ({ date: c.date, amRoutine: c.amRoutine, pmRoutine: c.pmRoutine }))
+            });
+          }
+        }
+      }
+      
+      if (isToday && isMorning) {
+        status = 'current'; // Current day being tracked
+      }
+      
+      calendar.push({ day: i, status, isToday, isPast, isFuture });
+    }
+    
+    return calendar;
+  };
+
   const [showGamification, setShowGamification] = useState(false);
   const [newAchievement, setNewAchievement] = useState(null);
+  const [currentSkinScore, setCurrentSkinScore] = useState(0); // Default fallback
+  const [consistency, setConsistency] = useState(0); // Default fallback
+  const [checkIns, setCheckIns] = useState([]); // Store check-ins for calendar
+  const [photosCount, setPhotosCount] = useState(0); // Store photos count
 
+  // Fetch latest skin score and calculate consistency
   useEffect(() => {
-    // Check for milestone prompts
-    if (isMilestoneDay(day)) {
-      navigate('/skin-score');
-    } else if (isWeeklyPhotoDay(patient?.startDate)) {
-      navigate('/weekly-photo');
-    }
-  }, [day, patient, navigate]);
+    const fetchData = async () => {
+      // Try both phone field names
+      const phoneNumber = patient?.phoneNumber || patient?.phone;
+      
+      if (phoneNumber && patient?.startDate) {
+        try {
+          // Get patient record to get patientId
+          const patientRecord = await getPatient(phoneNumber);
+          
+          if (!patientRecord) {
+            return;
+          }
+          
+          const patientId = patientRecord.id;
+          
+          // Fetch latest skin score
+          const latestScore = await getLatestSkinScore(patientId);
+          console.log('🏠 HomeScreen - Latest skin score fetched:', latestScore);
+          if (latestScore && latestScore.totalScore) {
+            setCurrentSkinScore(latestScore.totalScore);
+            console.log('✅ HomeScreen - Skin score updated to:', latestScore.totalScore);
+          } else {
+            console.log('❌ HomeScreen - No skin score found');
+          }
 
-  useEffect(() => {
-    // Load today's check-in if exists
-    const loadToday = async () => {
-      const today = await getTodayCheckIn(patient?.phoneNumber);
-      if (today) {
-        setAmRoutine(today.amRoutine);
-        setPmRoutine(today.pmRoutine);
-        setSunscreen(today.sunscreen);
-        setDietFollowed(today.dietFollowed);
-        setTriggerFoods(today.triggerFoods || []);
-        setWaterIntake(today.waterIntake);
-        setSkinMood(today.skinMood);
-        setHasSubmitted(true);
+          // Fetch check-ins and calculate consistency
+          const checkIns = await getCheckIns(patientId);
+          const calculatedConsistency = calculateConsistency(checkIns, patient.startDate);
+          setConsistency(calculatedConsistency);
+          setCheckIns(checkIns);
+
+          // Fetch weekly photos count
+          const photos = await getWeeklyPhotos(patientId);
+          setPhotosCount(photos.length);
+          
+          // Refresh streak data from server
+          await refreshStreak();
+        } catch (error) {
+          console.error('Error fetching data:', error);
+        }
       }
     };
-    loadToday();
+    
+    fetchData();
+    
+    // Listen for skin score updates from other components
+    const handleSkinScoreUpdate = (event) => {
+      console.log('🏠 HomeScreen received skin score update event:', event.detail);
+      if (event.detail && event.detail.latestScore) {
+        setCurrentSkinScore(event.detail.latestScore.totalScore);
+        console.log('✅ HomeScreen updated skin score from event:', event.detail.latestScore.totalScore);
+      }
+    };
+    
+    window.addEventListener('skinScoreUpdated', handleSkinScoreUpdate);
+    
+    // Refresh streak when page gets focus (user returns from other pages)
+    const handlePageFocus = () => {
+      refreshStreak();
+    };
+    
+    window.addEventListener('focus', handlePageFocus);
+    
+    return () => {
+      window.removeEventListener('skinScoreUpdated', handleSkinScoreUpdate);
+      window.removeEventListener('focus', handlePageFocus);
+    };
   }, [patient]);
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    
-    const checkInData = {
-      id: generateId(),
-      patientId: patient?.id,
-      patientPhone: patient?.phoneNumber,
-      date: new Date().toISOString().split('T')[0],
-      day,
-      amRoutine,
-      pmRoutine,
-      sunscreen,
-      dietFollowed,
-      triggerFoods,
-      waterIntake,
-      skinMood,
-      synced: false
-    };
+  const calendarData = getCalendarData(checkIns);
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const currentMonth = monthNames[new Date().getMonth()];
 
-    // Save to IndexedDB
-    await saveCheckIn(checkInData);
+  // Calculate journey milestones from actual check-in data
+  const calculateJourneyMilestones = (checkIns, currentDay) => {
+    const milestones = [
+      { week: 'Start', label: 'Start', day: 0, completed: true, current: false },
+      { week: 'W2', label: 'W2', day: 14, completed: false, current: false },
+      { week: 'W4', label: 'W4', day: 28, completed: false, current: false },
+      { week: 'W6', label: 'W6', day: 42, completed: false, current: false },
+      { week: 'W8', label: 'W8', day: 56, completed: false, current: false },
+      { week: 'W12', label: 'W12', day: 84, completed: false, current: false },
+    ];
 
-    // Queue for sync if online
-    if (isOnline) {
-      queueForSync('checkin', checkInData);
+    // Calculate completed milestones based on check-ins
+    if (checkIns && checkIns.length > 0) {
+      milestones.forEach(milestone => {
+        if (milestone.day === 0) {
+          milestone.completed = true; // Start is always completed
+        } else if (milestone.day <= currentDay) {
+          // Check if user has check-ins for this milestone period
+          const milestoneCheckIns = checkIns.filter(checkIn => 
+            checkIn.day && checkIn.day >= milestone.day - 7 && checkIn.day <= milestone.day
+          );
+          
+          if (milestoneCheckIns.length >= 5) { // At least 5 check-ins in the week
+            milestone.completed = true;
+          }
+        }
+        
+        // Set current milestone
+        if (milestone.day <= currentDay && !milestone.completed) {
+          milestone.current = true;
+        } else if (milestone.day > currentDay && !milestone.completed) {
+          milestone.current = false;
+        }
+      });
+    } else {
+      // No check-ins yet, only start is completed
+      milestones.forEach(milestone => {
+        if (milestone.day === 0) {
+          milestone.completed = true;
+        }
+        if (milestone.day <= currentDay && !milestone.completed) {
+          milestone.current = true;
+        }
+      });
     }
 
-    // Award points for daily check-in
-    awardPoints('daily_checkin');
-    
-    // Award bonus points for perfect day
-    if (amRoutine && pmRoutine && sunscreen && dietFollowed === 'Yes' && waterIntake >= 3) {
-      awardPoints('perfect_day');
-    }
-
-    // Refresh streak
-    await refreshStreak();
-
-    // Check for achievements
-    const checkIns = await getCheckIns();
-    const userStats = {
-      totalCheckins: checkIns.length,
-      currentStreak: calculateStreak(checkIns),
-      photoCount: 0, // Would need to fetch from photos
-      skinScores: 0, // Would need to fetch from skin scores
-      earlyCheckins: 0, // Would need to check time of check-ins
-      pmConsistency: 0.8, // Would need to calculate
-      hydrationStreak: 0 // Would need to calculate
-    };
-    checkAchievements(userStats);
-
-    // Check for celebration
-    const currentStreak = calculateStreak(checkIns);
-    if (currentStreak > 0 && currentStreak % 7 === 0) {
-      setShowCelebration(true);
-      setTimeout(() => setShowCelebration(false), 3000);
-    }
-
-    setHasSubmitted(true);
-    setIsSubmitting(false);
+    return milestones;
   };
 
-  const toggleTriggerFood = (food) => {
-    setTriggerFoods(prev => 
-      prev.includes(food) ? prev.filter(f => f !== food) : [...prev, food]
-    );
-  };
+  const journeyMilestones = calculateJourneyMilestones(checkIns, day);
 
-  const milestones = [
-    { day: 1, label: 'Day 1', active: day >= 1 },
-    { day: 28, label: 'Day 28', active: day >= 28 },
-    { day: 56, label: 'Day 56', active: day >= 56 },
-    { day: 84, label: 'Day 84', active: day >= 84 },
-  ];
+  const handleRoutineClick = () => {
+    if (isMorning) {
+      navigate('/amPage');
+    } else {
+      navigate('/pmPage');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#faf8f5] pb-24">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white px-6 py-4 border-b border-gray-100">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-full">
-              <Flame className="w-5 h-5 text-orange-500" />
-              <span className="font-bold text-orange-700">{streakData?.streak || 0}</span>
-              <span className="text-xs text-orange-600">day streak</span>
-            </div>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Shield 
-                  key={i} 
-                  className={`w-5 h-5 ${i < shields ? 'text-blue-500 fill-blue-500' : 'text-gray-300'}`}
-                />
-              ))}
-            </div>
+      <div className="px-5 py-4 flex justify-between items-start">
+        <div>
+          <p className="text-xs text-[#a39e95] font-outfit font-medium uppercase tracking-[0.5px]">
+            Good {isMorning ? 'morning' : 'evening'}
+          </p>
+          <h2 className="text-2xl font-bold text-[#191716] font-crimson leading-tight tracking-[-0.5px]">
+            {patient?.firstName || 'Priya'}
+          </h2>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <div className="px-3 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.03)] border border-[rgba(196,64,51,0.08)] cursor-pointer flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-[#7a756d] font-outfit">Score</span>
+            <span className="text-base font-bold text-[#c44033] font-crimson">{currentSkinScore}</span>
+            <span className="text-xs text-[#a39e95] font-outfit">/20</span>
           </div>
-          <div className="text-sm text-gray-500">Day {day}/90</div>
+          <div className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center">
+            <span className="text-base font-semibold text-[#c44033] font-crimson">P</span>
+          </div>
         </div>
       </div>
 
-      <div className="px-4 py-6 space-y-6">
-        {/* Progress Ring */}
-        <div className="flex justify-center">
-          <div className="relative w-40 h-40">
-            <svg className="w-full h-full transform -rotate-90">
-              <circle cx="80" cy="80" r="70" fill="none" stroke="#e5e7eb" strokeWidth="12" />
-              <circle
-                cx="80"
-                cy="80"
-                r="70"
-                fill="none"
-                stroke="#c44033"
-                strokeWidth="12"
-                strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 70}`}
-                strokeDashoffset={`${2 * Math.PI * 70 * (1 - progress / 100)}`}
-                className="transition-all duration-1000"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-bold text-gray-900">{day}</span>
-              <span className="text-sm text-gray-500">of 90 days</span>
+      {/* Streak Card */}
+      <div className="mx-5 my-3.5 p-3.5 rounded-[16px] bg-gradient-to-br from-[rgba(196,64,51,0.04)] to-[rgba(196,64,51,0.01)] border border-[rgba(196,64,51,0.08)] flex justify-between items-center">
+        <div className="flex items-center gap-2.5">
+          <div className="w-10 h-10 rounded-[12px] bg-gradient-to-br from-[rgba(220,38,38,0.125)] to-[rgba(220,38,38,0.03)] flex items-center justify-center">
+            <Flame className="w-5.5 h-5.5 text-[#dc2626]" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-[#191716] font-crimson tracking-[-0.2px]">
+              Current streak <span className="text-[#c44033] font-crimson text-xl font-bold ml-1">{streakData?.streak || 0}</span> <span className="text-xs text-[#7a756d] font-crimson">days</span>
+            </div>
+            <div className="text-xs text-[#a39e95] font-crimson mt-0.5 mb-0.5">
+              Best: <span className="font-semibold text-[#191716]">{streakData?.longestStreak || 0}</span> days
+            </div>
+            <div className="text-xs text-[#a39e95] font-outfit mt-0.5 flex items-center gap-1.5">
+              <span>Red Hot flame</span>
+              <span className="w-0.5 h-0.5 rounded-[2px] bg-[#ccc8c0]"></span>
+              <span>{consistency}% consistent</span>
             </div>
           </div>
         </div>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.05)]">
+          <Shield className={`w-3.5 h-3.5 ${getShieldColor(availableShields)}`} strokeWidth={1.3} />
+          <span className="text-sm font-bold text-[#c44033] font-outfit">{availableShields}</span>
+        </div>
+      </div>
 
-        {/* Milestones */}
-        <div className="flex justify-between items-center px-2">
-          {milestones.map((m, i) => (
-            <div key={m.day} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
-                day >= m.day 
-                  ? 'bg-[#c44033] text-white' 
-                  : day >= m.day - 7 
-                    ? 'bg-[#c44033]/20 text-[#c44033] border-2 border-[#c44033]' 
-                    : 'bg-gray-200 text-gray-400'
+      {/* Main CTA Button */}
+      <div 
+        onClick={handleRoutineClick}
+        className="mx-5 my-3 p-5 rounded-[18px] bg-[#c44033] cursor-pointer relative overflow-hidden shadow-[rgba(196,64,51,0.208)_0px_8px_24px]"
+      >
+        <div className="absolute -top-0.15 -right-5 w-20 h-20 rounded-[40px] bg-[rgba(255,255,255,0.08)]"></div>
+        <div className="flex items-center justify-between relative">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-[14px] bg-[rgba(255,255,255,0.15)] flex items-center justify-center">
+              <span className="text-xl">{isMorning ? '☀️' : '🌙'}</span>
+            </div>
+            <div>
+              <p className="text-base font-semibold text-white font-crimson">
+                Log {isMorning ? 'AM' : 'PM'} routine
+              </p>
+              <p className="text-xs text-[rgba(255,255,255,0.65)] font-outfit mt-0.5">
+                {isMorning ? 'Tap after your sunscreen absorbs' : 'Complete your evening routine'}
+              </p>
+            </div>
+          </div>
+          <div className="w-5 h-5 text-white opacity-60">
+            <svg viewBox="0 0 20 20" fill="none" strokeWidth={2} strokeLinecap="round">
+              <path d="M7 4l6 6-6 6" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Section */}
+      <div className="px-5 py-5 flex gap-5 items-center">
+        <div className="relative w-19 h-19 flex-shrink-0">
+          <svg width="76" height="76" viewBox="0 0 76 76">
+            <circle cx="38" cy="38" r="32" fill="none" stroke="#f4f2ef" strokeWidth="5" />
+            <circle
+              cx="38"
+              cy="38"
+              r="32"
+              fill="none"
+              stroke="#c44033"
+              strokeWidth="5"
+              strokeDasharray={`${62.53 * (progress / 100)} 201`}
+              strokeLinecap="round"
+              transform="rotate(-90 38 38)"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-xl font-bold text-[#191716] font-playfair leading-none">{day}</span>
+            <span className="text-xs text-[#a39e95] font-outfit tracking-[0.5px]">of 90</span>
+          </div>
+        </div>
+        <div className="flex-1">
+          <p className="text-xs text-[#c44033] font-semibold font-outfit mb-1 uppercase tracking-[0.8px]">Day {day}</p>
+          <p className="text-sm text-[#3d3935] font-crimson leading-[1.55]">
+            {day === 28 ? (
+              <>One full skin cycle complete. Your Glutathione is at peak efficacy now — most women see visible tone changes right around this point.</>
+            ) : (
+              <>Keep going! You're making great progress on your skin journey.</>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* Reorder Banner */}
+      <div className="mx-0 my-4 px-5 py-4 bg-gradient-to-br from-[rgba(196,64,51,0.03)] to-[rgba(196,64,51,0.016)] rounded-[16px] border border-[rgba(196,64,51,0.094)] flex justify-between items-center">
+        <div className="flex-1 mr-3">
+          <p className="text-sm font-semibold text-[#c44033] font-outfit">Products running low</p>
+          <p className="text-xs text-[#5c574f] font-outfit mt-0.5 leading-[1.4]">A gap resets your melanin suppression.</p>
+        </div>
+        <button className="px-5 py-2.5 bg-[#c44033] text-white border-0 rounded-[12px] text-sm font-semibold cursor-pointer font-outfit shadow-[rgba(196,64,51,0.25)_0px_4px_12px]">
+          Reorder →
+        </button>
+      </div>
+
+      {/* Calendar Section */}
+      <div className="px-5 py-4.5">
+        <div className="flex justify-between items-center mb-2.5">
+          <p className="text-sm font-semibold text-[#191716] font-outfit">{currentMonth}</p>
+          <div className="flex gap-3">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-[3px] bg-[#1a8a4a]"></div>
+              <span className="text-xs text-[#a39e95] font-outfit">Done</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-[3px] bg-[#d4a017]"></div>
+              <span className="text-xs text-[#a39e95] font-outfit">Partial</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-[3px] bg-[#e0ddd7]"></div>
+              <span className="text-xs text-[#a39e95] font-outfit">Missed</span>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 gap-1.5">
+          {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((dayName) => (
+            <div key={dayName} className="text-center text-xs text-[#a39e95] font-outfit pb-0.5 font-medium">
+              {dayName}
+            </div>
+          ))}
+          {calendarData.map((dayData, index) => (
+            <div
+              key={index}
+              className={`aspect-square rounded-[8px] flex items-center justify-center ${
+                dayData?.status === 'done' ? 'bg-[#1a8a4a] opacity-80' :
+                dayData?.status === 'partial' ? 'bg-[#d4a017] opacity-60' :
+                dayData?.status === 'current' ? 'bg-[#1a8a4a] opacity-80 shadow-[#c44033]_0px_0px_0px_2px' :
+                dayData?.isFuture ? 'bg-[#ede9e5] opacity-30' :
+                'bg-[#dc2626] opacity-40' // Red for missed days
+              }`}
+            >
+              <span className={`text-xs font-medium ${
+                dayData?.status === 'done' ? 'text-white' :
+                dayData?.status === 'partial' ? 'text-white' :
+                dayData?.status === 'current' ? 'text-white' :
+                dayData?.isFuture ? 'text-[#a39e95]' :
+                'text-white' // White text on red missed days
               }`}>
-                {m.day === 1 ? '1' : m.day === 28 ? '28' : m.day === 56 ? '56' : '84'}
-              </div>
-              {i < milestones.length - 1 && (
-                <div className={`w-8 h-0.5 mx-1 ${day > m.day ? 'bg-[#c44033]' : 'bg-gray-200'}`} />
+                {dayData?.day}
+              </span>
+              {dayData?.status === 'current' && (
+                <div className="w-1.5 h-1.5 rounded-[3px] bg-white"></div>
               )}
             </div>
           ))}
         </div>
-
-        {/* Check-in Card */}
-        <div className="card space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <Sun className="w-5 h-5 text-[#c44033]" />
-            Daily Routine
-          </h3>
-          
-          <div className="space-y-3">
-            <ToggleRow icon={<Sun className="w-4 h-4" />} label="AM Routine" checked={amRoutine} onChange={setAmRoutine} />
-            <ToggleRow icon={<Moon className="w-4 h-4" />} label="PM Routine" checked={pmRoutine} onChange={setPmRoutine} />
-            <ToggleRow icon={<span>☀️</span>} label="Sunscreen" checked={sunscreen} onChange={setSunscreen} />
-          </div>
-        </div>
-
-        {/* Diet Card */}
-        <div className="card space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <Utensils className="w-5 h-5 text-[#c44033]" />
-            Diet & Hydration
-          </h3>
-          
-          <div>
-            <p className="text-sm text-gray-600 mb-2">Followed diet today?</p>
-            <div className="flex gap-2">
-              {['Yes', 'Mostly', 'No'].map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setDietFollowed(option)}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                    dietFollowed === option ? 'bg-[#c44033] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm text-gray-600 mb-2">Trigger foods consumed</p>
-            <div className="flex flex-wrap gap-2">
-              {['Dairy', 'Sugar', 'Gluten', 'Spicy', 'Fried', 'Caffeine', 'Alcohol'].map((food) => (
-                <button
-                  key={food}
-                  onClick={() => toggleTriggerFood(food)}
-                  className={`chip ${triggerFoods.includes(food) ? 'chip-active' : 'chip-inactive'}`}
-                >
-                  {food}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm text-gray-600 mb-2">Water intake</p>
-            <div className="flex gap-2">
-              {[1, 2, 3, 4].map((level) => (
-                <button
-                  key={level}
-                  onClick={() => setWaterIntake(level)}
-                  className={`flex-1 py-3 rounded-lg flex justify-center transition-all ${
-                    waterIntake >= level ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
-                  }`}
-                >
-                  <Droplets className={`w-5 h-5 ${waterIntake >= level ? 'fill-blue-500' : ''}`} />
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-1 text-center">
-              {waterIntake === 1 && '1 glass'}
-              {waterIntake === 2 && '2-4 glasses'}
-              {waterIntake === 3 && '5-7 glasses'}
-              {waterIntake === 4 && '8+ glasses'}
-            </p>
-          </div>
-        </div>
-
-        {/* Skin Mood Card */}
-        <div className="card space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">How is your skin feeling today?</h3>
-          <div className="flex justify-center gap-4">
-            <button onClick={() => setSkinMood('Good')} className={`emoji-btn ${skinMood === 'Good' ? 'emoji-btn-active' : 'emoji-btn-inactive'}`}>
-              <Smile className="w-8 h-8 text-green-500" />
-              <span className="text-xs mt-1 font-medium">Good</span>
-            </button>
-            <button onClick={() => setSkinMood('Okay')} className={`emoji-btn ${skinMood === 'Okay' ? 'emoji-btn-active' : 'emoji-btn-inactive'}`}>
-              <Meh className="w-8 h-8 text-yellow-500" />
-              <span className="text-xs mt-1 font-medium">Okay</span>
-            </button>
-            <button onClick={() => setSkinMood('Off')} className={`emoji-btn ${skinMood === 'Off' ? 'emoji-btn-active' : 'emoji-btn-inactive'}`}>
-              <Frown className="w-8 h-8 text-red-500" />
-              <span className="text-xs mt-1 font-medium">Off</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Submit Button */}
-        <button onClick={handleSubmit} disabled={isSubmitting} className="btn-primary w-full">
-          {isSubmitting ? (
-            <span className="flex items-center justify-center gap-2">
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Saving...
-            </span>
-          ) : hasSubmitted ? 'Update Check-in' : 'Submit Check-in'}
-        </button>
       </div>
 
-      {/* Reorder Banner (Day 25+) */}
-      {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
-
-      {/* Celebration */}
-      {showCelebration && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-8 text-center max-w-sm mx-4">
-            <div className="text-6xl mb-4">🎉</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">{streakData?.streak || 0} Day Streak!</h3>
-            <p className="text-gray-600">You're building great habits. Keep it up!</p>
-          </motion.div>
-        </motion.div>
-      )}
-
-      {/* Gamification Panel */}
-      {showGamification && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Your Progress</h2>
-              <button onClick={() => setShowGamification(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+      {/* Journey Section */}
+      <div className="mx-5 my-8 p-4.5 bg-[#faf9f7] rounded-[20px] border border-[#ede9e5]">
+        <div className="flex justify-between items-center mb-4 p-2">
+          <p className="text-xs font-bold text-[#c44033] font-outfit uppercase tracking-[1px]">Your Journey</p>
+          <p className="text-xs text-[#7a756d] font-outfit">Day {day} of 90</p>
+        </div>
+        <div className="relative px-1.5">
+          <div className="absolute top-4 left-5.5 right-5.5 h-0.5 bg-[#e0ddd7] rounded-[2px]"></div>
+          <div className="absolute top-4 left-5.5 h-0.5 rounded-[2px] bg-gradient-to-r from-[#1a8a4a] to-[#c44033]" style={{width: '40%'}}></div>
+          <div className="flex justify-between relative">
+            {journeyMilestones.map((milestone, index) => (
+              <div key={milestone.week} className="flex flex-col items-center gap-1.5 w-10.5">
+                <div 
+                  className={`w-8 h-8 rounded-[16px] border flex items-center justify-center shadow transition-all ${
+                    milestone.current 
+                      ? 'w-9 h-9 bg-white border-2.5 border-[#c44033] shadow-[rgba(196,64,51,0.082)_0px_0px_0px_4px,rgba(0,0,0,0.08)_0px_2px_8px]' 
+                      : milestone.completed 
+                      ? 'bg-[#1a8a4a] border' 
+                      : 'bg-[#f4f2ef] border-2 border-[#e0ddd7]'
+                  }`}
+                >
+                  {milestone.current ? (
+                    <span className="text-xs font-bold text-[#c44033] font-playfair">✨</span>
+                  ) : milestone.completed ? (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M3 7l3 3 5-6" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <rect x="2" y="5.5" width="8" height="5" rx="1" stroke="#a39e95" strokeWidth={1} />
+                      <path d="M4 5.5V4a2 2 0 114 0v1.5" stroke="#a39e95" strokeWidth={1} />
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-xs font-semibold text-center leading-[1.2] font-outfit ${
+                  milestone.current ? 'text-[#c44033]' : 
+                  milestone.completed ? 'text-[#1a8a4a]' : 
+                  'text-[#a39e95] font-normal'
+                }`}>
+                  {milestone.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-5 px-4 py-3.5 bg-white rounded-[14px] border border-[#ede9e5] flex justify-between items-center">
+          <div className="flex-1">
+            <p className="text-xs text-[#c44033] font-bold font-outfit uppercase tracking-[0.8px]">Next: Transformation Card</p>
+            <p className="text-xs text-[#7a756d] font-outfit mt-0.5">Shareable before/after</p>
+            <div className="mt-2 h-1.5 bg-[#f4f2ef] rounded-[3px] overflow-hidden">
+              <div className="h-1.5 bg-gradient-to-r from-[#1a8a4a] to-[#c44033] rounded-[3px] w-0 transition-all duration-600"></div>
             </div>
-            <GamificationPanel />
-          </motion.div>
-        </motion.div>
-      )}
+          </div>
+          <div className="text-right ml-4">
+            <span className="text-xl font-bold text-[#c44033] font-playfair">{consistency}%</span>
+            <p className="text-xs text-[#1a8a4a] font-outfit font-semibold">On track ✓</p>
+          </div>
+        </div>
+      </div>
 
-      {/* Achievement Popup */}
-      {newAchievement && (
-        <AchievementPopup 
-          achievement={newAchievement} 
-          onClose={() => setNewAchievement(null)}
-          onShare={(achievement) => {
-            // Share achievement logic
-            console.log('Sharing achievement:', achievement);
-          }}
-        />
-      )}
+      {/* Promise Section */}
+      <div className="mx-5 my-8 rounded-[20px] overflow-hidden bg-[#191716] relative">
+        <div className="absolute -top-7.5 -right-5 w-25 h-25 rounded-[50px] bg-[rgba(196,64,51,0.08)]"></div>
+        <div className="absolute -bottom-5 -left-5 w-17.5 h-17.5 rounded-[35px] bg-[rgba(196,64,51,0.05)]"></div>
+        <div className="px-6 py-5 relative">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 rounded-[8px] bg-[rgba(196,64,51,0.15)] flex items-center justify-center">
+              <span className="text-xs">🤝</span>
+            </div>
+            <span className="text-xs font-bold text-[rgba(255,255,255,0.45)] font-outfit uppercase tracking-[1.2px]">Your Promise · Day {day}</span>
+          </div>
+          <p className="text-base text-[rgba(255,255,255,0.85)] font-playfair leading-[1.55] italic font-normal mb-5">
+            "I commit to giving my skin 90 days of consistent care."
+          </p>
+          <div className="flex items-center gap-4 mb-5">
+            <div className="relative w-14 h-14 flex-shrink-0">
+              <svg width="56" height="56" viewBox="0 0 56 56">
+                <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3.5" />
+                <circle
+                  cx="28"
+                  cy="28"
+                  r="24"
+                  fill="none"
+                  stroke="#c44033"
+                  strokeWidth="3.5"
+                  strokeDasharray={`${(progress / 100) * 150} 150`}
+                  strokeLinecap="round"
+                  transform="rotate(-90 28 28)"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-sm font-bold text-white font-playfair">{Math.round(progress)}%</span>
+              </div>
+            </div>
+            <p className="text-xs text-[rgba(255,255,255,0.7)] font-outfit leading-[1.5] flex-1">
+              Day {day} of your 90-day journey. You're keeping your promise to your skin.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="px-3 py-3 rounded-[10px] bg-[rgba(255,255,255,0.06)] text-center">
+              <span className="text-base font-bold text-white font-playfair block">{day}</span>
+              <span className="text-xs text-[rgba(255,255,255,0.4)] font-outfit block">days logged</span>
+            </div>
+            <div className="px-3 py-3 rounded-[10px] bg-[rgba(255,255,255,0.06)] text-center">
+              <span className="text-base font-bold text-white font-playfair block">{photosCount}</span>
+              <span className="text-xs text-[rgba(255,255,255,0.4)] font-outfit block">photos taken</span>
+            </div>
+            <div className="px-3 py-3 rounded-[10px] bg-[rgba(255,255,255,0.06)] text-center">
+              <span className="text-base font-bold text-white font-playfair block">{Math.round(consistency)}%</span>
+              <span className="text-xs text-[rgba(255,255,255,0.4)] font-outfit block">consistent</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Reorder Banner for Day 25+ */}
+      {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
 
       {/* Gamification Button */}
       <button
@@ -365,23 +560,30 @@ export default function HomeScreen() {
         aria-label="View progress and achievements"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0" />
         </svg>
       </button>
-    </div>
-  );
-}
 
-function ToggleRow({ icon, label, checked, onChange }) {
-  return (
-    <div className="flex items-center justify-between py-2">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600">{icon}</div>
-        <span className="font-medium text-gray-900">{label}</span>
-      </div>
-      <button onClick={() => onChange(!checked)} className={`toggle-btn ${checked ? 'toggle-btn-active' : 'toggle-btn-inactive'}`}>
-        <div className={`toggle-knob ${checked ? 'toggle-knob-active' : ''}`} />
-      </button>
+      {/* Gamification Panel */}
+      {showGamification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <GamificationPanel onClose={() => setShowGamification(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Achievement Popup */}
+      {newAchievement && (
+        <AchievementPopup 
+          achievement={newAchievement}
+          onClose={() => setNewAchievement(null)}
+          onShare={(achievement) => {
+            // Share achievement logic (can be implemented later)
+            console.log('Sharing achievement:', achievement);
+          }}
+        />
+      )}
     </div>
   );
 }

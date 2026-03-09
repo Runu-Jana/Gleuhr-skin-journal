@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { savePatient } from '../utils/db';
 
 const AuthContext = createContext();
 
@@ -34,6 +35,8 @@ export function AuthProvider({ children }) {
       if (response.data.success) {
         setPatient(response.data.patient);
         setIsAuthenticated(true);
+        // Save patient to IndexedDB for offline use
+        await savePatient(response.data.patient);
         loadPatientData(response.data.patient.phone);
       } else {
         // Token invalid, remove it
@@ -41,7 +44,14 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       console.error('Token verification error:', error);
-      localStorage.removeItem('gleuhrAuthToken');
+      // If server error (500), don't remove token - might be temporary server issue
+      if (error.response?.status === 500) {
+        console.warn('Server error during token verification, keeping token for retry');
+        // Don't remove token on server error, user can try again
+      } else {
+        // For other errors (401, 403, etc.), remove token
+        localStorage.removeItem('gleuhrAuthToken');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -65,6 +75,9 @@ export function AuthProvider({ children }) {
         setPatient(patient);
         setIsAuthenticated(true);
         
+        // Save patient to IndexedDB for offline use
+        await savePatient(patient);
+        
         // Load additional data
         await loadPatientData(patient.phone);
         
@@ -85,8 +98,13 @@ export function AuthProvider({ children }) {
       setStreak(streakRes.data);
 
       // Load skin scores using phone
-      const scoresRes = await axios.get(`/api/skinscore/${phone}`);
-      setSkinScores(scoresRes.data);
+      try {
+        const scoresRes = await axios.get(`/api/skinscore/${phone}`);
+        setSkinScores(scoresRes.data);
+      } catch (skinScoreError) {
+        console.error('Skin score API not available:', skinScoreError);
+        setSkinScores([]); // Set empty array as fallback
+      }
 
       // Load weekly photos using phone
       const photosRes = await axios.get(`/api/photo/${phone}`);
@@ -139,6 +157,16 @@ export function AuthProvider({ children }) {
     return btoa(navigator.userAgent + screenRef.width + screenRef.height + new Date().getTimezoneOffset());
   };
 
+  const loginWithToken = async (authToken, patientData) => {
+    localStorage.setItem('gleuhrAuthToken', authToken);
+    setPatient(patientData);
+    setIsAuthenticated(true);
+    if (patientData.phone) {
+      await loadPatientData(patientData.phone);
+    }
+    return { success: true, hasCommitted: patientData.hasCommitted };
+  };
+
   const value = {
     patient,
     streak,
@@ -146,6 +174,7 @@ export function AuthProvider({ children }) {
     isLoading,
     isAuthenticated,
     loginWithWhatsApp,
+    loginWithToken,
     logout,
     commitToProgram,
     refreshStreak,

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Sparkles, ArrowRight, Loader2, Lock, ChevronDown } from 'lucide-react';
 import axios from 'axios';
+import { savePatient } from '../utils/db';
 
 // Common country dial codes
 const countryCodes = [
@@ -81,6 +82,35 @@ export default function LoginScreen() {
     const result = await loginWithWhatsApp(fullPhone, verificationCode.trim());
     
     if (result.success) {
+      // Save patient to local database with new structure
+      if (result.patient) {
+        try {
+          await savePatient({
+            id: result.patient.id || result.patient._id,
+            name: result.patient.fullName || result.patient.name,
+            firstName: result.patient.fullName?.split(' ')[0] || result.patient.firstName,
+            phone: result.patient.phoneNumber,
+            phoneNumber: result.patient.phoneNumber,
+            startDate: result.patient.startDate || new Date().toISOString().split('T')[0],
+            hasCommitted: result.patient.hasCommitted || false,
+            skinType: result.patient.skinType,
+            skinConcern: result.patient.skinConcern,
+            goals: result.patient.goals,
+            planType: result.patient.planType,
+            age: result.patient.age,
+            gender: result.patient.gender,
+            // Add default dietician assignment (you can customize this)
+            assignedDietician: result.patient.assignedDietician || null,
+            dieticianName: result.patient.dieticianName || null,
+            createdAt: new Date().toISOString()
+          });
+          console.log('Patient saved to local database');
+        } catch (dbError) {
+          console.error('Error saving patient to local database:', dbError);
+          // Don't fail the login, just log the error
+        }
+      }
+      
       if (result.hasCommitted) {
         // Existing committed patient - go home
         navigate('/');
@@ -308,9 +338,9 @@ export default function LoginScreen() {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
               Having trouble?{' '}
-              <a 
-                href="https://wa.me/919876543210?text=Hi%2C%20I%20need%20help%20with%20login" 
-                target="_blank" 
+              <a
+                href="https://wa.me/919876543210?text=Hi%2C%20I%20need%20help%20with%20login"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#c44033] font-medium hover:underline"
               >

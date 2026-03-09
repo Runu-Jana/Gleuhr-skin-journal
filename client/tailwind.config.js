@@ -14,6 +14,9 @@ module.exports = {
         },
         background: '#faf8f5',
       },
+      fontFamily: {
+        crimson: ['"Crimson Pro"', 'serif'],
+      },
       animation: {
         'slide-up': 'slideUp 0.3s ease-out',
         'fade-in': 'fadeIn 0.3s ease-out',

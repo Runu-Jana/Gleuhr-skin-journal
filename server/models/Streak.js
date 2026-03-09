@@ -32,6 +32,24 @@ const streakSchema = new mongoose.Schema({
     achieved: Boolean,
     achievedDate: Date
   }],
+  // Shield system for streak restoration
+  shields: {
+    monthly: {
+      type: Number,
+      default: 3,
+      min: 0,
+      max: 3
+    },
+    used: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    lastResetMonth: {
+      type: String,
+      default: () => new Date().toISOString().slice(0, 7) // YYYY-MM format
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -42,9 +60,10 @@ const streakSchema = new mongoose.Schema({
   }
 });
 
-streakSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
+// Pre-save middleware - temporarily disabled due to next() issue
+// streakSchema.pre('save', function(next) {
+//   this.updatedAt = Date.now();
+//   next();
+// });
 
 module.exports = mongoose.model('Streak', streakSchema);

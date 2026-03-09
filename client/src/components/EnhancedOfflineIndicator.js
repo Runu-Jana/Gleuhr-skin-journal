@@ -6,7 +6,8 @@ export default function EnhancedOfflineIndicator() {
   const { isOnline, isSyncing, pendingCount, forceSync } = useOffline();
   const [showDetails, setShowDetails] = useState(false);
 
-  if (isOnline && pendingCount === 0 && !isSyncing) {
+  // Only show when offline — hide entirely when connected to internet
+  if (isOnline) {
     return null;
   }
 

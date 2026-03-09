@@ -18,7 +18,7 @@ export default function WeeklyPhotoScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const week = getWeekNumber(patient?.startDate);
-  const previousPhoto = weeklyPhotos.filter(p => p.week < week).sort((a, b) => b.week - a.week)[0] || null;
+  const previousPhoto = weeklyPhotos?.filter(p => p.week < week).sort((a, b) => b.week - a.week)[0] || null;
 
   const handleCapture = (e) => {
     const file = e.target.files?.[0];
@@ -116,7 +116,7 @@ export default function WeeklyPhotoScreen() {
             <X className="w-5 h-5" /> Retake
           </button>
           <button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 py-3 px-4 rounded-xl bg-[#c44033] text-white font-medium flex items-center justify-center gap-2">
-            <Check className="w-5 h-5" /> {isSubmitting ? 'Saving...' : 'Save'}
+            <Check className="w-5 h-5" /> {isSubmitting ? 'Saving...' : 'Saved'}
           </button>
         </div>
       </div>

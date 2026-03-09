@@ -1,314 +1,235 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { saveSkinScore } from '../utils/db';
 import { useOffline } from '../contexts/OfflineContext';
+import { saveSkinScore } from '../utils/db';
+import { ChevronLeft, TrendingUp } from 'lucide-react';
 import { calculateDay, generateId } from '../utils/helpers';
-import { ChevronLeft, Camera } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 const QUESTIONS = [
-  { key: 'texture', label: 'Skin Texture', question: 'How smooth is your skin texture?' },
-  { key: 'pigmentation', label: 'Pigmentation', question: 'How even is your skin tone?' },
-  { key: 'brightness', label: 'Brightness', question: 'How bright and radiant is your skin?' },
-  { key: 'breakouts', label: 'Breakouts', question: 'How clear is your skin from breakouts?' },
-  { key: 'confidence', label: 'Confidence', question: 'How confident do you feel about your skin?' },
-  { key: 'hydration', label: 'Hydration', question: 'How hydrated does your skin feel?' },
-  { key: 'smoothness', label: 'Smoothness', question: 'How soft and smooth is your skin to touch?' },
-  { key: 'evenness', label: 'Evenness', question: 'How even is your skin surface?' },
-  { key: 'firmness', label: 'Firmness', question: 'How firm and elastic is your skin?' },
-  { key: 'glow', label: 'Natural Glow', question: 'How much natural glow does your skin have?' },
+  { 
+    key: 'pigmentation', 
+    question: 'Look at the darkest patch on your face. Compared to when you started, it is...',
+    options: [
+      { value: 1, label: 'Much darker', color: 'bg-red-600' },
+      { value: 2, label: 'Slightly darker', color: 'bg-orange-600' },
+      { value: 3, label: 'Same', color: 'bg-yellow-600' },
+      { value: 4, label: 'Somewhat lighter', color: 'bg-green-400' },
+      { value: 5, label: 'Much lighter', color: 'bg-green-600' }
+    ]
+  },
+  { 
+    key: 'toneEvenness', 
+    question: 'How even does your overall skin tone look?',
+    options: [
+      { value: 1, label: 'Much less even', color: 'bg-red-600' },
+      { value: 2, label: 'Less even', color: 'bg-orange-600' },
+      { value: 3, label: 'Same', color: 'bg-yellow-600' },
+      { value: 4, label: 'More even', color: 'bg-green-400' },
+      { value: 5, label: 'Much more even', color: 'bg-green-600' }
+    ]
+  },
+  { 
+    key: 'texture', 
+    question: 'How does your skin texture feel?',
+    options: [
+      { value: 1, label: 'Very rough', color: 'bg-red-600' },
+      { value: 2, label: 'Rough', color: 'bg-orange-600' },
+      { value: 3, label: 'Normal', color: 'bg-yellow-600' },
+      { value: 4, label: 'Smooth', color: 'bg-green-400' },
+      { value: 5, label: 'Very smooth', color: 'bg-green-600' }
+    ]
+  },
+  { 
+    key: 'confidence', 
+    question: 'How confident do you feel about your skin right now?',
+    options: [
+      { value: 1, label: 'Not confident at all', color: 'bg-red-500' },
+      { value: 2, label: 'Not very confident', color: 'bg-orange-500' },
+      { value: 3, label: 'Somewhat confident', color: 'bg-yellow-500' },
+      { value: 4, label: 'Mostly confident', color: 'bg-blue-500' },
+      { value: 5, label: 'Very confident', color: 'bg-green-500' }
+    ]
+  }
 ];
 
 export default function SkinScoreScreen() {
-  const { patient, refreshSkinScores } = useAuth();
+  const { patient } = useAuth();
   const { isOnline, queueForSync } = useOffline();
   const navigate = useNavigate();
-  const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [showResults, setShowResults] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const day = calculateDay(patient?.startDate);
-  const currentQ = QUESTIONS[currentQuestion];
 
-  const handleAnswer = (value) => {
-    setAnswers({ ...answers, [currentQ.key]: value });
-    if (currentQuestion < QUESTIONS.length - 1) {
-      setTimeout(() => setCurrentQuestion(currentQuestion + 1), 300);
-    } else {
-      setShowResults(true);
-    }
+  const handleAnswer = (questionKey, value) => {
+    setAnswers({ ...answers, [questionKey]: value });
   };
 
-  const calculateTotal = () =>
-    Object.values(answers).reduce((a, b) => (b === null ? a : a + b), 0);
+  const calculateTotalScore = () => {
+    return Object.values(answers).reduce((sum, score) => sum + score, 0);
+  };
+
+  const allQuestionsAnswered = Object.values(answers).every(score => score > 0);
 
   const handleSubmit = async () => {
-    setIsSubmitting(true);
-    const total = calculateTotal();
-    const scoreData = {
-      id: generateId(),
-      patientId: patient?.id,
-      patientPhone: patient?.phone,
-      patientEmail: patient?.email,
-      date: new Date().toISOString(),
-      day,
-      ...answers,
-      totalScore: total,
-      synced: false,
-    };
-    await saveSkinScore(scoreData);
-    if (isOnline) {
-      queueForSync('skinScore', scoreData);
-      // Refresh skin scores from server after sync queued
-      await refreshSkinScores();
+    if (!allQuestionsAnswered) {
+      alert('Please answer all questions before submitting.');
+      return;
     }
-    setIsSubmitting(false);
-    navigate('/');
-  };
 
-  if (showResults) {
-    return (
-      <ResultsScreen
-        answers={answers}
-        totalScore={calculateTotal()}
-        onRetake={() => setShowResults(false)}
-        onSubmit={handleSubmit}
-        isSubmitting={isSubmitting}
-      />
-    );
-  }
+    // Validate patient data exists
+    if (!patient?.id) {
+      alert('Patient information not found. Please log in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const totalScore = calculateTotalScore();
+      
+      const scoreData = {
+        id: generateId(),
+        patientId: patient?.id,
+        patientName: patient?.name,
+        patientPhone: patient?.phone,
+        date: new Date().toISOString(),
+        day: day || 1,
+        assessmentType: 'skin-score',
+        totalScore,
+        maxScore: 20,
+        individualScores: answers,
+        darkest_patch: answers.pigmentation ?? 0,
+        skin_tone: answers.toneEvenness ?? 0,
+        texture: answers.texture ?? 0,
+        confidence: answers.confidence ?? 0,
+        synced: false
+      };
+
+      await saveSkinScore(scoreData);
+      
+      if (isOnline) {
+        // Only send the fields the API expects
+        const apiData = {
+          patientId: patient?.id,
+          patientPhone: patient?.phone,
+          date: scoreData.date,
+          day: scoreData.day,
+          darkest_patch: scoreData.darkest_patch,
+          skin_tone: scoreData.skin_tone,
+          texture: scoreData.texture,
+          confidence: scoreData.confidence,
+          totalScore: scoreData.totalScore
+        };
+        queueForSync('skinScore', apiData);
+      }
+      
+      console.log('Skin score assessment completed:', scoreData);
+      
+      navigate('/skin-score-results');
+      
+    } catch (error) {
+      console.error('Error saving skin score:', error);
+      alert('Failed to save assessment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f0f4ea]/5 to-[#faf8f5] px-6 py-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <motion.h1
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-4xl font-bold text-gray-900 mb-2"
-          >
-            Skin Assessment
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-lg text-gray-600 max-w-md mx-auto"
-          >
-            Day {day} of your skincare journey
-          </motion.p>
+        <div className="px-6 pt-6 pb-4">
+          <p className="text-xs text-[#c44033] font-bold uppercase tracking-wider mb-0">
+            Day {day} Progress Check
+          </p>
+          <h2 className="text-xl font-bold text-[#191716] font-['Playfair_Display'] mb-1">
+            Skin Score
+          </h2>
+          <p className="text-sm text-[#7a756d] font-['Outfit'] mb-0">
+            4 quick questions · takes 30 seconds
+          </p>
         </div>
 
-        {/* Progress Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 mb-8"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-[#c44033]/20 to-[#a03328]/80 flex items-center justify-center text-white font-semibold shadow-lg">
-                <span className="text-xl">
-                  {Math.round(((currentQuestion + 1) / QUESTIONS.length) * 100)}%
-                </span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Question {currentQuestion + 1} of {QUESTIONS.length}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Progress: {currentQuestion + 1}/{QUESTIONS.length}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() =>
-                currentQuestion > 0 && setCurrentQuestion(currentQuestion - 1)
-              }
-              disabled={currentQuestion === 0}
-              className="p-3 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
-            >
-              <ChevronLeft className="w-5 h-5 text-gray-400" />
-            </button>
-            <button
-              onClick={() => {
-                const remainingQuestions = QUESTIONS.length - currentQuestion - 1;
-                if (remainingQuestions > 0) {
-                  const finalAnswers = { ...answers };
-                  for (let i = currentQuestion + 1; i < QUESTIONS.length; i++) {
-                    finalAnswers[QUESTIONS[i].key] = null;
-                  }
-                  setAnswers(finalAnswers);
-                  setCurrentQuestion(currentQuestion + 1);
-                } else {
-                  setShowResults(true);
-                }
-              }}
-              disabled={currentQuestion >= QUESTIONS.length - 1}
-              className="text-sm text-gray-500 hover:text-gray-600 disabled:text-gray-300 disabled:cursor-not-allowed"
-            >
-              {currentQuestion < QUESTIONS.length - 1 ? 'Skip' : 'View Results'}
-            </button>
-          </div>
+        {/* Progress Dots */}
+        <div className="flex justify-center gap-2 px-6 pb-5">
+          {[1, 2, 3, 4].map((q) => (
+            <div
+              key={q}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                Object.keys(answers).length >= q ? 'bg-[#c44033]' : 'bg-[#e0ddd7]'
+              }`}
+            />
+          ))}
+        </div>
 
-          {/* Question Card */}
-          <motion.div
-            key={currentQuestion}
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8"
-          >
-            <div className="mb-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-xl">
-                  <Camera className="w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    {currentQ.label}
-                  </h3>
-                  <p className="text-gray-600 text-sm leading-relaxed">
-                    {currentQ.question}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Answer Options */}
-            <div className="space-y-4">
-              {[0, 1, 2].map((value) => (
-                <button
-                  key={value}
-                  onClick={() => handleAnswer(value)}
-                  className={`w-full p-6 rounded-2xl border-2 text-left transition-all hover:shadow-lg ${
-                    answers[currentQ.key] === value
-                      ? 'border-[#c44033] bg-[#c44033] text-white'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
-                        answers[currentQ.key] === value
-                          ? 'border-white bg-white'
-                          : 'border-gray-300 bg-gray-50'
-                      }`}
+        {/* Questions */}
+        <div className="px-6 flex flex-col gap-6">
+          {QUESTIONS.map((question, index) => (
+            <motion.div
+              key={question.key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <p className="text-sm font-semibold text-[#191716] font-['Outfit'] mb-3 leading-relaxed">
+                {question.question}
+              </p>
+              
+              {/* Options */}
+              <div className="flex gap-1.5">
+                {question.options.map((option, optionIndex) => {
+                  const value = option.value;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => handleAnswer(question.key, value)}
+                      className="flex-1 py-3 px-1 rounded-xl border-[1.5px] border-[#e0ddd7] bg-white cursor-pointer flex flex-col items-center gap-1 transition-all duration-150 min-h-[64px] justify-center hover:border-[#d0cdc7]"
+                      style={{
+                        backgroundColor: answers[question.key] === value ? '#fef2f1' : 'white',
+                        borderColor: answers[question.key] === value ? '#c44033' : '#e0ddd7'
+                      }}
                     >
-                      {answers[currentQ.key] === value && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="w-4 h-4 bg-[#c44033] rounded-full"
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <span className="font-medium">
-                        {value === 0 ? 'Poor' : value === 1 ? 'Fair' : 'Good'}
+                      <span 
+                        className="text-base font-bold font-['Playfair_Display']"
+                        style={{
+                          color: answers[question.key] === value ? '#c44033' : '#ccc8c0'
+                        }}
+                      >
+                        {value}
                       </span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                      <span className="text-xs text-[#7a756d] font-['Outfit'] leading-tight text-center whitespace-pre-line font-normal">
+                        {option.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
 
-          </motion.div>
-        </motion.div>
+      {/* Submit Button */}
+      <div className="px-6 py-7">
+        <button
+          onClick={handleSubmit}
+          disabled={!allQuestionsAnswered || isSubmitting}
+          className={`w-full py-[18px] rounded-2xl font-semibold transition-all duration-250 font-['Outfit'] text-base ${
+            allQuestionsAnswered && !isSubmitting
+              ? 'bg-[#c44033] text-white shadow-lg hover:bg-[#b33a2e]'
+              : 'bg-[#e0ddd7] text-[#a39e95] cursor-default'
+          }`}
+          style={{
+            boxShadow: allQuestionsAnswered && !isSubmitting ? '0 4px 12px rgba(196, 64, 51, 0.3)' : 'none'
+          }}
+        >
+          {isSubmitting ? 'Saving...' : 'See My Score →'}
+        </button>
       </div>
     </div>
   );
 }
-
-// Results Screen Component
-const ResultsScreen = ({ answers, totalScore, onRetake, onSubmit, isSubmitting }) => {
-
-  const getScoreLabel = (score) => {
-    if (score >= 16) return 'Excellent';
-    if (score >= 12) return 'Good';
-    if (score >= 8) return 'Fair';
-    return 'Needs Improvement';
-  };
-
-  const getScoreColor = (score) => {
-    if (score === null || score === undefined) return 'text-gray-400';
-    if (score >= 2) return 'text-green-600';
-    if (score >= 1) return 'text-blue-600';
-    return 'text-red-600';
-  };
-
-  const formatKey = (key) => {
-    return key
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, (str) => str.toUpperCase())
-      .trim();
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f0f4ea]/5 to-[#faf8f5] px-6 py-8">
-      <div className="max-w-2xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8"
-        >
-          <div className="text-center mb-8">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-[#c44033]/20 to-[#a03328]/80 flex flex-col items-center justify-center text-white shadow-xl"
-            >
-              <span className="text-4xl font-bold">{totalScore}</span>
-              <span className="text-sm mt-2">{getScoreLabel(totalScore)}</span>
-            </motion.div>
-            <p className="text-gray-600 mt-4">Your skin assessment is complete!</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 mb-8">
-            {Object.entries(answers)
-              .filter(([_, value]) => value !== null)
-              .map(([key, value]) => (
-                <div key={key} className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    {formatKey(key)}
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">Score:</span>
-                    <span className={`font-bold ${getScoreColor(value)}`}>
-                      {value}/2
-                    </span>
-                  </div>
-                </div>
-              ))}
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              onClick={onRetake}
-              disabled={isSubmitting}
-              className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
-            >
-              Retake Assessment
-            </button>
-            <button
-              onClick={onSubmit}
-              disabled={isSubmitting}
-              className="flex-1 bg-[#c44033] text-white py-3 px-6 rounded-xl font-semibold hover:bg-[#a03328] transition-colors shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <span>Save & Continue</span>
-              )}
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    </div>
-  );
-};
