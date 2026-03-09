@@ -103,27 +103,34 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
     
     try {
       const photoId = `photo-${Date.now()}`;
-      const photoData = {
-        patientPhone: patient?.phone || patient?.phoneNumber,
-        weekNumber: weekNumber,
+      const patientPhone = patient?.phone || patient?.phoneNumber;
+      const dayOfJourney = currentDay;
+      const today = new Date().toISOString().split('T')[0];
+
+      const photoPayload = {
+        patientPhone,
+        weekNumber,
+        day: dayOfJourney,
         photoData: capturedImage,
         photoUrl: '',
         skinScore: 0,
         notes: `Week ${weekNumber} photo - ${weeklyInsight.substring(0, 100)}...`,
-        tags: [`week-${weekNumber}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
+        tags: [`week-${weekNumber}`, `day-${dayOfJourney}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
       };
 
-      // Always save to IndexedDB first for instant feedback
-      await saveWeeklyPhoto({
+      const localPhoto = {
         id: photoId,
-        patientEmail: patient?.email,
-        patientPhone: patient?.phone || patient?.phoneNumber,
-        date: new Date().toISOString().split('T')[0],
+        patientPhone,
+        date: today,
         week: weekNumber,
+        day: dayOfJourney,
         photoData: capturedImage,
         synced: false,
         createdAt: new Date().toISOString()
-      });
+      };
+
+      // Always save to IndexedDB first for instant feedback
+      await saveWeeklyPhoto(localPhoto);
 
       setShowSuccess(true);
 
@@ -133,24 +140,14 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
           const response = await fetch('/api/photo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(photoData),
+            body: JSON.stringify(photoPayload),
           });
 
           if (response.ok) {
             const result = await response.json();
             console.log('Photo synced to server:', result);
             // Update local record as synced
-            await saveWeeklyPhoto({
-              id: photoId,
-              patientEmail: patient?.email,
-              patientPhone: patient?.phone || patient?.phoneNumber,
-              date: new Date().toISOString().split('T')[0],
-              week: weekNumber,
-              photoData: capturedImage,
-              synced: true,
-              serverId: result.id,
-              createdAt: new Date().toISOString()
-            });
+            await saveWeeklyPhoto({ ...localPhoto, synced: true, serverId: result.id });
           }
         } catch (syncError) {
           console.warn('Photo saved locally, will sync later:', syncError.message);
