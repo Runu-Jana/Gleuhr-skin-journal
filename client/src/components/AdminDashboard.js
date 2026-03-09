@@ -454,19 +454,30 @@ function DietTab({ details }) {
     return (
       <div className="admin-card" style={{ textAlign: 'center', padding: 40, color: '#999' }}>
         No diet plan found in Airtable for this customer phone number
-import React, { useState, useEffect } from 'react';
-import './AdminDashboard.css';
+      </div>
+    );
+  }
 
-const AdminDashboard = () => {
-  const [currentTab, setCurrentTab] = useState('today');
-  const [dashboardData, setDashboardData] = useState({
-  stats: { needAttention: 0, callsToday: 0, avgConsistency: 0, reorderDue: 0 },
-  patients: { needAttention: [], flagged: [], scheduledCalls: [], reorderConversations: [] },
-  summary: { totalPatients: 0, activePatients: 0, date: '' }
-});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  return (
+    <div className="admin-card">
+      <h3 style={{ marginBottom: 16 }}>🥗 Diet Plan</h3>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <div>
+          <strong>Plan:</strong> {dietPlan.planName || 'N/A'}
+        </div>
+        <div>
+          <strong>Duration:</strong> {dietPlan.duration || 'N/A'}
+        </div>
+        <div>
+          <strong>Calories:</strong> {dietPlan.calories || 'N/A'}
+        </div>
+        <div>
+          <strong>Notes:</strong> {dietPlan.notes || 'N/A'}
+        </div>
+      </div>
+    </div>
+  );
+}
   const [apiKey, setApiKey] = useState('');
   const [showLogin, setShowLogin] = useState(false);
   const [selectedUser, setSelectedUser] = useState({
@@ -716,7 +727,6 @@ const AdminDashboard = () => {
         </div>
       </div>
     );
-  };
 
   if (showLogin) {
     return (
@@ -816,7 +826,7 @@ const AdminDashboard = () => {
       )}
     </div>
   );
-}
+
 
 // ─── PHOTOS TAB (placeholder) ──────────────────────────────────
 function PhotosTab({ details }) {
@@ -849,11 +859,8 @@ function CallsTab() {
       <p>Call logs will appear here once logged.</p>
     </div>
   );
-}
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-
-  return (
+} 
+return (
     <div className="admin-dashboard">
       {/* Sidebar */}
       <div className="sidebar">
@@ -881,6 +888,7 @@ function CallsTab() {
               <div className="user-subtitle">Dr. Anjali Sharma</div>
             </div>
           </button>
+          
           <button 
             className={`user-btn ${selectedUser.type === 'coach' ? 'active' : 'inactive'}`}
             onClick={() => selectUser({
@@ -893,73 +901,29 @@ function CallsTab() {
               experience: '5 years'
             })}
           >
-            <span className="user-icon">🧴</span>
+            <span className="user-icon">👩‍⚕️</span>
             <div>
-              <div>Skin Coach</div>
+              <div>Coach</div>
               <div className="user-subtitle">Mary Chauhan</div>
             </div>
           </button>
-          <button 
-            className={`user-btn ${selectedUser.type === 'admin' ? 'active' : 'inactive'}`}
-            onClick={() => selectUser({
-              name: 'Priya Arora',
-              initials: 'PA',
-              role: 'Team Lead',
-              type: 'admin',
-              phone: '+91-76543-21098',
-              email: 'priya.arora@gleuhr.com',
-              experience: '10 years'
-            })}
-          >
-            <span className="user-icon">�</span>
-            <div>
-              <div>Team Lead</div>
-              <div className="user-subtitle">Priya Arora</div>
-            </div>
-          </button>
-        </div>
-        
-        <div className="user-details">
-          <div className="user-avatar">{selectedUser.initials}</div>
-          <div>
-            <div className="user-name">{selectedUser.name}</div>
-            <div className="user-role">{selectedUser.role}</div>
-          </div>
-        </div>
-        
-        <div className="sidebar-footer">
-          <div className="sync-status">📞 {selectedUser.phone}</div>
-          <div className="sync-status">✉️ {selectedUser.email}</div>
-          <div className="sync-status">💼 {selectedUser.experience} experience</div>
-          <div className="sync-status" style={{ marginTop: '8px' }}>Airtable Sync: <strong>Live</strong></div>
-          <div className="sync-status">Last updated: {new Date().toISOString().split('T')[0]}</div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="main-content">
-        <div className="header">
-          <h1>{greeting}, {selectedUser.name.split(' ')[0]}</h1>
-          <p>{updateDateTime()} · {dashboardData?.summary?.activePatients || 0} active patients</p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="stats-grid">
-          <div className="stat-card urgent">
-            <div className="stat-value">{dashboardData?.stats.needAttention || 0}</div>
-            <div className="stat-label">Need Attention</div>
-          </div>
-          <div className="stat-card calls">
-            <div className="stat-value">{dashboardData?.stats.callsToday || 0}</div>
-            <div className="stat-label">Calls Today</div>
-          </div>
-          <div className="stat-card consistency">
-            <div className="stat-value">{dashboardData?.stats.avgConsistency || 0}%</div>
-            <div className="stat-label">Avg Consistency</div>
-          </div>
-          <div className="stat-card reorder">
-            <div className="stat-value">{dashboardData?.stats.reorderDue || 0}</div>
-            <div className="stat-label">Reorder Due</div>
+        <div className="content-header">
+          <h2>Patient Management</h2>
+          <div className="header-actions">
+            <button 
+              onClick={() => window.open('https://airtable.com/app/vi32916h5i4w/tbl3291316h5i4w', '_blank')}
+              className="airtable-btn"
+            >
+              📊 Open Airtable
+            </button>
+            <button onClick={() => window.location.reload()}>
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -997,6 +961,6 @@ function CallsTab() {
       </div>
     </div>
   );
-};
+}
 
 export default AdminDashboard;
