@@ -102,85 +102,68 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
     setIsSubmitting(true);
     
     try {
+      const photoId = `photo-${Date.now()}`;
       const photoData = {
         patientPhone: patient?.phone || patient?.phoneNumber,
         weekNumber: weekNumber,
         photoData: capturedImage,
-        photoUrl: '', // Will be set by server if needed
+        photoUrl: '',
         skinScore: 0,
         notes: `Week ${weekNumber} photo - ${weeklyInsight.substring(0, 100)}...`,
         tags: [`week-${weekNumber}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
       };
 
-      if (isOnline) {
-        // Save directly to MongoDB
-        const response = await fetch('/api/photo', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(photoData),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to save photo to server');
-        }
-
-        const result = await response.json();
-        console.log('Photo saved to MongoDB:', result);
-        
-        // Also save to IndexedDB for local backup
-        await saveWeeklyPhoto({
-          id: `photo-${Date.now()}`,
-          patientEmail: patient?.email,
-          week: weekNumber,
-          photoData: capturedImage,
-          synced: true,
-          serverId: result.id,
-          createdAt: new Date().toISOString()
-        });
-      } else {
-        // Queue for sync when online
-        await queueForSync({
-          type: 'photo',
-          data: photoData,
-          id: `photo-${Date.now()}`,
-          createdAt: new Date().toISOString()
-        });
-
-        // Save to IndexedDB
-        await saveWeeklyPhoto({
-          id: `photo-${Date.now()}`,
-          patientEmail: patient?.email,
-          week: weekNumber,
-          photoData: capturedImage,
-          synced: false,
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      setShowSuccess(true);
-      setTimeout(() => {
-        onClose(); // Close popup instead of navigating
-      }, 2000);
-      
-    } catch (error) {
-      console.error('Error saving photo:', error);
-      
-      // Fallback: save to IndexedDB only
+      // Always save to IndexedDB first for instant feedback
       await saveWeeklyPhoto({
-        id: `photo-${Date.now()}`,
+        id: photoId,
         patientEmail: patient?.email,
+        patientPhone: patient?.phone || patient?.phoneNumber,
+        date: new Date().toISOString().split('T')[0],
         week: weekNumber,
         photoData: capturedImage,
         synced: false,
         createdAt: new Date().toISOString()
       });
-      
+
       setShowSuccess(true);
+
+      // Try server sync in the background (don't block UI)
+      if (isOnline) {
+        try {
+          const response = await fetch('/api/photo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(photoData),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('Photo synced to server:', result);
+            // Update local record as synced
+            await saveWeeklyPhoto({
+              id: photoId,
+              patientEmail: patient?.email,
+              patientPhone: patient?.phone || patient?.phoneNumber,
+              date: new Date().toISOString().split('T')[0],
+              week: weekNumber,
+              photoData: capturedImage,
+              synced: true,
+              serverId: result.id,
+              createdAt: new Date().toISOString()
+            });
+          }
+        } catch (syncError) {
+          console.warn('Photo saved locally, will sync later:', syncError.message);
+        }
+      }
+
       setTimeout(() => {
-        onClose(); // Close popup instead of navigating
+        onClose();
       }, 2000);
+
+    } catch (error) {
+      console.error('Error saving photo:', error);
+      alert('Failed to save photo. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
