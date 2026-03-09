@@ -1,11 +1,16 @@
 const Airtable = require('airtable');
 
-// Configure Airtable
-const base = new Airtable({
-  apiKey: process.env.AIRTABLE_PAT
-}).base(process.env.AIRTABLE_BASE_ID);
-
+// Configure Airtable (only if credentials are provided)
+let base = null;
 const DIET_PLAN_TABLE = process.env.AIRTABLE_DIET_PLAN_TABLE || 'Diet Plan';
+
+if (process.env.AIRTABLE_PAT && process.env.AIRTABLE_BASE_ID) {
+  base = new Airtable({
+    apiKey: process.env.AIRTABLE_PAT
+  }).base(process.env.AIRTABLE_BASE_ID);
+} else {
+  console.warn('Airtable credentials not configured. Diet plan features will be unavailable.');
+}
 
 /**
  * Fetch all diet plan records from Airtable.
@@ -22,6 +27,10 @@ const DIET_PLAN_TABLE = process.env.AIRTABLE_DIET_PLAN_TABLE || 'Diet Plan';
  *   - Notes
  */
 async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
+  if (!base) {
+    console.warn('Airtable not configured. Returning empty diet plans.');
+    return [];
+  }
   const records = [];
   const queryOptions = {
     pageSize: 100,
@@ -80,6 +89,10 @@ async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
  * Fetch a single diet plan by Airtable record ID.
  */
 async function fetchDietPlanById(recordId) {
+  if (!base) {
+    console.warn('Airtable not configured. Cannot fetch diet plan.');
+    return null;
+  }
   return new Promise((resolve, reject) => {
     base(DIET_PLAN_TABLE).find(recordId, (err, record) => {
       if (err) {
