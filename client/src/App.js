@@ -29,6 +29,7 @@ import InstallPrompt from './components/InstallPrompt';
 import GleuhrInsider from './components/GleuhrInsider';
 import AccessibilityMenu from './components/AccessibilityMenu';
 import AchievementPopup from './components/AchievementPopup';
+import AdminDietDashboard from './components/AdminDietDashboard';
 import AdminDashboard from './components/AdminDashboard';
 
 // Utils
@@ -125,10 +126,12 @@ function AppRoutes() {
             path="/register"
             element={<Navigate to="/login" replace />}
           />
-          <Route 
-            path="/login" 
-            element={isAuthenticated ? <Navigate to="/" replace /> : <LoginScreen />} 
+          <Route
+            path="/login"
+            element={isAuthenticated ? <Navigate to="/" replace /> : <LoginScreen />}
           />
+          <Route path="/admin/diet-plans" element={<AdminDietDashboard />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route 
             path="/onboarding" 
             element={!isAuthenticated ? <Navigate to="/login" replace /> : patient?.hasCommitted ? <Navigate to="/" replace /> : <OnboardingScreen />} 
