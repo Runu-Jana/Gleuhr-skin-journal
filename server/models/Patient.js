@@ -24,10 +24,11 @@ const patientSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  // Legacy field for backward compatibility - will be deprecated
   phone: {
     type: String,
-    required: true,
-    trim: true
+    trim: true,
+    sparse: true // Allows multiple null values
   },
   skinConcern: {
     type: String,
@@ -173,5 +174,23 @@ patientSchema.virtual('progressPercentage').get(function() {
 patientSchema.index({ createdAt: -1 });
 patientSchema.index({ currentDay: 1 });
 patientSchema.index({ isActive: 1 });
+
+// Pre-save middleware to ensure phone field is populated from phoneNumber
+patientSchema.pre('save', function(next) {
+  if (this.phoneNumber && !this.phone) {
+    this.phone = this.phoneNumber;
+  }
+  next();
+});
+
+// Pre-find middleware to handle both phone and phoneNumber queries
+patientSchema.pre(/^find/, function(next) {
+  // Normalize queries to use phoneNumber primarily
+  if (this.getQuery().phone && !this.getQuery().phoneNumber) {
+    this.setQuery({ phoneNumber: this.getQuery().phone });
+    this.setQuery({ phone: undefined });
+  }
+  next();
+});
 
 module.exports = mongoose.model('Patient', patientSchema);

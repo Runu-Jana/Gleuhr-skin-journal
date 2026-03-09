@@ -3,15 +3,12 @@ const router = express.Router();
 const Patient = require('../models/Patient');
 const whatsappService = require('../services/whatsappService');
 const crypto = require('crypto');
+const { validate, validationSchemas } = require('../middleware/validation');
 
 // POST /api/auth/send-verification - Send WhatsApp verification code to any phone
-router.post('/send-verification', async (req, res) => {
+router.post('/send-verification', validate(validationSchemas.sendVerification), async (req, res) => {
   try {
     const { phoneNumber, countryCode } = req.body;
-
-    if (!phoneNumber) {
-      return res.status(400).json({ error: 'Phone number is required' });
-    }
 
     // Check if patient exists
     const patient = await Patient.findOne({
@@ -42,10 +39,22 @@ router.post('/send-verification', async (req, res) => {
       });
     } else {
       console.error('WhatsApp OTP sending failed:', result.error || 'Unknown error');
-      res.status(500).json({ 
-        error: 'Failed to send verification code', 
-        details: result.error || 'Unknown error'
-      });
+      // If WhatsApp failed but fallback is available, still return success with fallback info
+      if (result.fallback) {
+        res.json({
+          success: true,
+          messageId: 'fallback',
+          fallback: true,
+          error: result.error,
+          // In development, return the code for testing
+          ...(process.env.NODE_ENV === 'development' && { code: verificationCode })
+        });
+      } else {
+        res.status(500).json({ 
+          error: 'Failed to send verification code', 
+          details: result.error || 'Unknown error'
+        });
+      }
     }
   } catch (error) {
     console.error('Send verification error:', error);
@@ -54,13 +63,9 @@ router.post('/send-verification', async (req, res) => {
 });
 
 // POST /api/auth/resend-verification - Resend WhatsApp verification code
-router.post('/resend-verification', async (req, res) => {
+router.post('/resend-verification', validate(validationSchemas.sendVerification), async (req, res) => {
   try {
     const { phoneNumber, countryCode } = req.body;
-
-    if (!phoneNumber) {
-      return res.status(400).json({ error: 'Phone number is required' });
-    }
 
     // Generate new verification code
     const verificationCode = await whatsappService.generateVerificationCode();
@@ -80,7 +85,21 @@ router.post('/resend-verification', async (req, res) => {
         ...(process.env.NODE_ENV === 'development' && { code: verificationCode })
       });
     } else {
-      res.status(500).json({ error: 'Failed to resend verification code' });
+      console.error('WhatsApp OTP resend failed:', result.error);
+      // If WhatsApp failed but fallback is available, still return success with fallback info
+      if (result.fallback) {
+        res.json({
+          success: true,
+          messageId: 'fallback',
+          resent: true,
+          fallback: true,
+          error: result.error,
+          // In development, return the code for testing
+          ...(process.env.NODE_ENV === 'development' && { code: verificationCode })
+        });
+      } else {
+        res.status(500).json({ error: 'Failed to resend verification code' });
+      }
     }
   } catch (error) {
     console.error('Resend verification error:', error);
@@ -89,13 +108,9 @@ router.post('/resend-verification', async (req, res) => {
 });
 
 // POST /api/auth/register - Verify code, auto-create patient if new, then login
-router.post('/register', async (req, res) => {
+router.post('/register', validate(validationSchemas.register), async (req, res) => {
   try {
     const { phoneNumber, verificationCode, deviceFingerprint } = req.body;
-
-    if (!phoneNumber || !verificationCode) {
-      return res.status(400).json({ error: 'Phone number and verification code are required' });
-    }
 
     // Verify WhatsApp verification code first
     const verificationResult = await whatsappService.verifyCode(phoneNumber, verificationCode);
@@ -161,13 +176,9 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/verify-token - Auto-login with stored token
-router.post('/verify-token', async (req, res) => {
+router.post('/verify-token', validate(validationSchemas.verifyToken), async (req, res) => {
   try {
     const { authToken, deviceFingerprint } = req.body;
-
-    if (!authToken) {
-      return res.status(400).json({ error: 'Auth token is required' });
-    }
 
     console.log(`🔑 Verifying token: ${authToken.substring(0, 10)}...`);
 

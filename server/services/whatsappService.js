@@ -54,13 +54,12 @@ class WhatsAppService {
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
       
-      // Fallback to console log in case of WhatsApp failure
-      console.log(`FALLBACK - OTP for ${phoneNumber}: ${otp}`);
-      
+      // Return failure status - let the client handle the fallback
       return {
-        success: true,
+        success: false,
+        error: error.message,
         fallback: true,
-        error: error.message
+        errorCode: error.response?.status || 'NETWORK_ERROR'
       };
     }
   }
@@ -112,14 +111,12 @@ class WhatsAppService {
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
       
-      // Fallback to console log in case of WhatsApp failure
-      console.log(`FALLBACK - RESEND OTP for ${phoneNumber}: ${otp}`);
-      
-      // Return success to avoid breaking the flow, but log the error
+      // Return failure status - let the client handle the fallback
       return {
-        success: true,
-        fallback: true,
+        success: false,
         error: error.message,
+        fallback: true,
+        errorCode: error.response?.status || 'NETWORK_ERROR',
         resent: true
       };
     }
@@ -140,16 +137,46 @@ class WhatsAppService {
     console.log('⚠️  This code will expire in 10 minutes\n');
     
     // In production, store in Redis or database
-    // For now, store in memory (not recommended for production)
+    // For now, store in memory with automatic cleanup
     if (!global.verificationCodes) {
       global.verificationCodes = new Map();
+      // Set up cleanup interval to run every 5 minutes
+      if (!global.cleanupInterval) {
+        global.cleanupInterval = setInterval(() => {
+          this.cleanupExpiredCodes();
+        }, 5 * 60 * 1000); // 5 minutes
+      }
     }
     
     global.verificationCodes.set(phoneNumber, {
       code,
       expiry: expiryTime,
-      attempts: 0
+      attempts: 0,
+      createdAt: new Date()
     });
+  }
+
+  cleanupExpiredCodes() {
+    if (!global.verificationCodes) return;
+    
+    const now = new Date();
+    const expiredKeys = [];
+    
+    for (const [phone, data] of global.verificationCodes.entries()) {
+      if (now > data.expiry) {
+        expiredKeys.push(phone);
+      }
+    }
+    
+    // Remove expired codes
+    expiredKeys.forEach(phone => {
+      global.verificationCodes.delete(phone);
+      console.log(`🧹 Cleaned up expired verification code for ${phone}`);
+    });
+    
+    if (expiredKeys.length > 0) {
+      console.log(`🧹 Cleaned up ${expiredKeys.length} expired verification codes`);
+    }
   }
 
   async verifyCode(phoneNumber, inputCode) {

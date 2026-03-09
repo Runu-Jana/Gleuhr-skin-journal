@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const SkinScore = require('../models/SkinScore');
 const Patient = require('../models/Patient');
+const { validate, validationSchemas } = require('../middleware/validation');
 
 // POST /api/skinscore - Save skin score assessment
-router.post('/', async (req, res) => {
+router.post('/', validate(validationSchemas.skinScore), async (req, res) => {
   try {
     const {
       patientId,
@@ -19,10 +20,6 @@ router.post('/', async (req, res) => {
       photoUrl,
       notes
     } = req.body;
-
-    if (!patientPhone || !date || day === undefined) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
 
     // Find patient by phone
     const patient = await Patient.findOne({

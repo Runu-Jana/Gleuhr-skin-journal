@@ -4,10 +4,10 @@ import './AdminDashboard.css';
 const AdminDashboard = () => {
   const [currentTab, setCurrentTab] = useState('today');
   const [dashboardData, setDashboardData] = useState({
-  stats: { needAttention: 0, callsToday: 0, avgConsistency: 0, reorderDue: 0 },
-  patients: { needAttention: [], flagged: [], scheduledCalls: [], reorderConversations: [] },
-  summary: { totalPatients: 0, activePatients: 0, date: '' }
-});
+    stats: { needAttention: 0, callsToday: 0, avgConsistency: 0, reorderDue: 0 },
+    patients: { needAttention: [], flagged: [], scheduledCalls: [], reorderConversations: [] },
+    summary: { totalPatients: 0, activePatients: 0, date: '' }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -23,12 +23,13 @@ const AdminDashboard = () => {
     experience: '8 years'
   });
 
-  const ADMIN_API_KEY = 'gleuhr-admin-2024';
-
   useEffect(() => {
-    // Check authentication
+    // Check authentication and restore API key
     const auth = sessionStorage.getItem('adminAuthenticated');
-    if (auth === 'true') {
+    const savedApiKey = sessionStorage.getItem('adminApiKey');
+    
+    if (auth === 'true' && savedApiKey) {
+      setApiKey(savedApiKey);
       setIsAuthenticated(true);
       loadDashboard();
     } else {
@@ -41,7 +42,7 @@ const AdminDashboard = () => {
       setLoading(true);
       const response = await fetch('/api/admin/dashboard', {
         headers: {
-          'X-Admin-API-Key': ADMIN_API_KEY
+          'X-Admin-API-Key': apiKey
         }
       });
 
@@ -63,14 +64,32 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleLogin = () => {
-    if (apiKey === ADMIN_API_KEY) {
-      setIsAuthenticated(true);
-      setShowLogin(false);
-      sessionStorage.setItem('adminAuthenticated', 'true');
-      loadDashboard();
-    } else {
-      alert('Invalid admin key');
+  const handleLogin = async () => {
+    if (!apiKey.trim()) {
+      alert('Please enter an admin API key');
+      return;
+    }
+
+    try {
+      // Test the API key by making a request
+      const response = await fetch('/api/admin/dashboard', {
+        headers: {
+          'X-Admin-API-Key': apiKey.trim()
+        }
+      });
+
+      if (response.ok) {
+        setIsAuthenticated(true);
+        setShowLogin(false);
+        sessionStorage.setItem('adminAuthenticated', 'true');
+        sessionStorage.setItem('adminApiKey', apiKey.trim());
+        loadDashboard();
+      } else {
+        alert('Invalid admin API key');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed. Please try again.');
     }
   };
 
@@ -83,7 +102,7 @@ const AdminDashboard = () => {
       // Get patient details by phone number from backend API
       const response = await fetch(`/api/admin/patient/${patientId}`, {
         headers: {
-          'X-Admin-API-Key': ADMIN_API_KEY
+          'X-Admin-API-Key': apiKey
         }
       });
       
@@ -275,7 +294,7 @@ const AdminDashboard = () => {
             onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
           />
           <button onClick={handleLogin}>Login</button>
-          <p>Demo key: gleuhr-admin-2024</p>
+          <p>Contact your system administrator for the API key</p>
         </div>
       </div>
     );
