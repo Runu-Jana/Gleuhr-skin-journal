@@ -55,18 +55,14 @@ export function isMilestoneDay(day) {
 
 export function isWeeklyPhotoDay(startDate) {
   if (!startDate) return false;
-  const start = new Date(startDate);
-  const today = new Date();
-  const days = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
-  return days % 7 === 0;
+  const day = calculateDay(startDate);
+  return day % 7 === 0;
 }
 
 export function getWeekNumber(startDate) {
   if (!startDate) return 1;
-  const start = new Date(startDate);
-  const today = new Date();
-  const days = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
-  return Math.ceil(days / 7);
+  const day = calculateDay(startDate);
+  return Math.ceil(day / 7);
 }
 
 export function getMilestoneLabel(day) {
