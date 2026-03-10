@@ -42,6 +42,7 @@ app.use('/api/checkin', require('./routes/checkin'));
 app.use('/api/reorder', require('./routes/reorder'));
 app.use('/api/admin/diet-plans', require('./routes/admin-diet-plans'));
 app.use('/api/admin/patients', require('./routes/admin-patients'));
+app.use('/api/admin/dietician', require('./routes/admin-dietician'));
 
 // Admin routes
 app.use('/api/admin', require('./admin'));
