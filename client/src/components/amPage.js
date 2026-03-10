@@ -404,6 +404,7 @@ export default function AMPage() {
 
         </div>
       </div>
+      </div>
 
       {/* Reorder Banner (Day 25+) */}
       {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
