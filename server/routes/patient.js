@@ -3,21 +3,17 @@ const router = express.Router();
 const Patient = require('../models/Patient');
 const Product = require('../models/Product');
 const DietPlan = require('../models/DietPlan');
+const { patientPhoneOr } = require('../utils/phoneVariants');
 
 // GET /api/patient/:phone - Get patient details by phone number
 router.get('/:phone', async (req, res) => {
   try {
     const { phone } = req.params;
     
-    // Find patient by phone number (support both field names for migration)
-    const patient = await Patient.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone }
-      ]
-    })
-    .populate('dietPlan')
-    .populate('products');
+    // Find patient by phone number (all variants: 7973944144, 917..., +917...)
+    const patient = await Patient.findOne({ $or: patientPhoneOr(phone) })
+      .populate('dietPlan')
+      .populate('products');
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
@@ -67,13 +63,8 @@ router.put('/:phone', async (req, res) => {
     const { phone } = req.params;
     const updates = req.body;
 
-    // Find patient by phone number
-    const patient = await Patient.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone }
-      ]
-    });
+    // Find patient by phone number (all variants)
+    const patient = await Patient.findOne({ $or: patientPhoneOr(phone) });
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
@@ -140,13 +131,8 @@ router.post('/:phone/products', async (req, res) => {
     const { phone } = req.params;
     const { name, category, instructions } = req.body;
 
-    // Find patient by phone number
-    const patient = await Patient.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone }
-      ]
-    });
+    // Find patient by phone number (all variants)
+    const patient = await Patient.findOne({ $or: patientPhoneOr(phone) });
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
@@ -188,13 +174,8 @@ router.delete('/:phone/products/:productId', async (req, res) => {
   try {
     const { phone, productId } = req.params;
 
-    // Find patient by phone number
-    const patient = await Patient.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone }
-      ]
-    });
+    // Find patient by phone number (all variants)
+    const patient = await Patient.findOne({ $or: patientPhoneOr(phone) });
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
@@ -225,13 +206,8 @@ router.post('/:phone/diet-plan', async (req, res) => {
     const { phone } = req.params;
     const { version, category, restrictions, recommendations, notes } = req.body;
 
-    // Find patient by phone number
-    const patient = await Patient.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone }
-      ]
-    });
+    // Find patient by phone number (all variants)
+    const patient = await Patient.findOne({ $or: patientPhoneOr(phone) });
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });

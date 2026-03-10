@@ -75,6 +75,16 @@ router.post('/', async (req, res) => {
       triggerFoods: triggerFoods || [],
       waterIntake: waterIntake || 0,
       skinMood: skinMood || 'Okay',
+      // Skin assessment fields
+      skinScore: skinScore !== undefined ? skinScore : undefined,
+      skinScores: skinScores || undefined,
+      // Wellness fields
+      mood: mood || undefined,
+      energy: energy || undefined,
+      sleep: sleep !== undefined ? sleep : undefined,
+      medications: medications || [],
+      symptoms: symptoms || [],
+      notes: notes || '',
       completed: true,
       completedAt: new Date()
     };
@@ -171,64 +181,48 @@ async function updateStreak(phoneNumber, currentDay, patientId = null) {
 
     if (streak) {
       const today = new Date().toISOString().split('T')[0];
-      const lastCheckin = streak.lastCheckinDate?.toISOString().split('T')[0];
+      // Use correct field name from Streak model: lastCheckIn (not lastCheckinDate)
+      const lastCheckin = streak.lastCheckIn ? new Date(streak.lastCheckIn).toISOString().split('T')[0] : null;
       const currentStreak = streak.currentStreak || 0;
-      
+
       // Calculate new streak
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
-      
+
       let newStreak = currentStreak;
       let newLongestStreak = streak.longestStreak || 0;
-      
-      if (lastCheckin === yesterdayStr) {
-        // Consecutive day - increment streak
+
+      if (lastCheckin === today) {
+        // Already checked in today — keep streak the same
+        newStreak = currentStreak;
+      } else if (lastCheckin === yesterdayStr) {
+        // Consecutive day — increment streak
         newStreak = currentStreak + 1;
-      } else if (lastCheckin !== today) {
-        // Gap in days or first check-in - reset to 1
+      } else {
+        // Gap in days or first check-in — reset to 1
         newStreak = 1;
       }
-      // If lastCheckin === today, streak stays the same (already logged today)
-      
+
       // Update longest streak if current streak exceeds it
       if (newStreak > newLongestStreak) {
         newLongestStreak = newStreak;
       }
 
-      // Update streak record
-      try {
-        if (streak) {
-          await Streak.findByIdAndUpdate(streak._id, {
-            currentStreak: newStreak,
-            longestStreak: newLongestStreak,
-            lastCheckinDate: today,
-            day: currentDay
-          });
-        } else {
-          // Create new streak record
-          streak = new Streak({
-            patientId: patientId,
-            patientPhone: phoneNumber,
-            currentStreak: 1,
-            longestStreak: 1,
-            lastCheckinDate: today,
-            day: currentDay
-          });
-          await streak.save();
-        }
-      } catch (error) {
-        console.error('Update streak error:', error);
-      }
+      await Streak.findByIdAndUpdate(streak._id, {
+        currentStreak: newStreak,
+        longestStreak: newLongestStreak,
+        lastCheckIn: new Date(),   // correct field name
+        day: currentDay
+      });
     } else {
       // Create new streak record
-      const today = new Date().toISOString().split('T')[0];
       streak = new Streak({
         patientId: patientId,
         patientPhone: phoneNumber,
         currentStreak: 1,
         longestStreak: 1,
-        lastCheckinDate: today,
+        lastCheckIn: new Date(),   // correct field name
         day: currentDay
       });
       await streak.save();
