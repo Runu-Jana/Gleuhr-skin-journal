@@ -72,6 +72,47 @@ function getPhoneFromRecord(record) {
   return '';
 }
 
+/**
+ * Map a raw Airtable record to our standard shape.
+ */
+function mapRecord(record) {
+  const dialCode = record.get('Dial Code') || '';
+  const phoneNumber = record.get('Phone Number') ? String(record.get('Phone Number')) : '';
+  return {
+    id: record.id,
+    airtableId: record.get('ID'),
+    treatmentPlan: record.get('Treatment Plan') || '',
+    customerName: extractLookup(record.get('Name')),
+    customerPhone: phoneNumber,
+    dialCode,
+    fullPhone: dialCode && phoneNumber ? `${dialCode}${phoneNumber}` : phoneNumber,
+    dieticianName: extractLookup(record.get('Dietician')) || extractLookup(record.get('Booked By')),
+    dieticianCallStatus: record.get('Dietician Call Status') || '',
+    dietPlanStatus: record.get('Diet Plan Status') || '',
+    dietPlanDate: record.get('Diet Plan Date') || null,
+  };
+}
+
+/**
+ * Fetch all records from the Diet Plan table (paginated).
+ * Optionally filter in JS by customerPhone or dieticianName.
+ */
+async function fetchAllDietPlans() {
+  if (!base) return [];
+  const records = [];
+  return new Promise((resolve, reject) => {
+    base(DIET_PLAN_TABLE)
+      .select({ pageSize: 100, sort: [{ field: 'ID', direction: 'desc' }] })
+      .eachPage(
+        (pageRecords, fetchNextPage) => {
+          pageRecords.forEach(r => records.push(mapRecord(r)));
+          fetchNextPage();
+        },
+        (err) => err ? reject(err) : resolve(records)
+      );
+  });
+}
+
 async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
   if (!base) {
     console.warn('Airtable not configured. Returning empty diet plans.');
@@ -91,25 +132,12 @@ async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
       })
       .eachPage(
         (pageRecords, fetchNextPage) => {
-          console.log(`📄 Page: ${pageRecords.length} records`);
           pageRecords.forEach((record) => {
             const recordPhone = getPhoneFromRecord(record);
             const normalizedRecordPhone = normalizePhone(recordPhone);
 
-            // Match using normalized phone numbers (or return all if no filter)
             if (!customerPhone || normalizedRecordPhone === normalizedSearchPhone) {
-              records.push({
-                id: record.id,
-                airtableId: record.get('ID'),
-                treatmentPlan: record.get('Treatment Plan') || '',
-                customerName: extractLookup(record.get('Name')),
-                customerPhone: record.get('Phone Number') ? String(record.get('Phone Number')) : '',
-                dialCode: record.get('Dial Code') || '',
-                dieticianName: extractLookup(record.get('Dietician')) || extractLookup(record.get('Booked By')),
-                dieticianCallStatus: record.get('Dietician Call Status') || '',
-                dietPlanStatus: record.get('Diet Plan Status') || '',
-                dietPlanDate: record.get('Diet Plan Date') || null,
-              });
+              records.push(mapRecord(record));
             }
           });
           fetchNextPage();
@@ -160,5 +188,6 @@ async function fetchDietPlanById(recordId) {
 
 module.exports = {
   fetchDietPlans,
-  fetchDietPlanById
+  fetchDietPlanById,
+  fetchAllDietPlans
 };
