@@ -26,14 +26,8 @@ export default function AMPage() {
   const progress = (day / 90) * 100;
   const shields = calculateShields(streakData?.streak || 0);
   const availableShields = streakData?.restorationShields?.available || shields || 0;
-
-  // Debug logging
-  console.log('🗓️ Date Debug Info:');
-  console.log('Start Date:', patient?.startDate);
-  console.log('Today:', new Date().toISOString());
-  console.log('Calculated Day:', day);
-  console.log('Day of Week:', new Date().toLocaleDateString('en-US', { weekday: 'long' }));
-
+  
+  // Determine shield color based on remaining count
   const getShieldColor = (count) => {
     if (count >= 3) return 'text-green-600 fill-green-600';
     if (count === 2) return 'text-yellow-600 fill-yellow-600';
@@ -46,8 +40,6 @@ export default function AMPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [showGamification, setShowGamification] = useState(false);
-  const [newAchievement, setNewAchievement] = useState(null);
   const [showShieldRestore, setShowShieldRestore] = useState(false);
   const [showShieldSuccess, setShowShieldSuccess] = useState(false);
   const [shieldRestoreData, setShieldRestoreData] = useState(null);
@@ -55,7 +47,7 @@ export default function AMPage() {
 
   const restoreStreakWithShield = async () => {
     if (!patient?.phone) return;
-
+    
     try {
       const response = await fetch('/api/streak/restore', {
         method: 'POST',
@@ -66,14 +58,15 @@ export default function AMPage() {
           phoneNumber: patient.phone
         })
       });
-
+      
       const result = await response.json();
-
+      
       if (result.success) {
         console.log('Streak restored with shield:', result);
         await refreshStreak();
         setShowShieldRestore(false);
-
+        
+        // Show success animation instead of alert
         setShieldRestoreData({
           streakRestored: true,
           shieldsRemaining: result.shieldsRemaining,
@@ -118,175 +111,116 @@ export default function AMPage() {
         const today = await getTodayCheckIn(patient?.phoneNumber || patient?.phone);
 
         if (today && today.date === new Date().toISOString().split('T')[0]) {
-          if (today.amRoutine !== undefined) {
-            setAmRoutine(today.amRoutine);
-          }
-          if (today.sunscreen !== undefined) {
-            setSunscreen(today.sunscreen);
-          }
-
-          if (today.amRoutine === true && today.sunscreen === true) {
-            setHasSubmitted(true);
-          }
-        } else {
-          setAmRoutine(false);
-          setSunscreen(false);
-          setHasSubmitted(false);
+          setAmRoutine(today.amRoutine);
+          setSunscreen(today.sunscreen);
+          setHasSubmitted(true);
         }
       } catch (error) {
         console.error('Error loading today check-in:', error);
-        setAmRoutine(false);
-        setSunscreen(false);
-        setHasSubmitted(false);
       }
     };
-
-    if (patient) {
-      loadToday();
-    }
-  }, [patient]);
-
-  const handleAMRoutineToggle = async () => {
-    const newAmRoutine = !amRoutine;
-    setAmRoutine(newAmRoutine);
-  };
-
-  const handleSunscreenToggle = async () => {
-    const newSunscreen = !sunscreen;
-    setSunscreen(newSunscreen);
-  };
+    loadToday();
+  }, [patient?.phoneNumber]);
 
   const handleSubmit = async () => {
-    setIsSubmitting(true);
-
-    try {
-      const phoneNumber = patient?.phoneNumber || patient?.phone;
-
-      if (!phoneNumber) {
-        alert('No phone number found. Please check your patient data.');
-        return;
-      }
-      const patientRecord = await getPatient(phoneNumber);
-
-      let patientId;
-      let existingCheckIn;
-
-      if (!patientRecord) {
-        try {
-          await savePatient({
-            id: patient.id,
-            name: patient.name,
-            firstName: patient.name?.split(' ')[0] || patient.firstName,
-            phone: patient.phone,
-            phoneNumber: patient.phone,
-            email: patient.email || null,
-            startDate: patient.startDate || new Date().toISOString().split('T')[0],
-            hasCommitted: patient.hasCommitted || false,
-            skinType: patient.skinType,
-            skinConcern: patient.skinConcern,
-            goals: patient.goals,
-            planType: patient.planType,
-            age: patient.age,
-            gender: patient.gender,
-            assignedDietician: patient.assignedDietician || null,
-            dieticianName: patient.dieticianName || null,
-            createdAt: new Date().toISOString()
-          });
-
-          const retryPatientRecord = await getPatient(phoneNumber);
-          if (!retryPatientRecord) {
-            alert('Patient record not found. Please contact support.');
-            return;
-          }
-
-          patientId = retryPatientRecord.id;
-
-        } catch (saveError) {
-          alert('Patient record not found. Please contact support.');
-          return;
-        }
-      } else {
-        patientId = patientRecord.id;
-      }
-
-      existingCheckIn = await getTodayCheckIn(patientId);
-
-      const todayDate = new Date().toISOString().split('T')[0];
-      const checkInData = {
-        id: existingCheckIn?.id || generateId(),
-        patientId: patientId,
-        patientPhone: phoneNumber,
-        date: todayDate,
-        day,
-        amRoutine: amRoutine,
-        sunscreen: sunscreen,
-        pmRoutine: existingCheckIn?.pmRoutine || false,
-        dietFollowed: existingCheckIn?.dietFollowed || '',
-        triggerFoods: existingCheckIn?.triggerFoods || [],
-        waterIntake: existingCheckIn?.waterIntake || 0,
-        skinMood: existingCheckIn?.skinMood || '',
-        synced: false
-      };
-
-      console.log('Submitting AM check-in data:', checkInData);
-
-      await saveCheckIn(checkInData);
-
-      try {
-        const response = await fetch('/api/checkin', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(checkInData)
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log('MongoDB AM check-in save response:', result);
-
-        if (result.success) {
-          checkInData.synced = true;
-          checkInData.id = result.id;
-          await saveCheckIn(checkInData);
-          console.log('AM check-in saved to MongoDB successfully!');
-        }
-      } catch (apiError) {
-        console.error('Failed to save AM check-in to MongoDB, queuing for sync:', apiError);
-
-        if (isOnline) {
-          queueForSync('checkin', checkInData);
-        }
-      }
-
-      if (amRoutine || sunscreen) {
-        awardPoints('am_routine');
-      }
-
-      try {
-        await refreshStreak();
-      } catch (streakError) {
-        console.error('Error refreshing streak in AM page:', streakError);
-      }
-
-      setHasSubmitted(true);
-
-      navigate('/checkin-success', {
-        state: {
-          streak: day,
-          message: "Your consistency puts you in the top 15% of all Gleuhr users this month."
-        }
-      });
-
-    } catch (error) {
-      console.error('Error submitting AM check-in:', error);
-      alert('Failed to save AM check-in. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+    if (!amRoutine) {
+      alert('Please complete your AM routine before submitting');
+      return;
     }
+    if (!sunscreen) {
+      alert('Please apply sunscreen before submitting');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    // Get patient record to get patientId
+    const phoneNumber = patient?.phoneNumber || patient?.phone;
+    
+    if (!phoneNumber) {
+      alert('No phone number found. Please check your patient data.');
+      return;
+    }
+    
+    const patientRecord = await getPatient(phoneNumber);
+    if (!patientRecord) {
+      alert('Patient record not found. Please contact support.');
+      return;
+    }
+    
+    const patientId = patientRecord.id;
+    
+    const checkInData = {
+      id: generateId(),
+      patientId: patientId,
+      patientPhone: phoneNumber,
+      date: new Date().toISOString().split('T')[0],
+      day,
+      amRoutine,
+      sunscreen,
+      synced: false
+    };
+
+    console.log('Submitting AM check-in data:', checkInData);
+
+    // Save to IndexedDB
+    await saveCheckIn(checkInData);
+
+    // Try to save to MongoDB directly
+    try {
+      const response = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(checkInData)
+      });
+      
+      const result = await response.json();
+      console.log('MongoDB AM check-in save response:', result);
+      
+      if (result.success) {
+        // Update local record as synced
+        checkInData.synced = true;
+        checkInData.id = result.id;
+        await saveCheckIn(checkInData);
+        console.log('AM check-in saved to MongoDB successfully!');
+      }
+    } catch (apiError) {
+      console.error('Failed to save AM check-in to MongoDB, queuing for sync:', apiError);
+      
+      // Queue for sync if API fails
+      if (isOnline) {
+        queueForSync('checkin', checkInData);
+      }
+    }
+
+    // Award points for AM routine
+    awardPoints('am_routine');
+    
+    // Refresh streak with small delay to ensure server update is complete
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for server to update
+      await refreshStreak();
+    } catch (streakError) {
+      console.error('Error refreshing streak:', streakError);
+      // Don't fail the entire submission if streak refresh fails
+    }
+
+    // Check if current day is a milestone and show celebration
+    if (isMilestoneDay(day)) {
+      setShowCelebration(true);
+      setTimeout(() => setShowCelebration(false), 5000);
+    }
+
+    setHasSubmitted(true);
+    setIsSubmitting(false);
+    
+    console.log('AM check-in submission completed!');
+    
+    // Show success message
+    setShowCheckinSuccess(true);
+    setTimeout(() => setShowCheckinSuccess(false), 3000);
   };
 
   const milestones = [
@@ -318,15 +252,6 @@ export default function AMPage() {
                 <Shield className={`w-4 h-4 ${getShieldColor(availableShields)}`} />
                 <span className={`font-bold ${availableShields >= 3 ? 'text-green-700' : availableShields === 2 ? 'text-yellow-700' : availableShields === 1 ? 'text-red-700' : 'text-gray-700'}`}>{streakData?.restorationShields?.available}</span>
                 <span className={`text-xs ${availableShields >= 3 ? 'text-green-600' : availableShields === 2 ? 'text-yellow-600' : availableShields === 1 ? 'text-red-600' : 'text-gray-600'}`}>shields</span>
-                <button
-                  onClick={() => setShowShieldRestore(true)}
-                  className={`ml-1 ${availableShields >= 3 ? 'text-green-600 hover:text-green-700' : availableShields === 2 ? 'text-yellow-600 hover:text-yellow-700' : availableShields === 1 ? 'text-red-600 hover:text-red-700' : 'text-gray-600 hover:text-gray-700'}`}
-                  title="Use shield to restore streak"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </button>
               </div>
             )}
             <div className="flex items-center gap-1">
@@ -337,6 +262,24 @@ export default function AMPage() {
                 />
               ))}
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/profile')}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c-.94 1.543.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c.94-1.543-.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -352,9 +295,8 @@ export default function AMPage() {
                 cy="80"
                 r="70"
                 fill="none"
-                stroke="#c44033"
+                stroke="#3b82f6"
                 strokeWidth="12"
-                strokeLinecap="round"
                 strokeDasharray={`${2 * Math.PI * 70}`}
                 strokeDashoffset={`${2 * Math.PI * 70 * (1 - progress / 100)}`}
                 className="transition-all duration-1000"
@@ -407,9 +349,7 @@ export default function AMPage() {
                       amRoutine ? 'translate-x-7' : 'translate-x-0'
                     }`} />
                   </button>
-                  <span className={`text-sm font-medium ${
-                    amRoutine ? 'text-green-600' : 'text-gray-500'
-                  }`}>
+                  <span className={`text-sm font-medium ${amRoutine ? 'text-green-600' : 'text-gray-500'}`}>
                     {amRoutine ? 'Completed' : 'Not Started'}
                   </span>
                 </div>
@@ -439,12 +379,8 @@ export default function AMPage() {
           {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || hasSubmitted || !sunscreen}
-            className={`w-full py-4 rounded-xl font-semibold text-white transition-all ${
-              hasSubmitted || !sunscreen
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-500 hover:bg-blue-600 active:scale-105'
-            }`}
+            disabled={isSubmitting || hasSubmitted}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting ? (
               <span className="flex items-center justify-center gap-2">
@@ -456,14 +392,7 @@ export default function AMPage() {
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                AM Routine Completed
-              </span>
-            ) : amRoutine && !sunscreen ? (
-              <span className="flex items-center justify-center">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-                </svg>
-                Apply Sunscreen
+                Completed
               </span>
             ) : (
               <span className="flex items-center justify-center">
@@ -473,8 +402,8 @@ export default function AMPage() {
             )}
           </button>
 
+        </div>
       </div>
-      
 
       {/* Reorder Banner (Day 25+) */}
       {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
@@ -487,21 +416,6 @@ export default function AMPage() {
             <h3 className="text-2xl font-bold text-gray-900 mb-2">{streakData?.streak || 0} Day Streak!</h3>
             <p className="text-gray-600">You're building great habits. Keep it up!</p>
           </motion.div>
-        </motion.div>
-      )}
-
-      {/* Check-in Success Message */}
-      {showCheckinSuccess && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span className="font-medium">AM check-in completed successfully!</span>
         </motion.div>
       )}
 
@@ -531,11 +445,11 @@ export default function AMPage() {
           </motion.div>
         </motion.div>
       )}
-
+      
       {/* Shield Success Animation */}
       <AnimatePresence>
-         {showShieldSuccess && shieldRestoreData && (
-                    <ShieldSuccessAnimation
+        {showShieldSuccess && shieldRestoreData && (
+          <ShieldSuccessAnimation
             streakRestored={shieldRestoreData.streakRestored}
             shieldsRemaining={shieldRestoreData.shieldsRemaining}
             previousStreak={shieldRestoreData.previousStreak}
