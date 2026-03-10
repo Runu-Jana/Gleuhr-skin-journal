@@ -29,9 +29,8 @@ const dietPlanSchema = new mongoose.Schema({
   }
 });
 
-dietPlanSchema.pre('save', function(next) {
+dietPlanSchema.pre('save', function() {
   this.updatedAt = Date.now();
-  next();
 });
 
 module.exports = mongoose.model('DietPlan', dietPlanSchema);

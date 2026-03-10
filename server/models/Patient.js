@@ -162,13 +162,12 @@ const patientSchema = new mongoose.Schema({
 });
 
 // Keep phone and phoneNumber in sync
-patientSchema.pre('save', function(next) {
+patientSchema.pre('save', function() {
   if (this.phoneNumber && !this.phone) {
     this.phone = this.phoneNumber;
   } else if (this.phone && !this.phoneNumber) {
     this.phoneNumber = this.phone;
   }
-  next();
 });
 
 // Virtuals

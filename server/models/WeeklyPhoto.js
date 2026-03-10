@@ -55,9 +55,8 @@ const weeklyPhotoSchema = new mongoose.Schema({
   }
 });
 
-weeklyPhotoSchema.pre('save', function(next) {
+weeklyPhotoSchema.pre('save', function() {
   this.updatedAt = Date.now();
-  next();
 });
 
 // Index for efficient queries

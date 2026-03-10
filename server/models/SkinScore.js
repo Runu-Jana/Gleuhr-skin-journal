@@ -87,23 +87,16 @@ const skinScoreSchema = new mongoose.Schema({
 });
 
 // Calculate total score before saving
-skinScoreSchema.pre('save', function(next) {
-  // Ensure next is a function
-  if (typeof next !== 'function') {
-    console.error('Pre-save hook: next is not a function');
-    return;
-  }
-  
+skinScoreSchema.pre('save', function() {
   const metrics = [
     this.darkest_patch || 0,
     this.skin_tone || 0,
     this.texture || 0,
     this.confidence || 0
   ];
-  
+
   this.totalScore = metrics.reduce((sum, val) => sum + val, 0);
   this.updatedAt = Date.now();
-  next();
 });
 
 // Indexes for better performance
