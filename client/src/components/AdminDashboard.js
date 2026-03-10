@@ -1,63 +1,78 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Phone as PhoneIcon, ArrowLeft, RefreshCw, Activity, Star, TrendingUp } from 'lucide-react';
+import { Search, Phone as PhoneIcon, RefreshCw, ArrowRight } from 'lucide-react';
 import axios from 'axios';
 import './AdminDashboard.css';
 
-// Configure axios with admin API key
 const adminApi = axios.create({
   baseURL: '/api',
-  headers: {
-    'x-admin-api-key': 'gleuhr-admin-2024'
-  }
+  headers: { 'x-admin-api-key': 'gleuhr-admin-2024' }
 });
 
-const MOOD_MAP = {
-  excellent: '\uD83D\uDE04',
-  good: '\uD83D\uDE42',
-  fair: '\uD83D\uDE10',
-  poor: '\uD83D\uDE1E'
-};
+const MOOD_MAP = { excellent: '\uD83D\uDE04', good: '\uD83D\uDE42', fair: '\uD83D\uDE10', poor: '\uD83D\uDE1E' };
+
+const AVATAR_COLORS = ['#c44033', '#16A34A', '#8B5CF6', '#CA8A04', '#0891B2', '#DB2777', '#EA580C', '#4F46E5'];
+function avatarColor(name) {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
 
 function getInitials(name) {
   if (!name) return '??';
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// ═══════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
-  const [currentTab, setCurrentTab] = useState('today');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [patients, setPatients] = useState([]);
+
+  // Queue state
+  const [queueData, setQueueData] = useState(null);
+  const [dieticians, setDieticians] = useState([]);
+  const [selectedDietician, setSelectedDietician] = useState(null);
+  const [activeTab, setActiveTab] = useState('queue');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Selected patient detail
+  // Detail state
   const [selectedPhone, setSelectedPhone] = useState(null);
   const [details, setDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState('overview');
-
-  // Sidebar user — populated from Airtable dietPlan of first loaded patient or selected patient
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // Load patients
-  const fetchPatients = useCallback(async () => {
+  // Fetch queue data
+  const fetchQueue = useCallback(async (dieticianName) => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await adminApi.get('/admin/patients');
-      setPatients(data.data || []);
+      const params = dieticianName ? { dietician: dieticianName } : {};
+      const { data } = await adminApi.get('/admin/patients/queue', { params });
+      setQueueData(data.data);
+      setDieticians(data.data.dieticians || []);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load patients');
+      setError(err.response?.data?.error || 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchPatients();
-  }, [fetchPatients]);
+    fetchQueue(selectedDietician);
+  }, [fetchQueue, selectedDietician]);
 
-  // Load patient detail
   const openPatientDetails = async (phone) => {
     setSelectedPhone(phone);
     setDetailsLoading(true);
@@ -66,7 +81,6 @@ export default function AdminDashboard() {
     try {
       const { data } = await adminApi.get(`/admin/patients/${encodeURIComponent(phone)}/details`);
       setDetails(data.data);
-      // Set sidebar user from Airtable dietPlan dietician
       if (data.data.dietPlan) {
         setSelectedUser(data.data.dietPlan);
       } else {
@@ -85,82 +99,32 @@ export default function AdminDashboard() {
     setDetails(null);
   };
 
-  const filtered = patients.filter((p) => {
-    const term = searchTerm.toLowerCase();
-    // Normalize phone search: strip non-digits for phone comparison
-    const termDigits = term.replace(/[^\d]/g, '');
-    const phoneDigits = (p.phone || '').replace(/[^\d]/g, '');
-    return (
-      (p.name || '').toLowerCase().includes(term) ||
-      (p.phone || '').includes(term) ||
-      (termDigits.length >= 4 && phoneDigits.includes(termDigits)) ||
-      (p.skinConcern || '').toLowerCase().includes(term)
-    );
-  });
-
-  // ─── PATIENT DETAIL VIEW ─────────────────────────────────────
+  // ─── PATIENT DETAIL VIEW ───────────────────────────────────
   if (selectedPhone) {
     return (
       <div className="admin-layout">
-        {/* Sidebar */}
-        <aside className="admin-sidebar">
-          <div className="admin-sidebar-logo">
-            <h2>GLEUHR</h2>
-            <p>Skin Journal</p>
-          </div>
-          <nav className="admin-sidebar-nav">
-            {/* Coach from MongoDB */}
-            <button className="admin-sidebar-item active">
-              <div className="admin-sidebar-avatar" style={{ background: '#c44033' }}>
-                {details?.patient?.coachName ? getInitials(details.patient.coachName) : 'CO'}
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>Coach</div>
-                <div style={{ fontSize: 11, opacity: 0.6 }}>{details?.patient?.coachName || '—'}</div>
-              </div>
-            </button>
-
-            {/* Dietician from Airtable */}
-            {selectedUser && (
-              <button className="admin-sidebar-item">
-                <div className="admin-sidebar-avatar" style={{ background: '#8B5CF6' }}>
-                  {selectedUser.dieticianName ? selectedUser.dieticianName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '??'}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>Dietician</div>
-                  <div style={{ fontSize: 11, opacity: 0.6 }}>{selectedUser.dieticianName || 'N/A'}</div>
-                </div>
-              </button>
-            )}
-          </nav>
-          <div className="admin-sidebar-footer">
-            <div>Airtable Sync: Live</div>
-            <div>Last updated: {new Date().toISOString().split('T')[0]}</div>
-          </div>
-        </aside>
-
-        {/* Main content */}
+        <Sidebar
+          dieticians={dieticians}
+          selectedDietician={selectedDietician}
+          onSelect={setSelectedDietician}
+          detailMode
+          coachName={details?.patient?.coachName}
+          dieticianUser={selectedUser}
+        />
         <div className="admin-main">
           {detailsLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
-              <div className="w-8 h-8 border-4 border-[#c44033] border-t-transparent rounded-full animate-spin" />
-            </div>
+            <div className="admin-center-spinner"><div className="spinner" /></div>
           ) : !details ? (
             <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>
-              <button onClick={goBack} style={{ color: '#c44033', fontWeight: 600, marginBottom: 16, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>
-                &larr; Back to patients
-              </button>
+              <button onClick={goBack} className="back-link">&larr; Back to queue</button>
               <p>Could not load details</p>
             </div>
           ) : (
             <>
-              {/* Header */}
               <div className="admin-header">
                 <div className="admin-header-left">
-                  <button onClick={goBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c44033', fontSize: 18, marginRight: 4 }}>
-                    &larr;
-                  </button>
-                  <div className="admin-header-avatar">
+                  <button onClick={goBack} className="back-arrow">&larr;</button>
+                  <div className="admin-header-avatar" style={{ background: avatarColor(details.patient.name) }}>
                     {getInitials(details.patient.name)}
                   </div>
                   <div>
@@ -177,26 +141,16 @@ export default function AdminDashboard() {
                   {details.streak.daysAbsent > 0 && (
                     <span className="absent-badge">{details.streak.daysAbsent} Days Absent</span>
                   )}
-                  <button className="log-call-btn">
-                    <PhoneIcon size={14} /> Log Call
-                  </button>
+                  <button className="log-call-btn"><PhoneIcon size={14} /> Log Call</button>
                 </div>
               </div>
-
-              {/* Tabs */}
               <div className="admin-tabs">
                 {['overview', 'diet', 'photos', 'calls'].map(tab => (
-                  <button
-                    key={tab}
-                    className={`admin-tab ${activeDetailTab === tab ? 'active' : ''}`}
-                    onClick={() => setActiveDetailTab(tab)}
-                  >
+                  <button key={tab} className={`admin-tab ${activeDetailTab === tab ? 'active' : ''}`} onClick={() => setActiveDetailTab(tab)}>
                     {{ overview: 'Overview', diet: 'Diet & Compliance', photos: 'Photos & Ratings', calls: 'Call History' }[tab]}
                   </button>
                 ))}
               </div>
-
-              {/* Tab Content */}
               <div className="admin-content">
                 {activeDetailTab === 'overview' && <OverviewTab details={details} />}
                 {activeDetailTab === 'diet' && <DietTab details={details} />}
@@ -210,84 +164,310 @@ export default function AdminDashboard() {
     );
   }
 
-  // ─── PATIENT LIST VIEW ────────────────────────────────────────
+  // ─── QUEUE DASHBOARD VIEW ──────────────────────────────────
+  const summary = queueData?.summary || {};
+  const categories = queueData?.categories || {};
+  const allPatients = queueData?.allPatients || [];
+  const onboarding = queueData?.onboarding || [];
+
+  // Filter patients by search
+  const filterList = (list) => {
+    if (!searchTerm) return list;
+    const term = searchTerm.toLowerCase();
+    const digits = term.replace(/[^\d]/g, '');
+    return list.filter(p =>
+      (p.name || '').toLowerCase().includes(term) ||
+      (p.phone || '').includes(term) ||
+      (digits.length >= 4 && (p.phone || '').replace(/[^\d]/g, '').includes(digits)) ||
+      (p.tpId || '').toLowerCase().includes(term)
+    );
+  };
+
+  const queueCount = (categories.urgent?.length || 0) + (categories.flagged?.length || 0) +
+    (categories.scheduledCalls?.length || 0) + (categories.reorder?.length || 0);
+
+  const firstName = selectedDietician ? selectedDietician.split(' ')[0] : 'Admin';
+
   return (
-    <div className="patient-list-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
-          <span style={{ color: '#c44033' }}>GLEUHR</span> Admin Dashboard
-        </h1>
-        <button
-          onClick={fetchPatients}
-          disabled={loading}
-          style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#c44033', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: loading ? 0.5 : 1 }}
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
-      </div>
-
-      {/* Search */}
-      <div style={{ position: 'relative', marginBottom: 16 }}>
-        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
-        <input
-          type="text"
-          placeholder="Search by name, phone, or skin concern..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: '100%', padding: '10px 12px 10px 36px', border: '1px solid #ddd', borderRadius: 8, fontSize: 13, outline: 'none' }}
-        />
-      </div>
-
-      {error && (
-        <div style={{ background: '#FEF2F2', color: '#c44033', padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{error}</div>
-      )}
-
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-          <div className="w-8 h-8 border-4 border-[#c44033] border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#999' }}>No patients found</div>
-      ) : (
-        filtered.map((p) => (
-          <div key={p.id} className="patient-card" onClick={() => openPatientDetails(p.phone)}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#c44033', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>
-                  {getInitials(p.name)}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: '#888' }}>{p.phone} &middot; Day {p.currentDay}/90 &middot; {p.skinConcern || '—'}</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, background: p.isActive ? '#DCFCE7' : '#F3F4F6', color: p.isActive ? '#16A34A' : '#666', fontWeight: 600 }}>
-                  {p.isActive ? 'Active' : 'Inactive'}
-                </span>
-                <button
-                  style={{ padding: '6px 14px', background: '#c44033', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                  onClick={(e) => { e.stopPropagation(); openPatientDetails(p.phone); }}
-                >
-                  View Details
-                </button>
-              </div>
-            </div>
+    <div className="admin-layout">
+      <Sidebar
+        dieticians={dieticians}
+        selectedDietician={selectedDietician}
+        onSelect={(d) => { setSelectedDietician(d); setActiveTab('queue'); }}
+      />
+      <div className="admin-main">
+        <div className="queue-header">
+          <div>
+            <h1 className="queue-greeting">{getGreeting()}, {firstName}</h1>
+            <p className="queue-date">{formatDate()} &middot; {summary.activePatients || 0} active patients</p>
           </div>
-        ))
-      )}
+          <button onClick={() => fetchQueue(selectedDietician)} disabled={loading} className="refresh-btn">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="summary-cards">
+          <div className="summary-card">
+            <div className="summary-num" style={{ color: '#DC2626' }}>{summary.needAttention || 0}</div>
+            <div className="summary-label">Need Attention</div>
+          </div>
+          <div className="summary-card">
+            <div className="summary-num" style={{ color: '#CA8A04' }}>{summary.callsToday || 0}</div>
+            <div className="summary-label">Calls Today</div>
+          </div>
+          <div className="summary-card">
+            <div className="summary-num" style={{ color: '#16A34A' }}>{summary.avgConsistency || 0}%</div>
+            <div className="summary-label">Avg Consistency</div>
+          </div>
+          <div className="summary-card">
+            <div className="summary-num" style={{ color: '#0891B2' }}>{summary.reorderDue || 0}</div>
+            <div className="summary-label">Reorder Due</div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="queue-tabs">
+          <button className={`queue-tab ${activeTab === 'queue' ? 'active' : ''}`} onClick={() => setActiveTab('queue')}>
+            Today's Queue {queueCount > 0 && <span className="tab-badge">{queueCount}</span>}
+          </button>
+          <button className={`queue-tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
+            All Patients <span className="tab-count">{allPatients.length}</span>
+          </button>
+          <button className={`queue-tab ${activeTab === 'onboarding' ? 'active' : ''}`} onClick={() => setActiveTab('onboarding')}>
+            Onboarding <span className="tab-count">{onboarding.length}</span>
+          </button>
+        </div>
+
+        {/* Search (for All Patients tab) */}
+        {activeTab === 'all' && (
+          <div className="queue-search">
+            <Search size={16} className="queue-search-icon" />
+            <input
+              type="text"
+              placeholder="Search by name, phone, or TP-ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="queue-search-input"
+            />
+          </div>
+        )}
+
+        {error && <div className="queue-error">{error}</div>}
+
+        {loading ? (
+          <div className="admin-center-spinner"><div className="spinner" /></div>
+        ) : (
+          <div className="queue-content">
+            {activeTab === 'queue' && (
+              <>
+                {categories.urgent?.length > 0 && (
+                  <CategorySection
+                    icon="red"
+                    title="URGENT \u2014 IMMEDIATE ACTION"
+                    patients={categories.urgent}
+                    onSelect={openPatientDetails}
+                  />
+                )}
+                {categories.flagged?.length > 0 && (
+                  <CategorySection
+                    icon="yellow"
+                    title="FLAGGED \u2014 ADDRESS THIS WEEK"
+                    patients={categories.flagged}
+                    onSelect={openPatientDetails}
+                  />
+                )}
+                {categories.scheduledCalls?.length > 0 && (
+                  <CategorySection
+                    icon="phone"
+                    title="SCHEDULED CALLS"
+                    patients={categories.scheduledCalls}
+                    onSelect={openPatientDetails}
+                  />
+                )}
+                {categories.reorder?.length > 0 && (
+                  <CategorySection
+                    icon="green"
+                    title="REORDER CONVERSATIONS"
+                    patients={categories.reorder}
+                    onSelect={openPatientDetails}
+                  />
+                )}
+                {queueCount === 0 && (
+                  <div className="queue-empty">No items in today's queue. All patients are on track!</div>
+                )}
+              </>
+            )}
+
+            {activeTab === 'all' && (
+              <div className="patient-list">
+                {filterList(allPatients).length === 0 ? (
+                  <div className="queue-empty">No patients found</div>
+                ) : (
+                  filterList(allPatients).map(p => (
+                    <PatientCard key={p.id} patient={p} onSelect={openPatientDetails} />
+                  ))
+                )}
+              </div>
+            )}
+
+            {activeTab === 'onboarding' && (
+              <div className="patient-list">
+                {onboarding.length === 0 ? (
+                  <div className="queue-empty">No patients currently onboarding</div>
+                ) : (
+                  onboarding.map(p => (
+                    <PatientCard key={p.id} patient={p} onSelect={openPatientDetails} />
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── OVERVIEW TAB ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function Sidebar({ dieticians, selectedDietician, onSelect, detailMode, coachName, dieticianUser }) {
+  return (
+    <aside className="admin-sidebar">
+      <div className="admin-sidebar-logo">
+        <h2>GLEUHR</h2>
+        <p>Skin Journal</p>
+      </div>
+      <nav className="admin-sidebar-nav">
+        {detailMode ? (
+          <>
+            <button className="admin-sidebar-item active">
+              <div className="admin-sidebar-avatar" style={{ background: '#c44033' }}>
+                {coachName ? getInitials(coachName) : 'CO'}
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Coach</div>
+                <div style={{ fontSize: 11, opacity: 0.6 }}>{coachName || '\u2014'}</div>
+              </div>
+            </button>
+            {dieticianUser && (
+              <button className="admin-sidebar-item">
+                <div className="admin-sidebar-avatar" style={{ background: '#8B5CF6' }}>
+                  {getInitials(dieticianUser.dieticianName)}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Dietician</div>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>{dieticianUser.dieticianName || 'N/A'}</div>
+                </div>
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Show all dieticians */}
+            {dieticians.map(d => (
+              <button
+                key={d}
+                className={`admin-sidebar-item ${selectedDietician === d ? 'active' : ''}`}
+                onClick={() => onSelect(d)}
+              >
+                <div className="admin-sidebar-avatar" style={{ background: avatarColor(d) }}>
+                  {getInitials(d)}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{d}</div>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>Skin Coach</div>
+                </div>
+              </button>
+            ))}
+            {/* Show All option */}
+            <button
+              className={`admin-sidebar-item ${!selectedDietician ? 'active' : ''}`}
+              onClick={() => onSelect(null)}
+            >
+              <div className="admin-sidebar-avatar" style={{ background: '#555' }}>
+                All
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>All Patients</div>
+                <div style={{ fontSize: 11, opacity: 0.6 }}>Overview</div>
+              </div>
+            </button>
+          </>
+        )}
+      </nav>
+      <div className="admin-sidebar-footer">
+        <div>Airtable Sync: Live</div>
+        <div>Last updated: {new Date().toISOString().split('T')[0]}</div>
+      </div>
+    </aside>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CATEGORY SECTION
+// ═══════════════════════════════════════════════════════════════
+function CategorySection({ icon, title, patients, onSelect }) {
+  const iconMap = {
+    red: '\uD83D\uDD34',
+    yellow: '\uD83D\uDFE1',
+    phone: '\uD83D\uDCDE',
+    green: '\u2705'
+  };
+  return (
+    <div className="category-section">
+      <h3 className="category-title">{iconMap[icon] || ''} {title}</h3>
+      {patients.map(p => (
+        <PatientCard key={p.id} patient={p} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PATIENT CARD (queue row)
+// ═══════════════════════════════════════════════════════════════
+function PatientCard({ patient: p, onSelect }) {
+  return (
+    <div className="queue-patient-card" onClick={() => onSelect(p.phone)}>
+      <div className="qpc-left">
+        <div className="qpc-avatar" style={{ background: avatarColor(p.name) }}>
+          {getInitials(p.name)}
+        </div>
+        <div className="qpc-info">
+          <div className="qpc-name">{p.name}</div>
+          <div className="qpc-meta">
+            {p.tpId && <span>{p.tpId}</span>}
+            <span>Day {p.currentDay}</span>
+            {p.streak > 0 && <span className="qpc-streak">{'\uD83D\uDD25'}{p.streak}</span>}
+            <span className={`qpc-consistency ${p.consistency >= 60 ? 'good' : p.consistency >= 40 ? 'ok' : 'low'}`}>
+              {p.consistency}%
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="qpc-right">
+        {p.flag && (
+          <span className="qpc-flag" style={{ background: p.flagColor + '18', color: p.flagColor, borderColor: p.flagColor + '40' }}>
+            {p.flag}
+          </span>
+        )}
+        {p.actionNeeded && <span className="qpc-action">{p.actionNeeded}</span>}
+        <ArrowRight size={16} className="qpc-arrow" />
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// OVERVIEW TAB
+// ═══════════════════════════════════════════════════════════════
 function OverviewTab({ details }) {
   const { patient, streak, consistency, reorder, weekGrid, skinTrajectory, last7Moods } = details;
-
   return (
     <>
       <div className="admin-grid-2">
-        {/* Streak & Shields */}
         <div className="admin-card">
           <h4>Streak & Shields</h4>
           <div className="streak-row">
@@ -308,8 +488,6 @@ function OverviewTab({ details }) {
           </div>
           <button className="restore-btn">{'\uD83D\uDEE1\uFE0F'} Restore Shield</button>
         </div>
-
-        {/* Consistency Breakdown */}
         <div className="admin-card">
           <h4>Consistency Breakdown</h4>
           {[
@@ -327,9 +505,7 @@ function OverviewTab({ details }) {
           ))}
         </div>
       </div>
-
       <div className="admin-grid-2">
-        {/* Skin Score Trajectory */}
         <div className="admin-card">
           <h4>Skin Score Trajectory</h4>
           <div className="trajectory-row">
@@ -350,69 +526,32 @@ function OverviewTab({ details }) {
             ))}
           </div>
         </div>
-
-        {/* Reorder Status */}
         <div className="admin-card">
           <h4>Reorder Status (Auto-Detected)</h4>
-          <div
-            className="reorder-status-badge"
-            style={{ background: reorder.daysRemaining > 14 ? '#DCFCE7' : '#FEF2F2', color: reorder.daysRemaining > 14 ? '#16A34A' : '#c44033' }}
-          >
+          <div className="reorder-status-badge" style={{ background: reorder.daysRemaining > 14 ? '#DCFCE7' : '#FEF2F2', color: reorder.daysRemaining > 14 ? '#16A34A' : '#c44033' }}>
             {reorder.daysRemaining > 14 ? 'On Track' : 'Attention Needed'}
           </div>
-          <div className="reorder-row">
-            <span>Plan ends</span>
-            <span className="reorder-val">{reorder.planEndDate || '—'}</span>
-          </div>
-          <div className="reorder-row">
-            <span>Days remaining</span>
-            <span className="reorder-val" style={{ color: reorder.daysRemaining <= 14 ? '#c44033' : '#16A34A' }}>{reorder.daysRemaining} days</span>
-          </div>
-          <div className="reorder-row">
-            <span>Banner shown in app</span>
-            <span>{reorder.bannerShown ? '\u2705' : '\u274C'}</span>
-          </div>
-          <div className="reorder-row">
-            <span>Banner clicked</span>
-            <span>{reorder.bannerClicked ? 'Yes' : 'No'}</span>
-          </div>
-          <div className="reorder-row">
-            <span>New Treatment Plan (Airtable)</span>
-            <span style={{ color: reorder.newTreatmentPlan ? '#16A34A' : '#c44033', fontWeight: 600 }}>
-              {reorder.newTreatmentPlan ? '\u2705 Ready' : '\u274C Not yet'}
-            </span>
-          </div>
+          <div className="reorder-row"><span>Plan ends</span><span className="reorder-val">{reorder.planEndDate || '\u2014'}</span></div>
+          <div className="reorder-row"><span>Days remaining</span><span className="reorder-val" style={{ color: reorder.daysRemaining <= 14 ? '#c44033' : '#16A34A' }}>{reorder.daysRemaining} days</span></div>
+          <div className="reorder-row"><span>Banner shown in app</span><span>{reorder.bannerShown ? '\u2705' : '\u274C'}</span></div>
+          <div className="reorder-row"><span>Banner clicked</span><span>{reorder.bannerClicked ? 'Yes' : 'No'}</span></div>
+          <div className="reorder-row"><span>New Treatment Plan (Airtable)</span><span style={{ color: reorder.newTreatmentPlan ? '#16A34A' : '#c44033', fontWeight: 600 }}>{reorder.newTreatmentPlan ? '\u2705 Ready' : '\u274C Not yet'}</span></div>
         </div>
       </div>
-
       <div className="admin-grid-2">
-        {/* This Week */}
         <div className="admin-card">
           <h4>This Week</h4>
           <div className="week-grid">
             <table>
-              <thead>
-                <tr>
-                  <th></th>
-                  {weekGrid.map((d, i) => <th key={i}>{d.dayLabel}</th>)}
-                </tr>
-              </thead>
+              <thead><tr><th></th>{weekGrid.map((d, i) => <th key={i}>{d.dayLabel}</th>)}</tr></thead>
               <tbody>
                 <tr>
                   <td style={{ fontWeight: 600, fontSize: 12 }}>AM</td>
-                  {weekGrid.map((d, i) => (
-                    <td key={i}>
-                      {d.isFuture ? '\u2014' : d.amCompleted === true ? '\u2705' : d.amCompleted === false ? '\u274C' : '\u2014'}
-                    </td>
-                  ))}
+                  {weekGrid.map((d, i) => <td key={i}>{d.isFuture ? '\u2014' : d.amCompleted === true ? '\u2705' : d.amCompleted === false ? '\u274C' : '\u2014'}</td>)}
                 </tr>
                 <tr>
                   <td style={{ fontWeight: 600, fontSize: 12 }}>PM</td>
-                  {weekGrid.map((d, i) => (
-                    <td key={i}>
-                      {d.isFuture ? '\u2014' : d.pmCompleted === true ? '\u2705' : d.pmCompleted === false ? '\u274C' : '\u2014'}
-                    </td>
-                  ))}
+                  {weekGrid.map((d, i) => <td key={i}>{d.isFuture ? '\u2014' : d.pmCompleted === true ? '\u2705' : d.pmCompleted === false ? '\u274C' : '\u2014'}</td>)}
                 </tr>
               </tbody>
             </table>
@@ -424,96 +563,54 @@ function OverviewTab({ details }) {
             ))}
           </div>
         </div>
-
-        {/* Products */}
         <div className="admin-card">
           <h4>Products</h4>
           <div className="products-list">
             {patient.products && patient.products.length > 0 ? (
-              patient.products.map(pr => (
-                <span key={pr.id} className="product-chip">{pr.name}</span>
-              ))
+              patient.products.map(pr => <span key={pr.id} className="product-chip">{pr.name}</span>)
             ) : (
               <span style={{ color: '#999', fontSize: 13 }}>No products assigned</span>
             )}
           </div>
         </div>
       </div>
-
-      {/* Coach Notes */}
       <div className="admin-card" style={{ marginBottom: 16 }}>
         <h4>Coach Notes</h4>
-        <textarea
-          className="coach-notes-area"
-          placeholder="Add notes about this patient..."
-          defaultValue={details.checkIns?.[0]?.notes || ''}
-          readOnly
-        />
+        <textarea className="coach-notes-area" placeholder="Add notes about this patient..." defaultValue={details.checkIns?.[0]?.notes || ''} readOnly />
       </div>
     </>
   );
 }
 
-// ─── DIET TAB ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// DIET TAB
+// ═══════════════════════════════════════════════════════════════
 function DietTab({ details }) {
   const { dietPlan } = details;
-
   if (!dietPlan) {
-    return (
-      <div className="admin-card" style={{ textAlign: 'center', padding: 40, color: '#999' }}>
-        No diet plan found in Airtable for this customer phone number
-      </div>
-    );
+    return <div className="admin-card" style={{ textAlign: 'center', padding: 40, color: '#999' }}>No diet plan found in Airtable for this customer</div>;
   }
-
   return (
     <div className="admin-card">
       <h3 style={{ marginBottom: 16 }}>Diet Plan (Airtable)</h3>
       <div style={{ display: 'grid', gap: 12 }}>
-        <div>
-          <strong>Customer:</strong> {dietPlan.customerName || 'N/A'}
-        </div>
-        <div>
-          <strong>Phone:</strong> {dietPlan.customerPhone || 'N/A'}
-        </div>
-        <div>
-          <strong>Plan Category:</strong> {dietPlan.planCategory || 'N/A'}
-        </div>
-        <div>
-          <strong>Status:</strong>{' '}
-          <span style={{ color: dietPlan.status === 'Active' ? '#16A34A' : '#c44033', fontWeight: 600 }}>
-            {dietPlan.status || 'N/A'}
-          </span>
-        </div>
-        {dietPlan.restrictions && dietPlan.restrictions.length > 0 && (
-          <div>
-            <strong>Restrictions:</strong> {Array.isArray(dietPlan.restrictions) ? dietPlan.restrictions.join(', ') : dietPlan.restrictions}
-          </div>
-        )}
-        {dietPlan.recommendations && (
-          <div>
-            <strong>Recommendations:</strong> {dietPlan.recommendations}
-          </div>
-        )}
-        <div>
-          <strong>Dietician:</strong> {dietPlan.dieticianName || 'N/A'} {dietPlan.dieticianPhone ? `(${dietPlan.dieticianPhone})` : ''}
-        </div>
-        {dietPlan.startDate && (
-          <div>
-            <strong>Start Date:</strong> {dietPlan.startDate}
-          </div>
-        )}
-        {dietPlan.notes && (
-          <div>
-            <strong>Notes:</strong> {dietPlan.notes}
-          </div>
-        )}
+        <div><strong>Customer:</strong> {dietPlan.customerName || 'N/A'}</div>
+        <div><strong>Phone:</strong> {dietPlan.customerPhone || 'N/A'}</div>
+        <div><strong>Plan Category:</strong> {dietPlan.planCategory || 'N/A'}</div>
+        <div><strong>Status:</strong> <span style={{ color: dietPlan.status === 'Active' ? '#16A34A' : '#c44033', fontWeight: 600 }}>{dietPlan.status || 'N/A'}</span></div>
+        {dietPlan.restrictions && dietPlan.restrictions.length > 0 && <div><strong>Restrictions:</strong> {Array.isArray(dietPlan.restrictions) ? dietPlan.restrictions.join(', ') : dietPlan.restrictions}</div>}
+        {dietPlan.recommendations && <div><strong>Recommendations:</strong> {dietPlan.recommendations}</div>}
+        <div><strong>Dietician:</strong> {dietPlan.dieticianName || 'N/A'} {dietPlan.dieticianPhone ? `(${dietPlan.dieticianPhone})` : ''}</div>
+        {dietPlan.startDate && <div><strong>Start Date:</strong> {dietPlan.startDate}</div>}
+        {dietPlan.notes && <div><strong>Notes:</strong> {dietPlan.notes}</div>}
       </div>
     </div>
   );
 }
 
-// ─── PHOTOS TAB (placeholder) ──────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// PHOTOS & CALLS TABS
+// ═══════════════════════════════════════════════════════════════
 function PhotosTab({ details }) {
   return (
     <div className="admin-card" style={{ textAlign: 'center', padding: 40, color: '#999' }}>
@@ -524,10 +621,8 @@ function PhotosTab({ details }) {
           <h4 style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#555', marginBottom: 12 }}>Skin Score History</h4>
           {details.skinScores.slice(0, 10).map(s => (
             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}>
-              <span style={{ color: '#888' }}>{s.date ? new Date(s.date).toLocaleDateString() : '—'} (Day {s.day})</span>
-              <span style={{ fontWeight: 700, color: s.totalScore >= 70 ? '#16A34A' : s.totalScore >= 40 ? '#CA8A04' : '#c44033' }}>
-                {s.totalScore}/100
-              </span>
+              <span style={{ color: '#888' }}>{s.date ? new Date(s.date).toLocaleDateString() : '\u2014'} (Day {s.day})</span>
+              <span style={{ fontWeight: 700, color: s.totalScore >= 70 ? '#16A34A' : s.totalScore >= 40 ? '#CA8A04' : '#c44033' }}>{s.totalScore}/100</span>
             </div>
           ))}
         </div>
@@ -536,7 +631,6 @@ function PhotosTab({ details }) {
   );
 }
 
-// ─── CALLS TAB (placeholder) ───────────────────────────────────
 function CallsTab() {
   return (
     <div className="admin-card" style={{ textAlign: 'center', padding: 40, color: '#999' }}>

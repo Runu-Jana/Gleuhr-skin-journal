@@ -9,27 +9,261 @@ const { fetchDietPlans } = require('../services/airtableService');
 
 /**
  * Normalize a phone number and return all possible format variants.
- * Handles: +917973944144, 917973944144, 7973944144, 07973944144
  */
 function getPhoneVariants(phone) {
   if (!phone) return [];
   const stripped = phone.replace(/[\s\-\(\)]/g, '');
-  // Get just the digits
   const digits = stripped.replace(/[^\d]/g, '');
   const variants = new Set();
-  variants.add(stripped); // original (may include +)
-
+  variants.add(stripped);
   if (digits.length >= 10) {
     const last10 = digits.slice(-10);
-    variants.add(last10);                  // 7973944144
-    variants.add('+91' + last10);          // +917973944144
-    variants.add('91' + last10);           // 917973944144
-    variants.add('0' + last10);            // 07973944144
+    variants.add(last10);
+    variants.add('+91' + last10);
+    variants.add('91' + last10);
+    variants.add('0' + last10);
   }
-  // Also add the full digits string
   variants.add(digits);
   return Array.from(variants);
 }
+
+/** Get last 10 digits of a phone for matching */
+function normPhone(phone) {
+  if (!phone) return '';
+  return phone.replace(/[^\d]/g, '').slice(-10);
+}
+
+// ─── GET /api/admin/patients/queue ────────────────────────────
+// Fetches all Airtable diet plans, matches with MongoDB, categorizes
+router.get('/queue', async (req, res) => {
+  try {
+    const { dietician } = req.query;
+
+    // 1. Fetch ALL Airtable diet plans
+    const allPlans = await fetchDietPlans({});
+
+    // 2. Get unique dietician names for sidebar
+    const dieticians = [...new Set(allPlans.map(p => p.dieticianName).filter(Boolean))];
+
+    // 3. Filter by selected dietician (if provided)
+    const plans = dietician
+      ? allPlans.filter(p => p.dieticianName === dietician)
+      : allPlans;
+
+    if (plans.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          dieticians,
+          selectedDietician: dietician || null,
+          summary: { activePatients: 0, needAttention: 0, callsToday: 0, avgConsistency: 0, reorderDue: 0 },
+          categories: { urgent: [], flagged: [], scheduledCalls: [], reorder: [] },
+          allPatients: [],
+          onboarding: []
+        }
+      });
+    }
+
+    // 4. Batch fetch all MongoDB data
+    const allPatients = await Patient.find({}).lean();
+    const allStreaks = await Streak.find({}).lean();
+
+    // Last 14 days for recent check-in analysis
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const recentCheckIns = await DailyCheckIn.find({ date: { $gte: fourteenDaysAgo } }).lean();
+
+    // All check-ins for overall consistency
+    const allCheckIns = await DailyCheckIn.find({}).lean();
+
+    // Build lookup maps using normalized phone (last 10 digits)
+    const patientMap = {};
+    allPatients.forEach(p => {
+      const key = normPhone(p.phone || p.phoneNumber);
+      if (key) patientMap[key] = p;
+    });
+
+    const streakMap = {};
+    allStreaks.forEach(s => {
+      const key = normPhone(s.patientPhone || s.patientId);
+      if (key) streakMap[key] = s;
+    });
+
+    const checkInMap = {};
+    allCheckIns.forEach(c => {
+      const key = normPhone(c.patientPhone || c.patientId);
+      if (!checkInMap[key]) checkInMap[key] = [];
+      checkInMap[key].push(c);
+    });
+
+    const recentCheckInMap = {};
+    recentCheckIns.forEach(c => {
+      const key = normPhone(c.patientPhone || c.patientId);
+      if (!recentCheckInMap[key]) recentCheckInMap[key] = [];
+      recentCheckInMap[key].push(c);
+    });
+
+    // 5. Match Airtable plans with MongoDB data and categorize
+    const now = new Date();
+    const enrichedPatients = [];
+
+    for (const plan of plans) {
+      const phoneKey = normPhone(plan.customerPhone);
+      if (!phoneKey) continue;
+
+      const patient = patientMap[phoneKey];
+      if (!patient) continue; // Skip if no MongoDB record
+
+      const streak = streakMap[phoneKey];
+      const patientCheckIns = checkInMap[phoneKey] || [];
+      const recent = recentCheckInMap[phoneKey] || [];
+
+      const currentDay = patient.currentDay || 1;
+      const currentStreak = streak?.currentStreak || 0;
+      const completedCheckIns = patientCheckIns.filter(c => c.completed).length;
+      const consistency = currentDay > 0 ? Math.round((completedCheckIns / currentDay) * 100) : 0;
+
+      // Days absent
+      let daysAbsent = 0;
+      if (streak?.lastCheckIn) {
+        daysAbsent = Math.floor((now - new Date(streak.lastCheckIn)) / (1000 * 60 * 60 * 24));
+      } else if (patientCheckIns.length === 0) {
+        daysAbsent = currentDay;
+      }
+
+      // Recent sunscreen/diet compliance (last 14 days)
+      const recentSunscreen = recent.filter(c => c.sunscreen).length;
+      const recentDiet = recent.filter(c => c.dietFollowed === 'Yes' || c.dietFollowed === 'Partial').length;
+      const recentTotal = recent.length || 1;
+      const sunscreenRate = Math.round((recentSunscreen / recentTotal) * 100);
+      const dietRate = Math.round((recentDiet / recentTotal) * 100);
+
+      // Weekly photo check
+      const lastPhotoDay = Math.floor(currentDay / 7) * 7;
+      const photoMissed = currentDay > 7 && (currentDay - lastPhotoDay) > 3; // simplified
+
+      // Reorder window
+      let daysRemaining = 0;
+      if (patient.startDate) {
+        const end = new Date(patient.startDate);
+        end.setDate(end.getDate() + 90);
+        daysRemaining = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
+      }
+      const inReorderWindow = currentDay >= 25 || daysRemaining <= 65;
+
+      // Categorize
+      let category = 'all';
+      let flag = null;
+      let flagColor = '#888';
+      let actionNeeded = '';
+
+      if (daysAbsent >= 7) {
+        category = 'urgent';
+        flag = `${daysAbsent} Days Absent`;
+        flagColor = '#DC2626';
+        actionNeeded = 'Phone call required';
+      } else if (daysAbsent >= 2) {
+        category = 'urgent';
+        flag = `${daysAbsent} Days Missed`;
+        flagColor = '#DC2626';
+        actionNeeded = 'Personal check-in';
+      } else if (!patient.isActive || patient.isActive === false) {
+        category = 'urgent';
+        flag = 'On Hold';
+        flagColor = '#CA8A04';
+        actionNeeded = 'Check in gently';
+      } else if (sunscreenRate < 40 && currentDay > 7) {
+        category = 'flagged';
+        flag = 'Sunscreen Skipping';
+        flagColor = '#CA8A04';
+        actionNeeded = 'Discuss sunscreen barrier';
+      } else if (dietRate < 40 && currentDay > 7) {
+        category = 'flagged';
+        flag = 'Diet Struggling';
+        flagColor = '#CA8A04';
+        actionNeeded = 'Discuss diet swaps';
+      } else if (consistency < 50 && currentDay > 14) {
+        category = 'flagged';
+        flag = 'Consistency Declining';
+        flagColor = '#CA8A04';
+        actionNeeded = 'Diagnose drop-off';
+      } else if (photoMissed) {
+        category = 'flagged';
+        flag = 'Photo Missed';
+        flagColor = '#CA8A04';
+        actionNeeded = 'Remind weekly photo';
+      } else if (currentDay <= 3) {
+        category = 'scheduledCalls';
+        flag = 'New Patient';
+        flagColor = '#16A34A';
+        actionNeeded = 'Introduction call';
+      } else if (inReorderWindow) {
+        category = 'reorder';
+        flag = 'Reorder Window';
+        flagColor = '#16A34A';
+        actionNeeded = 'Reorder conversation';
+      }
+
+      // TP-ID from Airtable record ID
+      const tpId = plan.id ? `TP-${plan.id.slice(-4).toUpperCase()}` : '';
+
+      enrichedPatients.push({
+        id: patient._id,
+        name: patient.name || patient.fullName || plan.customerName,
+        phone: patient.phone || patient.phoneNumber,
+        tpId,
+        currentDay,
+        consistency,
+        streak: currentStreak,
+        isActive: patient.isActive !== false,
+        daysAbsent,
+        skinConcern: patient.skinConcern || '',
+        coachName: patient.coachName || '',
+        dieticianName: plan.dieticianName || '',
+        planCategory: plan.planCategory || '',
+        startDate: patient.startDate,
+        category,
+        flag,
+        flagColor,
+        actionNeeded
+      });
+    }
+
+    // Group by category
+    const urgent = enrichedPatients.filter(p => p.category === 'urgent');
+    const flagged = enrichedPatients.filter(p => p.category === 'flagged');
+    const scheduledCalls = enrichedPatients.filter(p => p.category === 'scheduledCalls');
+    const reorder = enrichedPatients.filter(p => p.category === 'reorder');
+    const onboarding = enrichedPatients.filter(p => p.currentDay <= 3);
+
+    // Summary
+    const active = enrichedPatients.filter(p => p.isActive);
+    const avgConsistency = active.length > 0
+      ? Math.round(active.reduce((s, p) => s + p.consistency, 0) / active.length)
+      : 0;
+
+    res.json({
+      success: true,
+      data: {
+        dieticians,
+        selectedDietician: dietician || null,
+        summary: {
+          activePatients: active.length,
+          needAttention: urgent.length,
+          callsToday: scheduledCalls.length,
+          avgConsistency,
+          reorderDue: reorder.length
+        },
+        categories: { urgent, flagged, scheduledCalls, reorder },
+        allPatients: enrichedPatients,
+        onboarding
+      }
+    });
+  } catch (error) {
+    console.error('Admin queue error:', error);
+    res.status(500).json({ error: 'Failed to fetch queue data' });
+  }
+});
 
 // GET /api/admin/patients - List all patients from MongoDB
 router.get('/', async (req, res) => {
