@@ -44,7 +44,7 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
 
   const loadPreviousPhoto = async () => {
     try {
-      const userPhotos = await getWeeklyPhotos(patient?.email);
+      const userPhotos = await getWeeklyPhotos(patient?.phone || patient?.phoneNumber);
       if (userPhotos && userPhotos.length > 0) {
         const lastWeek = userPhotos[userPhotos.length - 1];
         setPreviousPhoto(lastWeek);
@@ -96,97 +96,77 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
     }, 100);
   };
 
+  const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+
   const handleSubmit = async () => {
     if (!capturedImage) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
-      const photoData = {
-        patientPhone: patient?.phone || patient?.phoneNumber,
-        weekNumber: weekNumber,
+      const photoId = `photo-${Date.now()}`;
+      const patientPhone = patient?.phone || patient?.phoneNumber;
+      const dayOfJourney = currentDay;
+      const today = new Date().toISOString().split('T')[0];
+
+      const photoPayload = {
+        patientPhone,
+        weekNumber,
+        day: dayOfJourney,
         photoData: capturedImage,
-        photoUrl: '', // Will be set by server if needed
+        photoUrl: '',
         skinScore: 0,
         notes: `Week ${weekNumber} photo - ${weeklyInsight.substring(0, 100)}...`,
-        tags: [`week-${weekNumber}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
+        tags: [`week-${weekNumber}`, `day-${dayOfJourney}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
       };
 
-      if (isOnline) {
-        // Save directly to MongoDB
-        const response = await fetch('/api/photo', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(photoData),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to save photo to server');
-        }
-
-        const result = await response.json();
-        console.log('Photo saved to MongoDB:', result);
-        
-        // Also save to IndexedDB for local backup
-        await saveWeeklyPhoto({
-          id: `photo-${Date.now()}`,
-          patientEmail: patient?.email,
-          week: weekNumber,
-          photoData: capturedImage,
-          synced: true,
-          serverId: result.id,
-          createdAt: new Date().toISOString()
-        });
-      } else {
-        // Queue for sync when online
-        await queueForSync({
-          type: 'photo',
-          data: photoData,
-          id: `photo-${Date.now()}`,
-          createdAt: new Date().toISOString()
-        });
-
-        // Save to IndexedDB
-        await saveWeeklyPhoto({
-          id: `photo-${Date.now()}`,
-          patientEmail: patient?.email,
-          week: weekNumber,
-          photoData: capturedImage,
-          synced: false,
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      setShowSuccess(true);
-      setTimeout(() => {
-        onClose(); // Close popup instead of navigating
-      }, 2000);
-      
-    } catch (error) {
-      console.error('Error saving photo:', error);
-      
-      // Fallback: save to IndexedDB only
-      await saveWeeklyPhoto({
-        id: `photo-${Date.now()}`,
-        patientEmail: patient?.email,
+      const localPhoto = {
+        id: photoId,
+        patientPhone,
+        date: today,
         week: weekNumber,
+        day: dayOfJourney,
         photoData: capturedImage,
         synced: false,
         createdAt: new Date().toISOString()
-      });
-      
+      };
+
+      // Always save to IndexedDB first for instant feedback
+      await saveWeeklyPhoto(localPhoto);
+
       setShowSuccess(true);
+
+      // Try server sync in the background (don't block UI)
+      if (isOnline) {
+        try {
+          const response = await fetch('/api/photo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(photoPayload),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('Photo synced to server:', result);
+            // Update local record as synced
+            await saveWeeklyPhoto({ ...localPhoto, synced: true, serverId: result.id });
+          }
+        } catch (syncError) {
+          console.warn('Photo saved locally, will sync later:', syncError.message);
+        }
+      }
+
       setTimeout(() => {
-        onClose(); // Close popup instead of navigating
+        onClose();
       }, 2000);
+
+    } catch (error) {
+      console.error('Error saving photo:', error);
+      alert('Failed to save photo. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
 
   if (!isVisible) return null;
 

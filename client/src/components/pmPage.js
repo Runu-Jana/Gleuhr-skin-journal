@@ -8,6 +8,7 @@ import { useGamification } from '../contexts/GamificationContext';
 import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
 import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId } from '../utils/helpers';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
+import BottomNavigation from './BottomNavigation';
 
 export default function PMPage() {
   const { patient, streak: streakData, refreshStreak } = useAuth();
@@ -930,6 +931,9 @@ export default function PMPage() {
         )}
       </AnimatePresence>
       </div>
+
+      {/* Bottom Navigation */}
+      <BottomNavigation />
     </div>
   );
 }

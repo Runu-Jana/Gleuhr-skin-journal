@@ -13,6 +13,7 @@ import ShieldSuccessAnimation from './ShieldSuccessAnimation';
 import ReorderBanner from './ReorderBanner';
 import GamificationPanel from './GamificationPanel';
 import AchievementPopup from './AchievementPopup';
+import BottomNavigation from './BottomNavigation';
 
 export default function AMPage() {
   const { patient, streak: streakData, refreshStreak } = useAuth();
@@ -541,6 +542,9 @@ export default function AMPage() {
         
         )}
       </AnimatePresence>
+
+      {/* Bottom Navigation */}
+      <BottomNavigation />
     </div>
   );
 }

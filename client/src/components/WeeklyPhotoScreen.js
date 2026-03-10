@@ -38,19 +38,45 @@ export default function WeeklyPhotoScreen() {
     if (!capturedImage) return;
     setIsSubmitting(true);
 
-    const photoData = {
+    const patientPhone = patient?.phone || patient?.phoneNumber;
+    const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+
+    const photoRecord = {
       id: generateId(),
-      patientId: patient?.id,
-      patientEmail: patient?.email,
+      patientPhone,
       week,
-      date: new Date().toISOString(),
-      photoUrl: capturedImage,
+      day: currentDay,
+      date: new Date().toISOString().split('T')[0],
+      photoData: capturedImage,
       consentGiven,
-      synced: false
+      synced: false,
+      createdAt: new Date().toISOString()
     };
 
-    await saveWeeklyPhoto(photoData);
-    if (isOnline) queueForSync('weeklyPhoto', photoData);
+    await saveWeeklyPhoto(photoRecord);
+
+    // Try to sync to server
+    if (isOnline) {
+      try {
+        const response = await fetch('/api/photo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientPhone,
+            weekNumber: week,
+            day: currentDay,
+            photoData: capturedImage,
+            tags: [`week-${week}`, `day-${currentDay}`, consentGiven ? 'consent-given' : 'no-consent']
+          }),
+        });
+        if (response.ok) {
+          const result = await response.json();
+          await saveWeeklyPhoto({ ...photoRecord, synced: true, serverId: result.id });
+        }
+      } catch (syncError) {
+        console.warn('Photo saved locally, will sync later:', syncError.message);
+      }
+    }
 
     setIsSubmitting(false);
     navigate('/');

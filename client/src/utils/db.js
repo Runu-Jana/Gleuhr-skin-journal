@@ -249,10 +249,13 @@ export async function getCurrentStreak(patientId) {
 // ============ WEEKLY PHOTO OPERATIONS ============
 export async function saveWeeklyPhoto(photo) {
   const database = await initDB();
-  await database.add('weeklyPhotos', {
+  // Use patientPhone as the patientId index key for consistent retrieval
+  const patientKey = photo.patientId || photo.patientPhone || photo.patientEmail;
+  await database.put('weeklyPhotos', {
     id: photo.id || `photo_${Date.now()}`,
     ...photo,
-    createdAt: new Date().toISOString()
+    patientId: patientKey,
+    createdAt: photo.createdAt || new Date().toISOString()
   });
 }
 
