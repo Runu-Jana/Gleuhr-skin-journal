@@ -5,6 +5,7 @@ import { getSkinScores } from '../utils/db';
 import { calculateDay, getMilestoneLabel } from '../utils/helpers';
 import { Check, Lock, Star, MapPin, TrendingUp, Gift, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import BottomNavigation from './BottomNavigation';
 
 export default function JourneyScreen() {
   const { patient } = useAuth();
@@ -271,6 +272,9 @@ export default function JourneyScreen() {
           </div>
         </div>
       </div>
+
+      {/* Bottom Navigation */}
+      <BottomNavigation />
     </div>
   );
 }
