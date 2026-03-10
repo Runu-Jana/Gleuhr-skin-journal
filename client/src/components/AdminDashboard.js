@@ -120,11 +120,11 @@ export default function AdminDashboard() {
             {selectedUser && (
               <button className="admin-sidebar-item">
                 <div className="admin-sidebar-avatar" style={{ background: '#8B5CF6' }}>
-                  {selectedUser.initials}
+                  {selectedUser.dieticianName ? selectedUser.dieticianName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '??'}
                 </div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>Dietician</div>
-                  <div style={{ fontSize: 11, opacity: 0.6 }}>{selectedUser.name}</div>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>{selectedUser.dieticianName || 'N/A'}</div>
                 </div>
               </button>
             )}
@@ -466,13 +466,31 @@ function DietTab({ details }) {
       <h3 style={{ marginBottom: 16 }}>🥗 Diet Plan</h3>
       <div style={{ display: 'grid', gap: 12 }}>
         <div>
-          <strong>Plan:</strong> {dietPlan.planName || 'N/A'}
+          <strong>Customer Name:</strong> {dietPlan.customerName || 'N/A'}
         </div>
         <div>
-          <strong>Duration:</strong> {dietPlan.duration || 'N/A'}
+          <strong>Customer Phone:</strong> {dietPlan.customerPhone || 'N/A'}
         </div>
         <div>
-          <strong>Calories:</strong> {dietPlan.calories || 'N/A'}
+          <strong>Plan Category:</strong> {dietPlan.planCategory || 'N/A'}
+        </div>
+        <div>
+          <strong>Restrictions:</strong> {Array.isArray(dietPlan.restrictions) ? dietPlan.restrictions.join(', ') : dietPlan.restrictions || 'N/A'}
+        </div>
+        <div>
+          <strong>Recommendations:</strong> {dietPlan.recommendations || 'N/A'}
+        </div>
+        <div>
+          <strong>Dietician Name:</strong> {dietPlan.dieticianName || 'N/A'}
+        </div>
+        <div>
+          <strong>Dietician Phone:</strong> {dietPlan.dieticianPhone || 'N/A'}
+        </div>
+        <div>
+          <strong>Status:</strong> {dietPlan.status || 'N/A'}
+        </div>
+        <div>
+          <strong>Start Date:</strong> {dietPlan.startDate ? new Date(dietPlan.startDate).toLocaleDateString() : 'N/A'}
         </div>
         <div>
           <strong>Notes:</strong> {dietPlan.notes || 'N/A'}
