@@ -341,7 +341,7 @@ export default function AMPage() {
                 <span className="text-gray-700 font-medium">AM Routine</span>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={handleAMRoutineToggle} 
+                    onClick={() => setAmRoutine(!amRoutine)} 
                     className={`w-14 h-7 rounded-full transition-colors duration-200 cursor-pointer flex items-center px-1 ${
                       amRoutine ? 'bg-green-500' : 'bg-gray-300'
                     }`}
@@ -360,7 +360,7 @@ export default function AMPage() {
                 <span className="text-gray-700 font-medium">Sunscreen</span>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={handleSunscreenToggle}
+                    onClick={() => setSunscreen(!sunscreen)}
                     className={`w-14 h-7 rounded-full transition-colors duration-200 cursor-pointer flex items-center px-1 ${
                       sunscreen ? 'bg-orange-500' : 'bg-gray-300'
                     }`}
@@ -405,63 +405,64 @@ export default function AMPage() {
 
         </div>
       </div>
-      </div>
 
-      {/* Reorder Banner (Day 25+) */}
-      {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
+      <>
+        {/* Reorder Banner (Day 25+) */}
+        {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
 
-      {/* Celebration */}
-      {showCelebration && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-8 text-center max-w-sm mx-4">
-            <div className="text-6xl mb-4">🎉</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">{streakData?.streak || 0} Day Streak!</h3>
-            <p className="text-gray-600">You're building great habits. Keep it up!</p>
+        {/* Celebration */}
+        {showCelebration && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-8 text-center max-w-sm mx-4">
+              <div className="text-6xl mb-4">🎉</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">{streakData?.streak || 0} Day Streak!</h3>
+              <p className="text-gray-600">You're building great habits. Keep it up!</p>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-
-      {/* Shield Restore Modal */}
-      {showShieldRestore && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-6 text-center max-w-sm mx-4">
-            <div className="text-4xl mb-4">🛡️</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Restore Your Streak?</h3>
-            <p className="text-gray-600 mb-4">
-              Use a shield to restore your streak. You have {streakData?.restorationShields?.available || 0} shields available this month.
-            </p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => setShowShieldRestore(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={restoreStreakWithShield}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-              >
-                Use Shield
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-      
-      {/* Shield Success Animation */}
-      <AnimatePresence>
-        {showShieldSuccess && shieldRestoreData && (
-          <ShieldSuccessAnimation
-            streakRestored={shieldRestoreData.streakRestored}
-            shieldsRemaining={shieldRestoreData.shieldsRemaining}
-            previousStreak={shieldRestoreData.previousStreak}
-            newStreak={shieldRestoreData.newStreak}
-          />
         )}
-      </AnimatePresence>
 
-      {/* Bottom Navigation */}
-      <BottomNavigation />
+        {/* Shield Restore Modal */}
+        {showShieldRestore && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-6 text-center max-w-sm mx-4">
+              <div className="text-4xl mb-4">🛡️</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Restore Your Streak?</h3>
+              <p className="text-gray-600 mb-4">
+                Use a shield to restore your streak. You have {streakData?.restorationShields?.available || 0} shields available this month.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setShowShieldRestore(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={restoreStreakWithShield}
+                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                >
+                  Use Shield
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        
+        {/* Shield Success Animation */}
+        <AnimatePresence>
+          {showShieldSuccess && shieldRestoreData && (
+            <ShieldSuccessAnimation
+              streakRestored={shieldRestoreData.streakRestored}
+              shieldsRemaining={shieldRestoreData.shieldsRemaining}
+              previousStreak={shieldRestoreData.previousStreak}
+              newStreak={shieldRestoreData.newStreak}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Bottom Navigation */}
+        <BottomNavigation />
+      </>
     </div>
   );
 }
