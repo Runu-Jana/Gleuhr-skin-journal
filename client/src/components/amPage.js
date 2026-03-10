@@ -45,6 +45,9 @@ export default function AMPage() {
   const [shieldRestoreData, setShieldRestoreData] = useState(null);
   const [showCheckinSuccess, setShowCheckinSuccess] = useState(false);
 
+  const handleAMRoutineToggle = () => setAmRoutine(!amRoutine);
+  const handleSunscreenToggle = () => setSunscreen(!sunscreen);
+
   const restoreStreakWithShield = async () => {
     if (!patient?.phone) return;
     
@@ -404,13 +407,12 @@ export default function AMPage() {
           </button>
 
         </div>
-      </div>
-      </div>
+      
 
-      {/* Reorder Banner (Day 25+) */}
-      {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
+     
+      {day >= 30 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
 
-      {/* Celebration */}
+     
       {showCelebration && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-8 text-center max-w-sm mx-4">
