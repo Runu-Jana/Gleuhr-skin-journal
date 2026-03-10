@@ -56,26 +56,34 @@ export default function WeeklyPhotoScreen() {
     await saveWeeklyPhoto(photoRecord);
 
     // Try to sync to server
+    const serverPayload = {
+      patientPhone,
+      weekNumber: week,
+      day: currentDay,
+      photoData: capturedImage,
+      tags: [`week-${week}`, `day-${currentDay}`, consentGiven ? 'consent-given' : 'no-consent']
+    };
+
     if (isOnline) {
       try {
         const response = await fetch('/api/photo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            patientPhone,
-            weekNumber: week,
-            day: currentDay,
-            photoData: capturedImage,
-            tags: [`week-${week}`, `day-${currentDay}`, consentGiven ? 'consent-given' : 'no-consent']
-          }),
+          body: JSON.stringify(serverPayload),
         });
         if (response.ok) {
           const result = await response.json();
           await saveWeeklyPhoto({ ...photoRecord, synced: true, serverId: result.id });
+        } else {
+          console.error('Photo upload failed with status:', response.status);
+          await queueForSync('weeklyPhoto', serverPayload);
         }
       } catch (syncError) {
-        console.warn('Photo saved locally, will sync later:', syncError.message);
+        console.warn('Photo saved locally, queued for sync:', syncError.message);
+        await queueForSync('weeklyPhoto', serverPayload);
       }
+    } else {
+      await queueForSync('weeklyPhoto', serverPayload);
     }
 
     setIsSubmitting(false);

@@ -16,7 +16,7 @@ const weeklyPhotoSchema = new mongoose.Schema({
   },
   photoUrl: {
     type: String,
-    required: true
+    default: ''
   },
   photoData: {
     type: String, // Base64 encoded image data

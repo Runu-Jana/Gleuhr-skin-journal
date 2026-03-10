@@ -52,6 +52,11 @@ router.post('/', async (req, res) => {
     const pid = patient._id.toString();
     const pPhone = patient.phone || patient.phoneNumber;
 
+    // Validate that we have photo data
+    if (!photoData && !photoUrl) {
+      return res.status(400).json({ error: 'Missing photo data' });
+    }
+
     // Upsert: update if photo for this week already exists, otherwise create
     const weeklyPhoto = await WeeklyPhoto.findOneAndUpdate(
       { patientId: pid, weekNumber: weekNum },
@@ -73,8 +78,10 @@ router.post('/', async (req, res) => {
           createdAt: new Date()
         }
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true, runValidators: true }
     );
+
+    console.log(`Photo saved for patient ${pPhone}, week ${weekNum}, id: ${weeklyPhoto._id}`);
 
     res.json({
       success: true,
