@@ -407,10 +407,10 @@ export default function AMPage() {
           </button>
 
         </div>
-      </div>
+      
 
      
-      {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
+      {day >= 30 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
 
      
       {showCelebration && (
