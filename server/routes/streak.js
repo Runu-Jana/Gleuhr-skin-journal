@@ -79,10 +79,11 @@ router.get('/:phone', async (req, res) => {
 // POST /api/streak/restore - Use shield to restore streak
 router.post('/restore', async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    // Accept both 'phone' and 'phoneNumber' from request body
+    const phoneNumber = req.body.phoneNumber || req.body.phone;
 
     if (!phoneNumber) {
-      return res.status(400).json({ error: 'Phone number required' });
+      return res.status(400).json({ error: 'Phone number required (send as phone or phoneNumber)' });
     }
 
     // Find patient

@@ -3,6 +3,7 @@ const router = express.Router();
 const SkinScore = require('../models/SkinScore');
 const Patient = require('../models/Patient');
 
+const { patientPhoneOr } = require('../utils/phoneVariants');
 // POST /api/skinscore - Save skin score assessment
 router.post('/', async (req, res) => {
   try {
@@ -80,13 +81,8 @@ router.get('/:phone', async (req, res) => {
   try {
     const { phone } = req.params;
     
-    // Find patient by phone
-    const patient = await Patient.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone }
-      ]
-    });
+    // Find patient by phone (all variants)
+    const patient = await Patient.findOne({ $or: patientPhoneOr(phone) });
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
@@ -121,13 +117,8 @@ router.get('/:phone/latest', async (req, res) => {
   try {
     const { phone } = req.params;
     
-    // Find patient by phone
-    const patient = await Patient.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone }
-      ]
-    });
+    // Find patient by phone (all variants)
+    const patient = await Patient.findOne({ $or: patientPhoneOr(phone) });
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });

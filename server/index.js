@@ -82,4 +82,9 @@ const startServer = async () => {
   });
 };
 
-startServer();
+// Only auto-start when run directly (not when required by tests)
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;
