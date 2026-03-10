@@ -93,6 +93,7 @@ export default function AMPage() {
       if (isMilestoneDay(day) && !alreadyScoredToday) {
         navigate('/skin-score');
       }
+      // Weekly photo reminders are handled by WeeklyPhotoPopup in App.js
       // Temporarily disabled weekly photo redirect
       // else if (isWeeklyPhotoDay(patient?.startDate)) {
       //   const photos = await getWeeklyPhotos(patient?.phoneNumber || patient?.phone);

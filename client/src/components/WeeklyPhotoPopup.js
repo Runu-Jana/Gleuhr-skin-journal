@@ -150,10 +150,16 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
             console.log('Photo synced to server:', result);
             // Update local record as synced
             await saveWeeklyPhoto({ ...localPhoto, synced: true, serverId: result.id });
+          } else {
+            console.error('Photo upload failed with status:', response.status);
+            await queueForSync('weeklyPhoto', photoPayload);
           }
         } catch (syncError) {
-          console.warn('Photo saved locally, will sync later:', syncError.message);
+          console.warn('Photo saved locally, queued for sync:', syncError.message);
+          await queueForSync('weeklyPhoto', photoPayload);
         }
+      } else {
+        await queueForSync('weeklyPhoto', photoPayload);
       }
 
       setTimeout(() => {

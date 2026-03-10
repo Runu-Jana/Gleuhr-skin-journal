@@ -37,6 +37,7 @@ import { initDB } from './utils/db';
 import AMPage from './components/amPage';
 import PMPage from './components/pmPage';
 import { getTimeOfDay } from './utils/timeUtils';
+import { calculateDay, isWeeklyPhotoDay } from './utils/helpers';
 import SkinScoreAssessment from './components/SkinScoreAssessment';
 
 function App() {
@@ -80,11 +81,8 @@ function AppRoutes() {
   // Check if today is a weekly photo day (7, 14, 21, 28, etc.)
   useEffect(() => {
     if (isAuthenticated && patient) {
-      const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
-      const isWeeklyPhotoDay = currentDay % 7 === 0;
-      
-      // Show popup on weekly photo days
-      if (isWeeklyPhotoDay) {
+      // Show popup on weekly photo days (every 7th day from start)
+      if (isWeeklyPhotoDay(patient?.startDate)) {
         setShowWeeklyPhotoPopup(true);
       }
     }
@@ -194,11 +192,8 @@ function MainApp() {
   // Check if today is a weekly photo day (7, 14, 21, 28, etc.)
   useEffect(() => {
     if (patient) {
-      const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
-      const isWeeklyPhotoDay = currentDay % 7 === 0;
-      
-      // Show popup on weekly photo days
-      if (isWeeklyPhotoDay) {
+      // Show popup on weekly photo days (every 7th day from start)
+      if (isWeeklyPhotoDay(patient?.startDate)) {
         setShowWeeklyPhotoPopup(true);
       }
     }

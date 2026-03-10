@@ -38,9 +38,11 @@ export default function PhotoUploadPage() {
     generateWeeklyInsight();
   }, [week]);
 
+  const patientPhone = patient?.phone || patient?.phoneNumber;
+
   const loadPreviousPhoto = async () => {
     try {
-      const userPhotos = await getWeeklyPhotos(patient?.email);
+      const userPhotos = await getWeeklyPhotos(patientPhone);
       if (userPhotos && userPhotos.length > 0) {
         const lastWeek = userPhotos[userPhotos.length - 1];
         setPreviousPhoto(lastWeek);
@@ -98,85 +100,62 @@ export default function PhotoUploadPage() {
     setIsSubmitting(true);
     
     try {
-      const photoData = {
-        patientPhone: patient?.phone || patient?.phoneNumber,
+      const serverPayload = {
+        patientPhone,
         weekNumber: weekNumber,
+        day: currentDay,
         photoData: capturedImage,
-        photoUrl: '', // Will be set by server if needed
+        photoUrl: '',
         skinScore: 0,
         notes: `Week ${weekNumber} photo - ${weeklyInsight.substring(0, 100)}...`,
-        tags: [`week-${weekNumber}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
+        tags: [`week-${weekNumber}`, `day-${currentDay}`, 'progress-photo', consentGiven ? 'consent-given' : 'no-consent']
       };
 
+      const localPhoto = {
+        id: `photo-${Date.now()}`,
+        patientPhone,
+        week: weekNumber,
+        day: currentDay,
+        photoData: capturedImage,
+        synced: false,
+        createdAt: new Date().toISOString()
+      };
+
+      // Always save locally first
+      await saveWeeklyPhoto(localPhoto);
+
       if (isOnline) {
-        // Save directly to MongoDB
-        const response = await fetch('/api/photo', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(photoData),
-        });
+        try {
+          const response = await fetch('/api/photo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(serverPayload),
+          });
 
-        if (!response.ok) {
-          throw new Error('Failed to save photo to server');
+          if (response.ok) {
+            const result = await response.json();
+            console.log('Photo saved to MongoDB:', result);
+            await saveWeeklyPhoto({ ...localPhoto, synced: true, serverId: result.id });
+          } else {
+            console.error('Photo upload failed with status:', response.status);
+            await queueForSync('weeklyPhoto', serverPayload);
+          }
+        } catch (syncError) {
+          console.warn('Photo saved locally, queued for sync:', syncError.message);
+          await queueForSync('weeklyPhoto', serverPayload);
         }
-
-        const result = await response.json();
-        console.log('Photo saved to MongoDB:', result);
-        
-        // Also save to IndexedDB for local backup
-        await saveWeeklyPhoto({
-          id: `photo-${Date.now()}`,
-          patientEmail: patient?.email,
-          week: weekNumber,
-          photoData: capturedImage,
-          synced: true,
-          serverId: result.id,
-          createdAt: new Date().toISOString()
-        });
       } else {
-        // Queue for sync when online
-        await queueForSync({
-          type: 'photo',
-          data: photoData,
-          id: `photo-${Date.now()}`,
-          createdAt: new Date().toISOString()
-        });
-
-        // Save to IndexedDB
-        await saveWeeklyPhoto({
-          id: `photo-${Date.now()}`,
-          patientEmail: patient?.email,
-          week: weekNumber,
-          photoData: capturedImage,
-          synced: false,
-          createdAt: new Date().toISOString()
-        });
+        await queueForSync('weeklyPhoto', serverPayload);
       }
 
       setShowSuccess(true);
       setTimeout(() => {
         navigate('/transformation');
       }, 2000);
-      
+
     } catch (error) {
       console.error('Error saving photo:', error);
-      
-      // Fallback: save to IndexedDB only
-      await saveWeeklyPhoto({
-        id: `photo-${Date.now()}`,
-        patientEmail: patient?.email,
-        week: weekNumber,
-        photoData: capturedImage,
-        synced: false,
-        createdAt: new Date().toISOString()
-      });
-      
-      setShowSuccess(true);
-      setTimeout(() => {
-        navigate('/transformation');
-      }, 2000);
+      alert('Failed to save photo. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
