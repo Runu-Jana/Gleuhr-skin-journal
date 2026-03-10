@@ -7,12 +7,36 @@ const SkinScore = require('../models/SkinScore');
 const ReorderEvent = require('../models/ReorderEvent');
 const { fetchDietPlans } = require('../services/airtableService');
 
+/**
+ * Normalize a phone number and return all possible format variants.
+ * Handles: +917973944144, 917973944144, 7973944144, 07973944144
+ */
+function getPhoneVariants(phone) {
+  if (!phone) return [];
+  const stripped = phone.replace(/[\s\-\(\)]/g, '');
+  // Get just the digits
+  const digits = stripped.replace(/[^\d]/g, '');
+  const variants = new Set();
+  variants.add(stripped); // original (may include +)
+
+  if (digits.length >= 10) {
+    const last10 = digits.slice(-10);
+    variants.add(last10);                  // 7973944144
+    variants.add('+91' + last10);          // +917973944144
+    variants.add('91' + last10);           // 917973944144
+    variants.add('0' + last10);            // 07973944144
+  }
+  // Also add the full digits string
+  variants.add(digits);
+  return Array.from(variants);
+}
+
 // GET /api/admin/patients - List all patients from MongoDB
 router.get('/', async (req, res) => {
   try {
     const patients = await Patient.find({})
       .sort({ createdAt: -1 })
-      .select('fullName name phone phoneNumber skinConcern planType startDate currentDay completionPercentage isActive totalPoints level createdAt');
+      .select('fullName name phone phoneNumber skinConcern planType startDate currentDay completionPercentage isActive totalPoints level createdAt coachName coachWhatsApp');
 
     res.json({
       success: true,
@@ -29,6 +53,8 @@ router.get('/', async (req, res) => {
         isActive: p.isActive !== false,
         totalPoints: p.totalPoints || 0,
         level: p.level || 1,
+        coachName: p.coachName || '',
+        coachWhatsApp: p.coachWhatsApp || '',
         createdAt: p.createdAt
       }))
     });
@@ -42,25 +68,31 @@ router.get('/', async (req, res) => {
 router.get('/:phone/details', async (req, res) => {
   try {
     const { phone } = req.params;
+    const phoneVariants = getPhoneVariants(phone);
+
+    // Build $or conditions for all phone variants
+    const patientOr = phoneVariants.flatMap(v => [{ phoneNumber: v }, { phone: v }]);
+    const streakOr = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
+    const checkInOr = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
+    const skinScoreOr = phoneVariants.map(v => ({ phoneNumber: v }));
+
+    // Try fetching Airtable with all phone variants (first match wins)
+    const fetchAirtableWithVariants = async () => {
+      for (const variant of phoneVariants) {
+        try {
+          const plans = await fetchDietPlans({ customerPhone: variant });
+          if (plans && plans.length > 0) return plans;
+        } catch (e) { /* continue */ }
+      }
+      return [];
+    };
 
     const [patient, streak, checkIns, skinScores, airtablePlans] = await Promise.all([
-      Patient.findOne({
-        $or: [{ phoneNumber: phone }, { phone: phone }]
-      }).populate('dietPlan').populate('products'),
-
-      Streak.findOne({
-        $or: [{ patientPhone: phone }, { patientId: phone }]
-      }),
-
-      DailyCheckIn.find({
-        $or: [{ patientPhone: phone }, { patientId: phone }]
-      }).sort({ date: -1 }).limit(90),
-
-      SkinScore.find({
-        $or: [{ phoneNumber: phone }]
-      }).sort({ date: -1 }).limit(90),
-
-      fetchDietPlans({ customerPhone: phone }).catch(() => [])
+      Patient.findOne({ $or: patientOr }).populate('dietPlan').populate('products'),
+      Streak.findOne({ $or: streakOr }),
+      DailyCheckIn.find({ $or: checkInOr }).sort({ date: -1 }).limit(90),
+      SkinScore.find({ $or: skinScoreOr }).sort({ date: -1 }).limit(90),
+      fetchAirtableWithVariants()
     ]);
 
     if (!patient) {
@@ -92,6 +124,12 @@ router.get('/:phone/details', async (req, res) => {
     const maxDay = patient.currentDay || 1;
     const overallConsistency = maxDay > 0 ? Math.round((completedCheckIns / maxDay) * 100) : 0;
 
+    // Sunscreen & Diet consistency
+    const sunscreenCount = checkIns.filter(c => c.sunscreen).length;
+    const dietCount = checkIns.filter(c => c.dietFollowed === 'Yes' || c.dietFollowed === 'Partial').length;
+    const sunscreenConsistency = maxDay > 0 ? Math.round((sunscreenCount / maxDay) * 100) : 0;
+    const dietConsistency = maxDay > 0 ? Math.round((dietCount / maxDay) * 100) : 0;
+
     // Plan end date
     let planEndDate = null;
     let daysRemaining = 0;
@@ -120,6 +158,8 @@ router.get('/:phone/details', async (req, res) => {
         date: dStr,
         dayLabel: ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i],
         completed: dayCheckIn ? dayCheckIn.completed : null,
+        amCompleted: dayCheckIn ? (dayCheckIn.amRoutine || false) : null,
+        pmCompleted: dayCheckIn ? (dayCheckIn.pmRoutine || false) : null,
         mood: dayCheckIn ? dayCheckIn.mood : null,
         isFuture: d > now
       });
@@ -181,8 +221,8 @@ router.get('/:phone/details', async (req, res) => {
         },
         consistency: {
           overall: overallConsistency,
-          sunscreen: 0,
-          diet: 0
+          sunscreen: sunscreenConsistency,
+          diet: dietConsistency
         },
         reorder: {
           planEndDate,
