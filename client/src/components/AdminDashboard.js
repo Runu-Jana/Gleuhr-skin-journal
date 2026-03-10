@@ -84,9 +84,13 @@ export default function AdminDashboard() {
 
   const filtered = patients.filter((p) => {
     const term = searchTerm.toLowerCase();
+    // Normalize phone search: strip non-digits for phone comparison
+    const termDigits = term.replace(/[^\d]/g, '');
+    const phoneDigits = (p.phone || '').replace(/[^\d]/g, '');
     return (
       (p.name || '').toLowerCase().includes(term) ||
       (p.phone || '').includes(term) ||
+      (termDigits.length >= 4 && phoneDigits.includes(termDigits)) ||
       (p.skinConcern || '').toLowerCase().includes(term)
     );
   });
@@ -159,6 +163,7 @@ export default function AdminDashboard() {
                   <div>
                     <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{details.patient.name}</h2>
                     <div className="admin-header-meta">
+                      {details.patient.planType && <span>{details.patient.planType}</span>}
                       <span>{details.patient.phone}</span>
                       <span>Day {details.patient.currentDay}/90</span>
                       <span>{details.patient.skinConcern}</span>
@@ -394,7 +399,7 @@ function OverviewTab({ details }) {
                   <td style={{ fontWeight: 600, fontSize: 12 }}>AM</td>
                   {weekGrid.map((d, i) => (
                     <td key={i}>
-                      {d.isFuture ? '\u2014' : d.completed === true ? '\u2705' : d.completed === false ? '\u274C' : '\u2014'}
+                      {d.isFuture ? '\u2014' : d.amCompleted === true ? '\u2705' : d.amCompleted === false ? '\u274C' : '\u2014'}
                     </td>
                   ))}
                 </tr>
@@ -402,7 +407,7 @@ function OverviewTab({ details }) {
                   <td style={{ fontWeight: 600, fontSize: 12 }}>PM</td>
                   {weekGrid.map((d, i) => (
                     <td key={i}>
-                      {d.isFuture ? '\u2014' : d.completed === true ? '\u2705' : d.completed === false ? '\u274C' : '\u2014'}
+                      {d.isFuture ? '\u2014' : d.pmCompleted === true ? '\u2705' : d.pmCompleted === false ? '\u274C' : '\u2014'}
                     </td>
                   ))}
                 </tr>
@@ -460,20 +465,46 @@ function DietTab({ details }) {
 
   return (
     <div className="admin-card">
-      <h3 style={{ marginBottom: 16 }}>🥗 Diet Plan</h3>
+      <h3 style={{ marginBottom: 16 }}>Diet Plan (Airtable)</h3>
       <div style={{ display: 'grid', gap: 12 }}>
         <div>
-          <strong>Plan:</strong> {dietPlan.planName || 'N/A'}
+          <strong>Customer:</strong> {dietPlan.customerName || 'N/A'}
         </div>
         <div>
-          <strong>Duration:</strong> {dietPlan.duration || 'N/A'}
+          <strong>Phone:</strong> {dietPlan.customerPhone || 'N/A'}
         </div>
         <div>
-          <strong>Calories:</strong> {dietPlan.calories || 'N/A'}
+          <strong>Plan Category:</strong> {dietPlan.planCategory || 'N/A'}
         </div>
         <div>
-          <strong>Notes:</strong> {dietPlan.notes || 'N/A'}
+          <strong>Status:</strong>{' '}
+          <span style={{ color: dietPlan.status === 'Active' ? '#16A34A' : '#c44033', fontWeight: 600 }}>
+            {dietPlan.status || 'N/A'}
+          </span>
         </div>
+        {dietPlan.restrictions && dietPlan.restrictions.length > 0 && (
+          <div>
+            <strong>Restrictions:</strong> {Array.isArray(dietPlan.restrictions) ? dietPlan.restrictions.join(', ') : dietPlan.restrictions}
+          </div>
+        )}
+        {dietPlan.recommendations && (
+          <div>
+            <strong>Recommendations:</strong> {dietPlan.recommendations}
+          </div>
+        )}
+        <div>
+          <strong>Dietician:</strong> {dietPlan.dieticianName || 'N/A'} {dietPlan.dieticianPhone ? `(${dietPlan.dieticianPhone})` : ''}
+        </div>
+        {dietPlan.startDate && (
+          <div>
+            <strong>Start Date:</strong> {dietPlan.startDate}
+          </div>
+        )}
+        {dietPlan.notes && (
+          <div>
+            <strong>Notes:</strong> {dietPlan.notes}
+          </div>
+        )}
       </div>
     </div>
   );
