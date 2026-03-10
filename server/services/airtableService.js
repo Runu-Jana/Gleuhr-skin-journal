@@ -36,12 +36,14 @@ if (process.env.AIRTABLE_PAT && process.env.AIRTABLE_BASE_ID) {
  *   - Notes
  */
 /**
- * Normalize phone number by removing +, spaces, dashes, etc.
- * Helps match phone numbers between MongoDB and Airtable formats
+ * Normalize phone number by removing +91 and other formatting
+ * Matches MongoDB format (+917973944144) with Airtable data
  */
 function normalizePhone(phone) {
   if (!phone) return '';
-  return phone.replace(/[^\d]/g, '').replace(/^(\d{2})(\d{8})(\d{0,})$/, '$1$2$3');
+  // Remove +91 prefix if present, then normalize
+  const cleanPhone = phone.replace(/^\+91/, '');
+  return cleanPhone.replace(/[^\d]/g, '').replace(/^(\d{2})(\d{8})(\d{0,})$/, '$1$2$3');
 }
 
 /**
@@ -63,6 +65,25 @@ function getPhoneFromRecord(record) {
          record.get('Contact') || 
          record.get('Mobile') || 
          directPhone || '';
+}
+
+/**
+ * Get customer name from record (handle lookup fields)
+ */
+function getCustomerNameFromRecord(record) {
+  // Try direct field first
+  const directName = record.get('Customer Name');
+  if (directName) return directName;
+  
+  // Try lookup field (may contain linked record name)
+  const lookupName = record.get('Customer');
+  if (lookupName) {
+    console.log(`🔗 Found Customer lookup field: ${lookupName}`);
+    return lookupName;
+  }
+  
+  console.log('⚠️ No customer name found in record fields');
+  return '';
 }
 
 async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
