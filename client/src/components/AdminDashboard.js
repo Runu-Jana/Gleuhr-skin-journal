@@ -3,6 +3,14 @@ import { Search, Phone as PhoneIcon, ArrowLeft, RefreshCw, Activity, Star, Trend
 import axios from 'axios';
 import './AdminDashboard.css';
 
+// Configure axios with admin API key
+const adminApi = axios.create({
+  baseURL: '/api',
+  headers: {
+    'x-admin-api-key': 'gleuhr-admin-2024'
+  }
+});
+
 const MOOD_MAP = {
   excellent: '\uD83D\uDE04',
   good: '\uD83D\uDE42',
@@ -36,7 +44,7 @@ export default function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await axios.get('/api/admin/patients');
+      const { data } = await adminApi.get('/admin/patients');
       setPatients(data.data || []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load patients');
@@ -56,18 +64,13 @@ export default function AdminDashboard() {
     setDetails(null);
     setActiveDetailTab('overview');
     try {
-      const { data } = await axios.get(`/api/admin/patients/${encodeURIComponent(phone)}/details`);
+      const { data } = await adminApi.get(`/admin/patients/${encodeURIComponent(phone)}/details`);
       setDetails(data.data);
       // Set sidebar user from Airtable dietPlan dietician
       if (data.data.dietPlan) {
-        setSelectedUser({
-          name: data.data.dietPlan.dieticianName || 'Unknown',
-          initials: getInitials(data.data.dietPlan.dieticianName),
-          role: 'Dietician',
-          type: 'dietitian',
-          phone: data.data.dietPlan.dieticianPhone || '',
-          planCategory: data.data.dietPlan.planCategory || ''
-        });
+        setSelectedUser(data.data.dietPlan);
+      } else {
+        setSelectedUser(null);
       }
     } catch (err) {
       setDetails(null);
@@ -121,11 +124,11 @@ export default function AdminDashboard() {
             {selectedUser && (
               <button className="admin-sidebar-item">
                 <div className="admin-sidebar-avatar" style={{ background: '#8B5CF6' }}>
-                  {selectedUser.initials}
+                  {selectedUser.dieticianName ? selectedUser.dieticianName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '??'}
                 </div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>Dietician</div>
-                  <div style={{ fontSize: 11, opacity: 0.6 }}>{selectedUser.name}</div>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>{selectedUser.dieticianName || 'N/A'}</div>
                 </div>
               </button>
             )}
