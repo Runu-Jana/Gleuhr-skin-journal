@@ -380,33 +380,35 @@ export default function AMPage() {
             </div>
           </div>
 
-          {/* Submit Button */}
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || hasSubmitted}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Saving...
-              </span>
-            ) : hasSubmitted ? (
-              <span className="flex items-center justify-center">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Completed
-              </span>
-            ) : (
-              <span className="flex items-center justify-center">
-                <Sun className="w-5 h-5 mr-2" />
-                Log AM
-              </span>
-            )}
-          </button>
-
         </div>
+
+      {/* Submit Button - full width */}
+      <div className="px-4 mt-2 mb-6">
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting || hasSubmitted}
+          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+        >
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Saving...
+            </span>
+          ) : hasSubmitted ? (
+            <span className="flex items-center justify-center">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Completed
+            </span>
+          ) : (
+            <span className="flex items-center justify-center">
+              <Sun className="w-5 h-5 mr-2" />
+              Log AM
+            </span>
+          )}
+        </button>
+      </div>
       
 
      
