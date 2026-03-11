@@ -182,9 +182,9 @@ export default function PMPage() {
       patientPhone: phoneNumber,
       date: new Date().toISOString().split('T')[0],
       day,
-      // Preserve existing AM data if any
-      amRoutine: existingCheckIn?.amRoutine || false,
-      sunscreen: existingCheckIn?.sunscreen || false,
+      // Use AM data: prefer checkbox state (user just logged it), fall back to existing DB value
+      amRoutine: amRoutine || existingCheckIn?.amRoutine || false,
+      sunscreen: sunscreen || existingCheckIn?.sunscreen || false,
       // Add PM data
       pmRoutine: true,
       dietFollowed: dietFollowedValue,
@@ -334,24 +334,46 @@ export default function PMPage() {
           <div className="px-4 sm:px-5 flex flex-col gap-3 sm:gap-3.5">
             {/* AM Routine Status - Only show if not already logged today */}
             {!hasAMRoutineToday && (
-              <div style={{ padding: '10px 12px', background: 'rgba(212, 160, 23, 0.08)', borderRadius: '12px', border: '1px solid rgba(212, 160, 23, 0.15)' }}>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <div 
-                    onClick={() => {
-                      setAmRoutine(!amRoutine);
-                      setSunscreen(!amRoutine); // Toggle both AM routine and sunscreen together
-                    }}
-                    style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204, 200, 192)', background: 'rgb(255, 255, 255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
-                  >
-                    {amRoutine && (
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                        <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
-                      </svg>
-                    )}
+              <>
+                <div style={{ padding: '10px 12px', background: 'rgba(212, 160, 23, 0.08)', borderRadius: '12px', border: '1px solid rgba(212, 160, 23, 0.15)' }}>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div
+                      onClick={() => {
+                        setAmRoutine(!amRoutine);
+                        if (amRoutine) setSunscreen(false); // uncheck sunscreen when unchecking AM
+                      }}
+                      style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204, 200, 192)', background: 'rgb(255, 255, 255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
+                    >
+                      {amRoutine && (
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                          <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
+                        </svg>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '12px', color: 'rgb(61, 57, 53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Completed AM routine this morning?</span>
+                  </label>
+                </div>
+
+                {/* Quick Logs — shown when AM routine checkbox is checked */}
+                {amRoutine && (
+                  <div style={{ padding: '10px 12px', background: 'rgba(16, 185, 129, 0.06)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                    <p style={{ fontSize: '11px', fontWeight: '600', color: 'rgb(5, 150, 105)', fontFamily: 'Outfit, sans-serif', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Quick AM Log</p>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <div
+                        onClick={() => setSunscreen(!sunscreen)}
+                        style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204, 200, 192)', background: 'rgb(255, 255, 255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
+                      >
+                        {sunscreen && (
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                            <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
+                          </svg>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'rgb(61, 57, 53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Applied sunscreen this morning?</span>
+                    </label>
                   </div>
-                  <span style={{ fontSize: '12px', color: 'rgb(61, 57, 53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Completed AM routine this morning?</span>
-                </label>
-              </div>
+                )}
+              </>
             )}
 
             {/* PM Routine Toggle */}
