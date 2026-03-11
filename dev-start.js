@@ -14,7 +14,7 @@ const path = require('path');
   console.log('✅ MongoDB running at:', uri);
 
   process.env.MONGODB_URI = uri;
-  process.env.PORT = process.env.PORT || '5001';
+  process.env.PORT = process.env.PORT || '5000';
 
   // Load rest of .env (but override MONGODB_URI)
   require('dotenv').config({ override: false });
