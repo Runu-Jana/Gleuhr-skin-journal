@@ -11,16 +11,25 @@ const PORT = process.env.PORT || 5000;
 // Trust proxy (needed for rate limiting behind proxy)
 app.set('trust proxy', 1);
 
-// Rate limiting - skip for development
+// General rate limiter: 200 req / 15 min per IP (skipped in development)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs (increased for testing)
-  skip: (req) => process.env.NODE_ENV === 'development', // Skip in dev
-  keyGenerator: (req) => req.ip // Use IP for rate limiting
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  skip: (req) => process.env.NODE_ENV === 'development',
+  keyGenerator: (req) => req.ip,
+  message: { error: 'Too many requests, please try again later.' }
 });
 
-// Temporarily disable rate limiting for testing
-// app.use(limiter);
+// Strict limiter for auth endpoints: 10 req / 15 min per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skip: (req) => process.env.NODE_ENV === 'development',
+  keyGenerator: (req) => req.ip,
+  message: { error: 'Too many authentication attempts, please try again later.' }
+});
+
+app.use(limiter);
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -32,8 +41,8 @@ app.use(express.static(path.join(__dirname, '../client/build')));
 app.use(express.static(path.join(__dirname, '../client/public')));
 
 // Routes (All MongoDB-based)
-app.use('/api/admin/auth', require('./routes/admin-auth'));
-app.use('/api/auth', require('./routes/auth'));
+app.use('/api/admin/auth', authLimiter, require('./routes/admin-auth'));
+app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/self-register', require('./routes/self-register'));
 app.use('/api/patient', require('./routes/patient'));
 app.use('/api/photo', require('./routes/photo'));

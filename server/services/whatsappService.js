@@ -16,7 +16,7 @@ class WhatsAppService {
       // Use provided country code (default to India if not specified)
       const formattedPhone = cleanPhone.startsWith(countryCode) ? cleanPhone : `${countryCode}${cleanPhone}`;
       
-      console.log(`Sending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode}): ${otp}`);
+      console.log(`Sending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode})`);
       
       // Interakt API payload for WhatsApp template message
       const payload = {
@@ -51,17 +51,14 @@ class WhatsAppService {
 
     } catch (error) {
       console.error('Interakt WhatsApp OTP sending failed:', error.message);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      
-      // Fallback to console log in case of WhatsApp failure
-      console.log(`FALLBACK - OTP for ${phoneNumber}: ${otp}`);
-      
-      return {
-        success: true,
-        fallback: true,
-        error: error.message
-      };
+
+      if (process.env.NODE_ENV === 'development') {
+        // In dev, log OTP and treat as success so testing works without real credentials
+        console.log(`[DEV] WhatsApp unavailable. OTP for ${phoneNumber}: ${otp}`);
+        return { success: true, fallback: true, error: error.message };
+      }
+
+      return { success: false, fallback: true, error: error.message };
     }
   }
 
@@ -89,7 +86,7 @@ class WhatsAppService {
         }
       };
 
-      console.log(`Resending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode}): ${otp}`);
+      console.log(`Resending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode})`);
 
       const response = await axios.post(`${this.baseUrl}`, payload, {
         headers: {
@@ -109,19 +106,13 @@ class WhatsAppService {
 
     } catch (error) {
       console.error('Interakt WhatsApp OTP resend failed:', error.message);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      
-      // Fallback to console log in case of WhatsApp failure
-      console.log(`FALLBACK - RESEND OTP for ${phoneNumber}: ${otp}`);
-      
-      // Return success to avoid breaking the flow, but log the error
-      return {
-        success: true,
-        fallback: true,
-        error: error.message,
-        resent: true
-      };
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEV] WhatsApp unavailable. OTP for ${phoneNumber}: ${otp}`);
+        return { success: true, fallback: true, error: error.message, resent: true };
+      }
+
+      return { success: false, fallback: true, error: error.message, resent: true };
     }
   }
 

@@ -4,6 +4,20 @@ const Patient = require('../models/Patient');
 const whatsappService = require('../services/whatsappService');
 const crypto = require('crypto');
 
+// Validation helpers
+const PHONE_RE = /^\d{7,15}$/;
+const COUNTRY_CODE_RE = /^\d{1,4}$/;
+const OTP_RE = /^\d{4,8}$/;
+
+function validatePhone(phone) {
+  const clean = (phone || '').replace(/\D/g, '');
+  return PHONE_RE.test(clean) ? clean : null;
+}
+
+function validateCountryCode(cc) {
+  return COUNTRY_CODE_RE.test((cc || '').toString()) ? cc : null;
+}
+
 // POST /api/auth/send-verification - Send WhatsApp verification code to any phone
 router.post('/send-verification', async (req, res) => {
   try {
@@ -11,6 +25,14 @@ router.post('/send-verification', async (req, res) => {
 
     if (!phoneNumber) {
       return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    if (!validatePhone(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
+    if (countryCode && !validateCountryCode(countryCode)) {
+      return res.status(400).json({ error: 'Invalid country code' });
     }
 
     // Check if patient exists
@@ -21,8 +43,10 @@ router.post('/send-verification', async (req, res) => {
       return res.status(404).json({ error: 'Patient not found. Please contact your coach.' });
     }
 
-    // Fixed verification code for easy login
-    const verificationCode = '123456';
+    // Generate a real random OTP; use fixed code only in development
+    const verificationCode = process.env.NODE_ENV === 'development'
+      ? '123456'
+      : await whatsappService.generateVerificationCode();
 
     // Store verification code with expiry
     await whatsappService.storeVerificationCode(phoneNumber, verificationCode);
@@ -62,8 +86,18 @@ router.post('/resend-verification', async (req, res) => {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
-    // Fixed verification code for easy login
-    const verificationCode = '123456';
+    if (!validatePhone(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
+    if (countryCode && !validateCountryCode(countryCode)) {
+      return res.status(400).json({ error: 'Invalid country code' });
+    }
+
+    // Generate a real random OTP; use fixed code only in development
+    const verificationCode = process.env.NODE_ENV === 'development'
+      ? '123456'
+      : await whatsappService.generateVerificationCode();
 
     // Store new verification code with expiry
     await whatsappService.storeVerificationCode(phoneNumber, verificationCode);
@@ -95,6 +129,14 @@ router.post('/register', async (req, res) => {
 
     if (!phoneNumber || !verificationCode) {
       return res.status(400).json({ error: 'Phone number and verification code are required' });
+    }
+
+    if (!validatePhone(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
+    if (!OTP_RE.test(verificationCode)) {
+      return res.status(400).json({ error: 'Invalid verification code format' });
     }
 
     // Verify WhatsApp verification code first
