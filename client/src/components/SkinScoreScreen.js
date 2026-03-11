@@ -109,11 +109,10 @@ export default function SkinScoreScreen() {
       };
 
       await saveSkinScore(scoreData);
-      
-      if (isOnline) {
-        // Only send the fields the API expects
+
+      // Save to MongoDB directly
+      try {
         const apiData = {
-          patientId: patient?.id,
           patientPhone: patient?.phone,
           date: scoreData.date,
           day: scoreData.day,
@@ -123,7 +122,23 @@ export default function SkinScoreScreen() {
           confidence: scoreData.confidence,
           totalScore: scoreData.totalScore
         };
-        queueForSync('skinScore', apiData);
+        const response = await fetch('/api/skinscore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(apiData)
+        });
+        const result = await response.json();
+        if (result.success) {
+          scoreData.synced = true;
+          await saveSkinScore(scoreData);
+        } else if (isOnline) {
+          queueForSync('skinScore', apiData);
+        }
+      } catch (apiError) {
+        console.error('Failed to save skin score to MongoDB:', apiError);
+        if (isOnline) {
+          queueForSync('skinScore', { patientPhone: patient?.phone, ...scoreData });
+        }
       }
       
       console.log('Skin score assessment completed:', scoreData);
@@ -139,7 +154,7 @@ export default function SkinScoreScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f0f4ea]/5 to-[#faf8f5] px-6 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] via-[#f0f4ea]/5 to-[#faf8f5] py-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
@@ -178,22 +193,22 @@ export default function SkinScoreScreen() {
               <p className="text-sm font-semibold text-[#191716] font-['Outfit'] mb-3 leading-relaxed">
                 {question.question}
               </p>
-              
+
               {/* Options */}
               <div className="flex gap-1.5">
-                {question.options.map((option, optionIndex) => {
+                {question.options.map((option) => {
                   const value = option.value;
                   return (
                     <button
                       key={value}
                       onClick={() => handleAnswer(question.key, value)}
-                      className="flex-1 py-3 px-1 rounded-xl border-[1.5px] border-[#e0ddd7] bg-white cursor-pointer flex flex-col items-center gap-1 transition-all duration-150 min-h-[64px] justify-center hover:border-[#d0cdc7]"
+                      className="flex-1 min-w-0 py-3 px-1 rounded-xl border-[1.5px] border-[#e0ddd7] bg-white cursor-pointer flex flex-col items-center gap-1 transition-all duration-150 min-h-[64px] justify-center hover:border-[#d0cdc7]"
                       style={{
                         backgroundColor: answers[question.key] === value ? '#fef2f1' : 'white',
                         borderColor: answers[question.key] === value ? '#c44033' : '#e0ddd7'
                       }}
                     >
-                      <span 
+                      <span
                         className="text-base font-bold font-['Playfair_Display']"
                         style={{
                           color: answers[question.key] === value ? '#c44033' : '#ccc8c0'
@@ -201,7 +216,7 @@ export default function SkinScoreScreen() {
                       >
                         {value}
                       </span>
-                      <span className="text-xs text-[#7a756d] font-['Outfit'] leading-tight text-center whitespace-pre-line font-normal">
+                      <span className="text-xs text-[#7a756d] font-['Outfit'] leading-tight text-center break-words font-normal w-full">
                         {option.label}
                       </span>
                     </button>
@@ -211,24 +226,24 @@ export default function SkinScoreScreen() {
             </motion.div>
           ))}
         </div>
-      </div>
 
-      {/* Submit Button */}
-      <div className="px-6 py-7">
-        <button
-          onClick={handleSubmit}
-          disabled={!allQuestionsAnswered || isSubmitting}
-          className={`w-full py-[18px] rounded-2xl font-semibold transition-all duration-250 font-['Outfit'] text-base ${
-            allQuestionsAnswered && !isSubmitting
-              ? 'bg-[#c44033] text-white shadow-lg hover:bg-[#b33a2e]'
-              : 'bg-[#e0ddd7] text-[#a39e95] cursor-default'
-          }`}
-          style={{
-            boxShadow: allQuestionsAnswered && !isSubmitting ? '0 4px 12px rgba(196, 64, 51, 0.3)' : 'none'
-          }}
-        >
-          {isSubmitting ? 'Saving...' : 'See My Score →'}
-        </button>
+        {/* Submit Button */}
+        <div className="px-6 py-7">
+          <button
+            onClick={handleSubmit}
+            disabled={!allQuestionsAnswered || isSubmitting}
+            className={`w-full py-[18px] rounded-2xl font-semibold transition-all duration-250 font-['Outfit'] text-base ${
+              allQuestionsAnswered && !isSubmitting
+                ? 'bg-[#c44033] text-white shadow-lg hover:bg-[#b33a2e]'
+                : 'bg-[#e0ddd7] text-[#a39e95] cursor-default'
+            }`}
+            style={{
+              boxShadow: allQuestionsAnswered && !isSubmitting ? '0 4px 12px rgba(196, 64, 51, 0.3)' : 'none'
+            }}
+          >
+            {isSubmitting ? 'Saving...' : 'See My Score →'}
+          </button>
+        </div>
       </div>
     </div>
   );
