@@ -16,7 +16,7 @@ class WhatsAppService {
       // Use provided country code (default to India if not specified)
       const formattedPhone = cleanPhone.startsWith(countryCode) ? cleanPhone : `${countryCode}${cleanPhone}`;
       
-      console.log(`Sending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode}): ${otp}`);
+      console.log(`Sending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode})`);
       
       // Interakt API payload for WhatsApp template message
       const payload = {
@@ -54,11 +54,13 @@ class WhatsAppService {
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
       
-      // Fallback to console log in case of WhatsApp failure
-      console.log(`FALLBACK - OTP for ${phoneNumber}: ${otp}`);
-      
+      // In development only, log the OTP so testing remains possible
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEV] WhatsApp failed. OTP for ${phoneNumber}: ${otp}`);
+      }
+
       return {
-        success: true,
+        success: false,
         fallback: true,
         error: error.message
       };
@@ -89,7 +91,7 @@ class WhatsAppService {
         }
       };
 
-      console.log(`Resending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode}): ${otp}`);
+      console.log(`Resending WhatsApp OTP via Interakt to ${formattedPhone} (country: ${countryCode})`);
 
       const response = await axios.post(`${this.baseUrl}`, payload, {
         headers: {
@@ -112,12 +114,13 @@ class WhatsAppService {
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
       
-      // Fallback to console log in case of WhatsApp failure
-      console.log(`FALLBACK - RESEND OTP for ${phoneNumber}: ${otp}`);
-      
-      // Return success to avoid breaking the flow, but log the error
+      // In development only, log the OTP so testing remains possible
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEV] WhatsApp resend failed. OTP for ${phoneNumber}: ${otp}`);
+      }
+
       return {
-        success: true,
+        success: false,
         fallback: true,
         error: error.message,
         resent: true
