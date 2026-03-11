@@ -35,6 +35,45 @@ export default function HomeScreen() {
   const timeOfDay = getTimeOfDay();
   const isMorning = timeOfDay === 'AM';
 
+  // Calculate streak values from local check-in records (source of truth for the calendar)
+  const calculateStreakFromCheckIns = (checkIns) => {
+    if (!checkIns || checkIns.length === 0) return { currentStreak: 0, longestStreak: 0 };
+
+    const activeDates = new Set(
+      checkIns.filter(c => c.amRoutine || c.pmRoutine).map(c => c.date)
+    );
+    if (activeDates.size === 0) return { currentStreak: 0, longestStreak: 0 };
+
+    const sorted = [...activeDates].sort();
+
+    // Longest consecutive run
+    let longestStreak = 1;
+    let run = 1;
+    for (let i = 1; i < sorted.length; i++) {
+      const diff = Math.round((new Date(sorted[i]) - new Date(sorted[i - 1])) / 86400000);
+      if (diff === 1) { run++; if (run > longestStreak) longestStreak = run; }
+      else run = 1;
+    }
+
+    // Current streak: consecutive days ending at today or yesterday
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const yest = new Date(today); yest.setDate(today.getDate() - 1);
+    const yesterdayStr = yest.toISOString().split('T')[0];
+
+    let currentStreak = 0;
+    const startOffset = activeDates.has(todayStr) ? 0 : activeDates.has(yesterdayStr) ? 1 : -1;
+    if (startOffset >= 0) {
+      for (let i = startOffset; i <= sorted.length; i++) {
+        const d = new Date(today); d.setDate(today.getDate() - i);
+        if (activeDates.has(d.toISOString().split('T')[0])) currentStreak++;
+        else break;
+      }
+    }
+
+    return { currentStreak, longestStreak: Math.max(longestStreak, currentStreak) };
+  };
+
   // Calculate calendar data from real check-ins
   const getCalendarData = (checkIns) => {
     const now = new Date();
@@ -123,6 +162,7 @@ export default function HomeScreen() {
   const [currentSkinScore, setCurrentSkinScore] = useState(0); // Default fallback
   const [consistency, setConsistency] = useState(0); // Default fallback
   const [checkIns, setCheckIns] = useState([]); // Store check-ins for calendar
+  const [localStreak, setLocalStreak] = useState({ currentStreak: 0, longestStreak: 0 });
   const [photosCount, setPhotosCount] = useState(0); // Store photos count
 
   // Fetch latest skin score and calculate consistency
@@ -157,6 +197,7 @@ export default function HomeScreen() {
           const calculatedConsistency = calculateConsistency(checkIns, patient.startDate);
           setConsistency(calculatedConsistency);
           setCheckIns(checkIns);
+          setLocalStreak(calculateStreakFromCheckIns(checkIns));
 
           // Fetch weekly photos count
           const photos = await getWeeklyPhotos(patientId);
@@ -291,10 +332,10 @@ export default function HomeScreen() {
           </div>
           <div>
             <div className="text-sm font-semibold text-[#191716] font-crimson tracking-[-0.2px]">
-              Current streak <span className="text-[#c44033] font-crimson text-xl font-bold ml-1">{streakData?.streak || 0}</span> <span className="text-xs text-[#7a756d] font-crimson">days</span>
+              Current streak <span className="text-[#c44033] font-crimson text-xl font-bold ml-1">{localStreak.currentStreak || streakData?.streak || 0}</span> <span className="text-xs text-[#7a756d] font-crimson">days</span>
             </div>
             <div className="text-xs text-[#a39e95] font-crimson mt-0.5 mb-0.5">
-              Best: <span className="font-semibold text-[#191716]">{streakData?.longestStreak || 0}</span> days
+              Best: <span className="font-semibold text-[#191716]">{localStreak.longestStreak || streakData?.longestStreak || 0}</span> days
             </div>
             <div className="text-xs text-[#a39e95] font-outfit mt-0.5 flex items-center gap-1.5">
               <span>Red Hot flame</span>

@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'gleuhr-db';
-const DB_VERSION = 3; // Increment to force schema upgrade
+const DB_VERSION = 4; // Increment to force schema upgrade
 
 let db = null;
 
@@ -330,10 +330,12 @@ export async function getSyncQueue() {
   const database = await initDB();
   try {
     return database.getAllFromIndex('syncQueue', 'by-created');
-  } catch (error) {
-    // Fallback: try getting all items if index doesn't exist
-    console.warn('SyncQueue index not found, trying fallback method:', error);
-    return database.getAll('syncQueue');
+  } catch {
+    try {
+      return database.getAll('syncQueue');
+    } catch {
+      return [];
+    }
   }
 }
 

@@ -149,6 +149,8 @@ router.get('/:phone', async (req, res) => {
       id: record._id,
       date: record.date,
       day: record.dayOfJourney,
+      amRoutine: record.amRoutine,
+      pmRoutine: record.pmRoutine,
       skinScore: record.skinScore,
       skinScores: record.skinScores,
       mood: record.mood,
@@ -168,65 +170,65 @@ router.get('/:phone', async (req, res) => {
   }
 });
 
-// Helper to update streak
+// Helper to update streak — recalculates from actual DailyCheckIn records
 async function updateStreak(phoneNumber, currentDay, patientId = null) {
   try {
-    // Find existing streak (support both field names)
-    let streak = await Streak.findOne({
-      $or: [
-        { phoneNumber },
-        { patientPhone: phoneNumber }
-      ]
-    });
+    // Fetch all check-ins for this patient
+    const orClauses = [{ patientPhone: phoneNumber }];
+    if (patientId) orClauses.push({ patientId });
+    const allCheckIns = await DailyCheckIn.find({ $or: orClauses }).sort({ date: 1 });
 
-    if (streak) {
-      const today = new Date().toISOString().split('T')[0];
-      // Use correct field name from Streak model: lastCheckIn (not lastCheckinDate)
-      const lastCheckin = streak.lastCheckIn ? new Date(streak.lastCheckIn).toISOString().split('T')[0] : null;
-      const currentStreak = streak.currentStreak || 0;
+    // Dates with at least one completed routine
+    const activeDates = new Set(
+      allCheckIns.filter(c => c.amRoutine || c.pmRoutine).map(c => c.date)
+    );
 
-      // Calculate new streak
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+    if (activeDates.size === 0) return;
 
-      let newStreak = currentStreak;
-      let newLongestStreak = streak.longestStreak || 0;
+    const sorted = [...activeDates].sort();
 
-      if (lastCheckin === today) {
-        // Already checked in today — keep streak the same
-        newStreak = currentStreak;
-      } else if (lastCheckin === yesterdayStr) {
-        // Consecutive day — increment streak
-        newStreak = currentStreak + 1;
+    // Longest streak: max consecutive run of active dates
+    let longestStreak = 1;
+    let run = 1;
+    for (let i = 1; i < sorted.length; i++) {
+      const diff = Math.round((new Date(sorted[i]) - new Date(sorted[i - 1])) / 86400000);
+      if (diff === 1) {
+        run++;
+        if (run > longestStreak) longestStreak = run;
       } else {
-        // Gap in days or first check-in — reset to 1
-        newStreak = 1;
+        run = 1;
       }
-
-      // Update longest streak if current streak exceeds it
-      if (newStreak > newLongestStreak) {
-        newLongestStreak = newStreak;
-      }
-
-      await Streak.findByIdAndUpdate(streak._id, {
-        currentStreak: newStreak,
-        longestStreak: newLongestStreak,
-        lastCheckIn: new Date(),   // correct field name
-        day: currentDay
-      });
-    } else {
-      // Create new streak record
-      streak = new Streak({
-        patientId: patientId,
-        patientPhone: phoneNumber,
-        currentStreak: 1,
-        longestStreak: 1,
-        lastCheckIn: new Date(),   // correct field name
-        day: currentDay
-      });
-      await streak.save();
     }
+
+    // Current streak: consecutive active dates ending at today or yesterday
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    let currentStreak = 0;
+    const startOffset = activeDates.has(todayStr) ? 0 : activeDates.has(yesterdayStr) ? 1 : -1;
+    if (startOffset >= 0) {
+      for (let i = startOffset; i <= sorted.length; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        if (activeDates.has(dateStr)) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    if (currentStreak > longestStreak) longestStreak = currentStreak;
+
+    await Streak.findOneAndUpdate(
+      { $or: orClauses },
+      { currentStreak, longestStreak, lastCheckIn: new Date(), day: currentDay, patientPhone: phoneNumber, ...(patientId && { patientId }) },
+      { upsert: true, new: true }
+    );
   } catch (error) {
     console.error('Update streak error:', error);
   }
