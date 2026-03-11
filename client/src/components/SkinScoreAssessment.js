@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { saveSkinScore } from '../utils/db';
-import { generateId } from '../utils/helpers';
+import { generateId, calculateDay } from '../utils/helpers';
 
 export default function SkinScoreAssessment() {
   const { patient } = useAuth();
@@ -80,7 +80,7 @@ export default function SkinScoreAssessment() {
   };
 
   const calculateTotalScore = () => {
-    return Object.values(scores).reduce((sum, score) => sum + score, 1);
+    return Object.values(scores).reduce((sum, score) => sum + score, 0);
   };
 
   const allQuestionsAnswered = Object.values(scores).every(score => score > 0);
@@ -101,14 +101,15 @@ export default function SkinScoreAssessment() {
     
     try {
       const totalScore = calculateTotalScore();
-      
+      const currentDay = calculateDay(patient?.startDate) || 1;
+
       const scoreData = {
         id: generateId(),
         patientId: patient?.id,
         patientName: patient?.name,
         patientPhone: patient?.phone,
         date: new Date().toISOString(),
-        day: patient?.day || 1,
+        day: currentDay,
         assessmentType: 'skin-score',
         totalScore,
         maxScore: 20,
@@ -122,12 +123,37 @@ export default function SkinScoreAssessment() {
 
       // Save to IndexedDB
       await saveSkinScore(scoreData);
-      
+
+      // Save to MongoDB
+      try {
+        const response = await fetch('/api/skinscore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientPhone: patient?.phone,
+            date: scoreData.date,
+            day: currentDay,
+            darkest_patch: scores.pigmentation ?? 0,
+            skin_tone: scores.toneEvenness ?? 0,
+            texture: scores.texture ?? 0,
+            confidence: scores.confidence ?? 0,
+            totalScore,
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          scoreData.synced = true;
+          await saveSkinScore(scoreData);
+        }
+      } catch (apiError) {
+        console.error('Failed to save skin score to MongoDB:', apiError);
+      }
+
       console.log('Skin score assessment completed:', scoreData);
-      
+
       // Navigate home after successful submission
       navigate('/');
-      
+
     } catch (error) {
       console.error('Error saving skin score:', error);
       alert('Failed to save assessment. Please try again.');
@@ -149,7 +175,7 @@ export default function SkinScoreAssessment() {
             Skin Score Assessment
           </h1>
           <p className="text-gray-600">
-            Day {patient?.day || 1} • 4 quick questions • takes 30 seconds
+            Day {calculateDay(patient?.startDate) || 1} • 4 quick questions • takes 30 seconds
           </p>
         </motion.div>
 

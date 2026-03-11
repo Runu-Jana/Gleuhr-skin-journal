@@ -81,6 +81,11 @@ const dailyCheckInSchema = new mongoose.Schema({
     max: 20,
     default: 8
   },
+  skinMood: {
+    type: String,
+    enum: ['good', 'okay', 'off'],
+    default: 'okay'
+  },
   medications: [{
     name: String,
     taken: Boolean,
