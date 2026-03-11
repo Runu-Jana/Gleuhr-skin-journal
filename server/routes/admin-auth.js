@@ -10,16 +10,18 @@ router.post('/login', (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const validEmail = process.env.ADMIN_EMAIL || 'admin@gleuhr.com';
-  const validPassword = process.env.ADMIN_PASSWORD || 'gleuhr-admin-2024';
+  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.JWT_SECRET) {
+    console.error('Missing required env vars: ADMIN_EMAIL, ADMIN_PASSWORD, JWT_SECRET');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
 
-  if (email !== validEmail || password !== validPassword) {
+  if (email !== process.env.ADMIN_EMAIL || password !== process.env.ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
   const token = jwt.sign(
     { role: 'admin', email },
-    process.env.JWT_SECRET || 'gleuhr-jwt-secret',
+    process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );
 
@@ -36,7 +38,7 @@ router.post('/verify', (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'gleuhr-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Not an admin token' });
     }
