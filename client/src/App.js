@@ -31,6 +31,7 @@ import AccessibilityMenu from './components/AccessibilityMenu';
 import AchievementPopup from './components/AchievementPopup';
 import AdminDietDashboard from './components/AdminDietDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import AdminLogin from './components/AdminLogin';
 
 // Utils
 import { initDB } from './utils/db';
@@ -39,6 +40,12 @@ import PMPage from './components/pmPage';
 import { getTimeOfDay } from './utils/timeUtils';
 import { calculateDay, isWeeklyPhotoDay } from './utils/helpers';
 import SkinScoreAssessment from './components/SkinScoreAssessment';
+
+function AdminRoute({ children }) {
+  const token = localStorage.getItem('adminToken');
+  if (!token) return <Navigate to="/admin/login" replace />;
+  return children;
+}
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -128,8 +135,9 @@ function AppRoutes() {
             path="/login"
             element={isAuthenticated ? <Navigate to="/" replace /> : <LoginScreen />}
           />
-          <Route path="/admin/diet-plans" element={<AdminDietDashboard />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/login" element={<AdminLogin onLogin={() => window.location.replace('/admin/dashboard')} />} />
+          <Route path="/admin/diet-plans" element={<AdminRoute><AdminDietDashboard /></AdminRoute>} />
+          <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route 
             path="/onboarding" 
             element={!isAuthenticated ? <Navigate to="/login" replace /> : patient?.hasCommitted ? <Navigate to="/" replace /> : <OnboardingScreen />} 
@@ -170,9 +178,9 @@ function AppRoutes() {
             path="/checkin-success" 
             element={!isAuthenticated ? <Navigate to="/login" replace /> : <CheckInSuccessPage />} 
           />
-          <Route 
-            path="/admin" 
-            element={<AdminDashboard />} 
+          <Route
+            path="/admin"
+            element={<AdminRoute><AdminDashboard /></AdminRoute>}
           />
           <Route 
             path="/" 

@@ -1,22 +1,23 @@
-// Simple admin authentication middleware
-// In production, you should use proper authentication like JWT, sessions, etc.
+const jwt = require('jsonwebtoken');
 
 const adminAuth = (req, res, next) => {
-  // For development, we'll use a simple API key
-  // In production, implement proper authentication
-  const apiKey = req.headers['x-admin-api-key'];
-  
-  // Simple API key check (change this in production!)
-  const validApiKey = process.env.ADMIN_API_KEY || 'gleuhr-admin-2024';
-  
-  if (!apiKey || apiKey !== validApiKey) {
-    return res.status(401).json({ 
-      error: 'Unauthorized',
-      message: 'Valid admin API key required'
-    });
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ error: 'Admin token required' });
   }
-  
-  next();
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'gleuhr-jwt-secret');
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    req.admin = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired admin token' });
+  }
 };
 
 module.exports = adminAuth;

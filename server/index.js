@@ -32,6 +32,7 @@ app.use(express.static(path.join(__dirname, '../client/build')));
 app.use(express.static(path.join(__dirname, '../client/public')));
 
 // Routes (All MongoDB-based)
+app.use('/api/admin/auth', require('./routes/admin-auth'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/self-register', require('./routes/self-register'));
 app.use('/api/patient', require('./routes/patient'));

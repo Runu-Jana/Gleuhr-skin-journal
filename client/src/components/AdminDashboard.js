@@ -3,9 +3,12 @@ import { Search, Phone as PhoneIcon, ArrowLeft, RefreshCw, ChevronDown } from 'l
 import axios from 'axios';
 import './AdminDashboard.css';
 
-const adminApi = axios.create({
-  baseURL: '/api',
-  headers: { 'x-admin-api-key': 'gleuhr-admin-2024' }
+const adminApi = axios.create({ baseURL: '/api' });
+
+adminApi.interceptors.request.use(config => {
+  const token = localStorage.getItem('adminToken');
+  if (token) config.headers['Authorization'] = `Bearer ${token}`;
+  return config;
 });
 
 const MOOD_MAP = { excellent: '😄', good: '🙂', fair: '😐', poor: '😞' };
