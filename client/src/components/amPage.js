@@ -219,12 +219,16 @@ export default function AMPage() {
 
     setHasSubmitted(true);
     setIsSubmitting(false);
-    
+
     console.log('AM check-in submission completed!');
-    
-    // Show success message
-    setShowCheckinSuccess(true);
-    setTimeout(() => setShowCheckinSuccess(false), 3000);
+
+    // Navigate to success page (same as PM page)
+    navigate('/checkin-success', {
+      state: {
+        streak: day,
+        message: "Great start to your day! Keep your morning routine going strong."
+      }
+    });
   };
 
   const milestones = [
