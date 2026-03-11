@@ -195,14 +195,14 @@ export default function SkinScoreScreen() {
               </p>
 
               {/* Options */}
-              <div className="flex gap-1.5">
+              <div className="grid grid-cols-5 gap-1.5">
                 {question.options.map((option) => {
                   const value = option.value;
                   return (
                     <button
                       key={value}
                       onClick={() => handleAnswer(question.key, value)}
-                      className="flex-1 min-w-0 py-3 px-1 rounded-xl border-[1.5px] border-[#e0ddd7] bg-white cursor-pointer flex flex-col items-center gap-1 transition-all duration-150 min-h-[64px] justify-center hover:border-[#d0cdc7]"
+                      className="py-3 px-1 rounded-xl border-[1.5px] border-[#e0ddd7] bg-white cursor-pointer flex flex-col items-center gap-1 transition-all duration-150 min-h-[64px] justify-center hover:border-[#d0cdc7] w-full overflow-hidden"
                       style={{
                         backgroundColor: answers[question.key] === value ? '#fef2f1' : 'white',
                         borderColor: answers[question.key] === value ? '#c44033' : '#e0ddd7'
@@ -216,7 +216,7 @@ export default function SkinScoreScreen() {
                       >
                         {value}
                       </span>
-                      <span className="text-xs text-[#7a756d] font-['Outfit'] leading-tight text-center break-words font-normal w-full">
+                      <span className="text-xs text-[#7a756d] font-['Outfit'] leading-tight text-center font-normal w-full" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                         {option.label}
                       </span>
                     </button>
