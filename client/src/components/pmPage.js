@@ -172,6 +172,10 @@ export default function PMPage() {
     // Get today's existing check-in data
     const existingCheckIn = await getTodayCheckIn(patientId);
     
+    // Map UI diet labels to model enum values
+    const dietFollowedMap = { 'Yes ✓': 'Yes', 'Mostly': 'Partial', 'Not today': 'No' };
+    const dietFollowedValue = dietFollowedMap[dietFollowed] || dietFollowed || 'No';
+
     const checkInData = {
       id: existingCheckIn?.id || generateId(),
       patientId: patientId,
@@ -183,7 +187,7 @@ export default function PMPage() {
       sunscreen: existingCheckIn?.sunscreen || false,
       // Add PM data
       pmRoutine: true,
-      dietFollowed,
+      dietFollowed: dietFollowedValue,
       triggerFoods,
       waterIntake,
       skinMood,
