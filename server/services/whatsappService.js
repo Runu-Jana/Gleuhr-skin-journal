@@ -51,19 +51,14 @@ class WhatsAppService {
 
     } catch (error) {
       console.error('Interakt WhatsApp OTP sending failed:', error.message);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      
-      // In development only, log the OTP so testing remains possible
+
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[DEV] WhatsApp failed. OTP for ${phoneNumber}: ${otp}`);
+        // In dev, log OTP and treat as success so testing works without real credentials
+        console.log(`[DEV] WhatsApp unavailable. OTP for ${phoneNumber}: ${otp}`);
+        return { success: true, fallback: true, error: error.message };
       }
 
-      return {
-        success: false,
-        fallback: true,
-        error: error.message
-      };
+      return { success: false, fallback: true, error: error.message };
     }
   }
 
@@ -111,20 +106,13 @@ class WhatsAppService {
 
     } catch (error) {
       console.error('Interakt WhatsApp OTP resend failed:', error.message);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      
-      // In development only, log the OTP so testing remains possible
+
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[DEV] WhatsApp resend failed. OTP for ${phoneNumber}: ${otp}`);
+        console.log(`[DEV] WhatsApp unavailable. OTP for ${phoneNumber}: ${otp}`);
+        return { success: true, fallback: true, error: error.message, resent: true };
       }
 
-      return {
-        success: false,
-        fallback: true,
-        error: error.message,
-        resent: true
-      };
+      return { success: false, fallback: true, error: error.message, resent: true };
     }
   }
 
