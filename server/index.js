@@ -40,6 +40,10 @@ app.use(express.static(path.join(__dirname, '../client/build')));
 // Serve PWA icons and manifest from public folder
 app.use(express.static(path.join(__dirname, '../client/public')));
 
+// Dietician routes (before admin routes)
+app.use('/api/dietician/auth', authLimiter, require('./routes/dietician-auth'));
+app.use('/api/dietician', require('./routes/dietician'));
+
 // Routes (All MongoDB-based)
 app.use('/api/admin/auth', authLimiter, require('./routes/admin-auth'));
 app.use('/api/auth', authLimiter, require('./routes/auth'));

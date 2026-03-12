@@ -32,6 +32,8 @@ import AchievementPopup from './components/AchievementPopup';
 import AdminDietDashboard from './components/AdminDietDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AdminLogin from './components/AdminLogin';
+import DieticianLogin from './components/DieticianLogin';
+import DieticianDashboard from './components/DieticianDashboard';
 
 // Utils
 import { initDB } from './utils/db';
@@ -44,6 +46,12 @@ import SkinScoreAssessment from './components/SkinScoreAssessment';
 function AdminRoute({ children }) {
   const token = localStorage.getItem('adminToken');
   if (!token) return <Navigate to="/admin/login" replace />;
+  return children;
+}
+
+function DieticianRoute({ children }) {
+  const token = localStorage.getItem('dieticianToken');
+  if (!token) return <Navigate to="/dietician/login" replace />;
   return children;
 }
 
@@ -135,6 +143,8 @@ function AppRoutes() {
             path="/login"
             element={isAuthenticated ? <Navigate to="/" replace /> : <LoginScreen />}
           />
+          <Route path="/dietician/login" element={<DieticianLogin onLogin={() => window.location.replace('/dietician/dashboard')} />} />
+          <Route path="/dietician/dashboard" element={<DieticianRoute><DieticianDashboard /></DieticianRoute>} />
           <Route path="/admin/login" element={<AdminLogin onLogin={() => window.location.replace('/admin/dashboard')} />} />
           <Route path="/admin/diet-plans" element={<AdminRoute><AdminDietDashboard /></AdminRoute>} />
           <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

@@ -108,6 +108,38 @@ function mapRecord(record) {
   };
 }
 
+const TEAM_TABLE = process.env.AIRTABLE_TEAM_TABLE || 'Team';
+
+/**
+ * Fetch all team members from the Team table filtered by Department = 'Dieticians'.
+ * Returns array of {id, name, email, phone}.
+ */
+async function fetchTeamMembers() {
+  if (!base) return [];
+  const records = [];
+  return new Promise((resolve, reject) => {
+    base(TEAM_TABLE)
+      .select({
+        pageSize: 100,
+        filterByFormula: "{Department} = 'Dieticians'",
+      })
+      .eachPage(
+        (pageRecords, fetchNextPage) => {
+          pageRecords.forEach(r => {
+            records.push({
+              id: r.id,
+              name: extractString(r.get('Name')) || '',
+              email: extractString(r.get('Email ID')) || '',
+              phone: extractString(r.get('Phone Number')) || '',
+            });
+          });
+          fetchNextPage();
+        },
+        (err) => err ? reject(err) : resolve(records)
+      );
+  });
+}
+
 /**
  * Fetch all records from the Diet Plan table (paginated).
  * Optionally filter in JS by customerPhone or dieticianName.
@@ -204,5 +236,6 @@ async function fetchDietPlanById(recordId) {
 module.exports = {
   fetchDietPlans,
   fetchDietPlanById,
-  fetchAllDietPlans
+  fetchAllDietPlans,
+  fetchTeamMembers
 };
