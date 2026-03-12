@@ -15,6 +15,8 @@ router.post('/login', (req, res) => {
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
+  console.log('[admin-auth] login attempt:', { email, expectedEmail: process.env.ADMIN_EMAIL, passwordMatch: password === process.env.ADMIN_PASSWORD });
+
   if (email !== process.env.ADMIN_EMAIL || password !== process.env.ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
