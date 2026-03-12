@@ -41,11 +41,26 @@ if (process.env.AIRTABLE_PAT && process.env.AIRTABLE_BASE_ID) {
  */
 
 /**
- * Safely extract first value from a lookup/linked field (returns array from API)
+ * Safely convert any Airtable field value to a plain string.
+ * Handles strings, numbers, arrays, and Collaborator/People objects {id, email, name}.
+ */
+function extractString(value) {
+  if (!value && value !== 0) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return extractString(value[0]);
+  // Collaborator / People field returns { id, email, name }
+  if (typeof value === 'object') return value.name || value.email || '';
+  return '';
+}
+
+/**
+ * Safely extract first value from a lookup/linked field (returns array from API).
+ * Also handles Collaborator objects that return {id, email, name} instead of strings.
  */
 function extractLookup(value) {
-  if (Array.isArray(value)) return value[0] || '';
-  return value || '';
+  if (Array.isArray(value)) return extractString(value[0]);
+  return extractString(value);
 }
 
 /**
@@ -76,21 +91,53 @@ function getPhoneFromRecord(record) {
  * Map a raw Airtable record to our standard shape.
  */
 function mapRecord(record) {
-  const dialCode = record.get('Dial Code') || '';
+  const dialCode = extractString(record.get('Dial Code'));
   const phoneNumber = record.get('Phone Number') ? String(record.get('Phone Number')) : '';
   return {
     id: record.id,
     airtableId: record.get('ID'),
-    treatmentPlan: record.get('Treatment Plan') || '',
+    treatmentPlan: extractString(record.get('Treatment Plan')),
     customerName: extractLookup(record.get('Name')),
     customerPhone: phoneNumber,
     dialCode,
     fullPhone: dialCode && phoneNumber ? `${dialCode}${phoneNumber}` : phoneNumber,
     dieticianName: extractLookup(record.get('Dietician')) || extractLookup(record.get('Booked By')),
-    dieticianCallStatus: record.get('Dietician Call Status') || '',
-    dietPlanStatus: record.get('Diet Plan Status') || '',
+    dieticianCallStatus: extractString(record.get('Dietician Call Status')),
+    dietPlanStatus: extractString(record.get('Diet Plan Status')),
     dietPlanDate: record.get('Diet Plan Date') || null,
   };
+}
+
+const TEAM_TABLE = process.env.AIRTABLE_TEAM_TABLE || 'Team';
+
+/**
+ * Fetch all team members from the Team table filtered by Department = 'Dieticians'.
+ * Returns array of {id, name, email, phone}.
+ */
+async function fetchTeamMembers() {
+  if (!base) return [];
+  const records = [];
+  return new Promise((resolve, reject) => {
+    base(TEAM_TABLE)
+      .select({
+        pageSize: 100,
+        filterByFormula: "{Department} = 'Dieticians'",
+      })
+      .eachPage(
+        (pageRecords, fetchNextPage) => {
+          pageRecords.forEach(r => {
+            records.push({
+              id: r.id,
+              name: extractString(r.get('Name')) || '',
+              email: extractString(r.get('Email ID')) || '',
+              phone: extractString(r.get('Phone Number')) || '',
+            });
+          });
+          fetchNextPage();
+        },
+        (err) => err ? reject(err) : resolve(records)
+      );
+  });
 }
 
 /**
@@ -189,5 +236,6 @@ async function fetchDietPlanById(recordId) {
 module.exports = {
   fetchDietPlans,
   fetchDietPlanById,
-  fetchAllDietPlans
+  fetchAllDietPlans,
+  fetchTeamMembers
 };
