@@ -390,8 +390,16 @@ export default function AMPage() {
       <div className="px-4 mt-2 mb-6">
         <button
           onClick={handleSubmit}
-          disabled={isSubmitting || hasSubmitted}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          disabled={isSubmitting || hasSubmitted || !(amRoutine && sunscreen)}
+          className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+            isSubmitting || hasSubmitted
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : amRoutine && sunscreen
+              ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+              : amRoutine && !sunscreen
+              ? 'bg-amber-400 text-white cursor-not-allowed'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
@@ -404,6 +412,11 @@ export default function AMPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               Completed
+            </span>
+          ) : amRoutine && !sunscreen ? (
+            <span className="flex items-center justify-center">
+              <Sun className="w-5 h-5 mr-2" />
+              Apply Sunscreen
             </span>
           ) : (
             <span className="flex items-center justify-center">
