@@ -40,10 +40,11 @@ const DIET_STATUS_STYLE = {
 };
 
 function Badge({ label, styleMap }) {
-  const s = styleMap[label] || styleMap['default'];
+  const labelStr = typeof label === 'string' ? label : (label?.name || label?.email || '');
+  const s = styleMap[labelStr] || styleMap['default'];
   return (
     <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: s.bg, color: s.color, whiteSpace: 'nowrap' }}>
-      {label || '—'}
+      {labelStr || '—'}
     </span>
   );
 }
@@ -228,7 +229,10 @@ export default function AdminDashboard() {
               >
                 {dieticians.length === 0
                   ? <option value={dietician}>{dietician}</option>
-                  : dieticians.map(d => <option key={d} value={d}>{d}</option>)
+                  : dieticians.map((d, i) => {
+                      const name = typeof d === 'string' ? d : (d?.name || d?.email || String(i));
+                      return <option key={name} value={name}>{name}</option>;
+                    })
                 }
               </select>
               <ChevronDown size={14} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#888' }}/>
