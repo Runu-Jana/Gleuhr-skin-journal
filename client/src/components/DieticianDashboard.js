@@ -312,25 +312,21 @@ function PatientDetailModal({ phone, onClose }) {
               </div>
             )}
 
-            {/* Products */}
-            {data.patient.products && data.patient.products.length > 0 && (
+            {/* Products — sourced from Airtable Diet Plan table */}
+            {data.dietPlan?.products && data.dietPlan.products.length > 0 && (
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Products</div>
-                {data.patient.products.map((p, i) => (
-                  <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '8px 0', borderBottom: '1px solid #f5f5f5', fontSize: 13,
-                  }}>
-                    <span>{p.name}</span>
-                    <span style={{
-                      fontSize: 10, padding: '2px 7px', borderRadius: 99,
-                      background: p.category === 'AM' ? '#fef9c3' : p.category === 'PM' ? '#ede9fe' : '#f0fdf4',
-                      color: p.category === 'AM' ? '#92400e' : p.category === 'PM' ? '#6d28d9' : '#16a34a',
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {data.dietPlan.products.map((p, i) => (
+                    <span key={i} style={{
+                      fontSize: 12, padding: '4px 12px', borderRadius: 99,
+                      background: '#f3f4f6', color: '#374151',
+                      border: '1px solid #e5e7eb',
                     }}>
-                      {p.category}
+                      {p}
                     </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
 

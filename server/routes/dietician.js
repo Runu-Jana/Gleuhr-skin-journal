@@ -379,6 +379,7 @@ function buildAirtableShape(plan) {
     dieticianCallStatus: plan.dieticianCallStatus,
     dietPlanStatus: plan.dietPlanStatus,
     dietPlanDueDate: plan.dietPlanDate,
+    products: plan.products || [],
   };
 }
 

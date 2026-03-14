@@ -464,7 +464,13 @@ function OverviewTab({ customer, rich, detailsLoading }) {
         </div>
         <div className="admin-card">
           <h4>Products</h4>
-          <span style={{ color:'#999',fontSize:13 }}>No products data — customer not in app</span>
+          <div className="products-list">
+            {airtable.products && airtable.products.length > 0 ? (
+              airtable.products.map((p, i) => <span key={i} className="product-chip">{p}</span>)
+            ) : (
+              <span style={{ color:'#999',fontSize:13 }}>No products assigned</span>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -623,12 +629,12 @@ function OverviewTab({ customer, rich, detailsLoading }) {
           )}
         </div>
 
-        {/* Products */}
+        {/* Products — sourced from Airtable Diet Plan table */}
         <div className="admin-card">
           <h4>Products</h4>
           <div className="products-list">
-            {mongodb.products && mongodb.products.length > 0 ? (
-              mongodb.products.map(pr => <span key={pr.id} className="product-chip">{pr.name}</span>)
+            {airtable.products && airtable.products.length > 0 ? (
+              airtable.products.map((p, i) => <span key={i} className="product-chip">{p}</span>)
             ) : (
               <span style={{ color:'#999',fontSize:13 }}>No products assigned</span>
             )}

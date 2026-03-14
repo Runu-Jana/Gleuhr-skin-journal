@@ -138,6 +138,7 @@ router.get('/:name/customers', async (req, res) => {
             dieticianCallStatus: plan.dieticianCallStatus,
             dietPlanStatus: plan.dietPlanStatus,
             dietPlanDate: plan.dietPlanDate,
+            products: plan.products || [],
           },
           // ── MongoDB data (null if customer not in app) ─────────
           mongodb: patient ? {
