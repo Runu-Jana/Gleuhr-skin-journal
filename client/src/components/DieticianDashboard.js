@@ -69,15 +69,24 @@ function ConsistencyBar({ label, value }) {
   );
 }
 
+function safeStr(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number') return String(v);
+  if (Array.isArray(v)) return safeStr(v[0]);
+  if (typeof v === 'object') return v.name || v.email || '';
+  return '';
+}
+
 function PatientCard({ item, onViewDetails }) {
   const { airtable, mongodb, reason, action } = item;
-  const name = mongodb?.name || airtable?.customerName || '—';
-  const phone = airtable?.customerPhone || '—';
+  const name = safeStr(mongodb?.name) || safeStr(airtable?.customerName) || '—';
+  const phone = safeStr(airtable?.customerPhone) || '—';
   const currentDay = mongodb?.currentDay;
   const streak = mongodb?.streak?.currentStreak || 0;
   const consistency = mongodb?.consistency;
-  const callStatus = airtable?.dieticianCallStatus;
-  const planStatus = airtable?.dietPlanStatus;
+  const callStatus = safeStr(airtable?.dieticianCallStatus);
+  const planStatus = safeStr(airtable?.dietPlanStatus);
 
   return (
     <div style={{
@@ -274,8 +283,8 @@ function PatientDetailModal({ phone, onClose }) {
               <div style={{ background: '#eff6ff', borderRadius: 10, padding: '12px 16px', marginBottom: 20 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#2563eb', marginBottom: 6 }}>Diet Plan (Airtable)</div>
                 <div style={{ fontSize: 13 }}>
-                  <div>Call Status: <strong>{data.dietPlan.dieticianCallStatus || '—'}</strong></div>
-                  <div>Plan Status: <strong>{data.dietPlan.dietPlanStatus || '—'}</strong></div>
+                  <div>Call Status: <strong>{safeStr(data.dietPlan.dieticianCallStatus) || '—'}</strong></div>
+                  <div>Plan Status: <strong>{safeStr(data.dietPlan.dietPlanStatus) || '—'}</strong></div>
                   {data.dietPlan.dietPlanDate && <div>Plan Date: <strong>{data.dietPlan.dietPlanDate}</strong></div>}
                 </div>
               </div>

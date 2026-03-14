@@ -39,8 +39,21 @@ const DIET_STATUS_STYLE = {
   'default':             { bg: '#F3F4F6', color: '#374151' }
 };
 
+/**
+ * Safely convert any value (including Airtable Collaborator objects {id,email,name})
+ * to a plain string for rendering.
+ */
+function safeStr(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number') return String(v);
+  if (Array.isArray(v)) return safeStr(v[0]);
+  if (typeof v === 'object') return v.name || v.email || '';
+  return '';
+}
+
 function Badge({ label, styleMap }) {
-  const labelStr = typeof label === 'string' ? label : (label?.name || label?.email || '');
+  const labelStr = safeStr(label);
   const s = styleMap[labelStr] || styleMap['default'];
   return (
     <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: s.bg, color: s.color, whiteSpace: 'nowrap' }}>
@@ -318,8 +331,8 @@ function StatCard({ label, value, color }) {
 // ── Customer list card ───────────────────────────────────────────────────────
 function CustomerCard({ customer, onView }) {
   const { airtable, mongodb } = customer;
-  const name = airtable.customerName || 'Unknown';
-  const phone = airtable.dialCode ? `+${airtable.dialCode} ${airtable.customerPhone}` : airtable.customerPhone;
+  const name = safeStr(airtable.customerName) || 'Unknown';
+  const phone = airtable.dialCode ? `+${safeStr(airtable.dialCode)} ${safeStr(airtable.customerPhone)}` : safeStr(airtable.customerPhone);
 
   return (
     <div className="patient-card" style={{ cursor: 'pointer' }} onClick={onView}>
@@ -334,7 +347,7 @@ function CustomerCard({ customer, onView }) {
           <div style={{ display:'flex',alignItems:'center',gap:8,flexWrap:'wrap' }}>
             <span style={{ fontWeight:600,fontSize:14 }}>{name}</span>
             {airtable.treatmentPlan && (
-              <span style={{ fontSize:11,color:'#888',fontFamily:'monospace' }}>{airtable.treatmentPlan}</span>
+              <span style={{ fontSize:11,color:'#888',fontFamily:'monospace' }}>{safeStr(airtable.treatmentPlan)}</span>
             )}
             {mongodb && (
               <span style={{ fontSize:10,padding:'1px 7px',borderRadius:99,background:'#EDE9FE',color:'#6D28D9',fontWeight:700 }}>In App</span>
@@ -371,8 +384,8 @@ function CustomerCard({ customer, onView }) {
 // ── Customer detail view ─────────────────────────────────────────────────────
 function CustomerDetailView({ customer, details, detailsLoading, activeTab, setActiveTab }) {
   const { airtable, mongodb } = customer;
-  const name = airtable.customerName || 'Unknown';
-  const phone = airtable.dialCode ? `+${airtable.dialCode} ${airtable.customerPhone}` : airtable.customerPhone;
+  const name = safeStr(airtable.customerName) || 'Unknown';
+  const phone = airtable.dialCode ? `+${safeStr(airtable.dialCode)} ${safeStr(airtable.customerPhone)}` : safeStr(airtable.customerPhone);
 
   const rich = details?.richDetail;   // from /api/admin/patients/:phone/details
   const hasApp = !!mongodb;
@@ -388,7 +401,7 @@ function CustomerDetailView({ customer, details, detailsLoading, activeTab, setA
           <div>
             <h2 style={{ margin:0,fontSize:18,fontWeight:700 }}>{name}</h2>
             <div className="admin-header-meta">
-              {airtable.treatmentPlan && <span>{airtable.treatmentPlan}</span>}
+              {airtable.treatmentPlan && <span>{safeStr(airtable.treatmentPlan)}</span>}
               <span>{phone}</span>
               {hasApp && <span>Day {mongodb.currentDay}/90</span>}
               {hasApp && <Badge label={airtable.dieticianCallStatus} styleMap={CALL_STATUS_STYLE} />}
@@ -440,7 +453,7 @@ function OverviewTab({ customer, rich, detailsLoading }) {
         <div className="admin-card">
           <h4>Airtable Record</h4>
           <div style={{ display:'grid',gap:10,fontSize:13 }}>
-            <div><strong>Treatment Plan:</strong> {airtable.treatmentPlan || '—'}</div>
+            <div><strong>Treatment Plan:</strong> {safeStr(airtable.treatmentPlan) || '—'}</div>
             <div><strong>Call Status:</strong> <Badge label={airtable.dieticianCallStatus} styleMap={CALL_STATUS_STYLE}/></div>
             <div><strong>Diet Plan Status:</strong> <Badge label={airtable.dietPlanStatus} styleMap={DIET_STATUS_STYLE}/></div>
             {airtable.dietPlanDate && <div><strong>Diet Plan Due:</strong> {new Date(airtable.dietPlanDate).toLocaleDateString()}</div>}
@@ -642,9 +655,9 @@ function DietTab({ airtable }) {
     <div className="admin-card">
       <h3 style={{ marginBottom:16 }}>Diet Plan (Airtable)</h3>
       <div style={{ display:'grid',gap:12,fontSize:13 }}>
-        <div><strong>Customer:</strong> {airtable.customerName || '—'}</div>
-        <div><strong>Phone:</strong> {airtable.customerPhone ? `+${airtable.dialCode || ''} ${airtable.customerPhone}` : '—'}</div>
-        <div><strong>Treatment Plan:</strong> {airtable.treatmentPlan || '—'}</div>
+        <div><strong>Customer:</strong> {safeStr(airtable.customerName) || '—'}</div>
+        <div><strong>Phone:</strong> {airtable.customerPhone ? `+${safeStr(airtable.dialCode)} ${safeStr(airtable.customerPhone)}` : '—'}</div>
+        <div><strong>Treatment Plan:</strong> {safeStr(airtable.treatmentPlan) || '—'}</div>
         <div><strong>Call Status:</strong> <Badge label={airtable.dieticianCallStatus} styleMap={CALL_STATUS_STYLE}/></div>
         <div><strong>Diet Plan Status:</strong> <Badge label={airtable.dietPlanStatus} styleMap={DIET_STATUS_STYLE}/></div>
         {airtable.dietPlanDate && <div><strong>Diet Plan Due Date:</strong> {new Date(airtable.dietPlanDate).toLocaleDateString()}</div>}

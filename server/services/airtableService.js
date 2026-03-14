@@ -220,13 +220,13 @@ async function fetchDietPlanById(recordId) {
       resolve({
         id: record.id,
         airtableId: record.get('ID'),
-        treatmentPlan: record.get('Treatment Plan') || '',
+        treatmentPlan: extractString(record.get('Treatment Plan')),
         customerName: extractLookup(record.get('Name')),
         customerPhone: record.get('Phone Number') ? String(record.get('Phone Number')) : '',
-        dialCode: record.get('Dial Code') || '',
+        dialCode: extractString(record.get('Dial Code')),
         dieticianName: extractLookup(record.get('Dietician')) || extractLookup(record.get('Booked By')),
-        dieticianCallStatus: record.get('Dietician Call Status') || '',
-        dietPlanStatus: record.get('Diet Plan Status') || '',
+        dieticianCallStatus: extractString(record.get('Dietician Call Status')),
+        dietPlanStatus: extractString(record.get('Diet Plan Status')),
         dietPlanDate: record.get('Diet Plan Date') || null,
       });
     });

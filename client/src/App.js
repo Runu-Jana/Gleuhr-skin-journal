@@ -111,14 +111,6 @@ function AppRoutes() {
   console.log('AppRoutes - patient:', patient);
   console.log('AppRoutes - isLoading:', isLoading);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#c44033] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#faf8f5] pb-20">
       {/* Skip to main content for accessibility */}
@@ -128,11 +120,11 @@ function AppRoutes() {
       >
         Skip to main content
       </button>
-      
+
       <AccessibilityMenu />
       <EnhancedOfflineIndicator />
       <InstallPrompt />
-      
+
       <main id="main-content" tabIndex="-1">
         <Routes>
           <Route
@@ -143,61 +135,70 @@ function AppRoutes() {
             path="/login"
             element={isAuthenticated ? <Navigate to="/" replace /> : <LoginScreen />}
           />
+          {/* Dietician & admin routes — always available, no auth loading dependency */}
           <Route path="/dietician/login" element={<DieticianLogin onLogin={() => window.location.replace('/dietician/dashboard')} />} />
           <Route path="/dietician/dashboard" element={<DieticianRoute><DieticianDashboard /></DieticianRoute>} />
           <Route path="/admin/login" element={<AdminLogin onLogin={() => window.location.replace('/admin/dashboard')} />} />
           <Route path="/admin/diet-plans" element={<AdminRoute><AdminDietDashboard /></AdminRoute>} />
           <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-          <Route 
-            path="/onboarding" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : patient?.hasCommitted ? <Navigate to="/" replace /> : <OnboardingScreen />} 
-          />
-          <Route 
-            path="/skin-score" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <SkinScoreScreen />} 
-          />
-          <Route 
-            path="/skin-score-results" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <SkinScoreResults/>} 
-          />
-          <Route 
-            path="/weekly-photo" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <WeeklyPhotoScreen />} 
-          />
-          <Route 
-            path="/amPage" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <AMPage />} 
-          />
-          <Route 
-            path="/pmPage" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <PMPage />} 
-          />
-          <Route 
-            path="/transformation" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <TransformationPage />} 
-          />
-          <Route 
-            path="/journey" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <JourneyScreen />} 
-          />
-          <Route 
-            path="/photo-upload" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <PhotoUploadPage />} 
-          />
-          <Route 
-            path="/checkin-success" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <CheckInSuccessPage />} 
-          />
-          <Route
-            path="/admin"
-            element={<AdminRoute><AdminDashboard /></AdminRoute>}
-          />
-          <Route 
-            path="/" 
-            element={!isAuthenticated ? <Navigate to="/login" replace /> : <MainApp />} 
-          />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          {/* Patient routes — show loading spinner while auth state resolves */}
+          {isLoading ? (
+            <Route path="*" element={
+              <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
+                <div className="w-8 h-8 border-4 border-[#c44033] border-t-transparent rounded-full animate-spin" />
+              </div>
+            } />
+          ) : (
+            <>
+              <Route
+                path="/onboarding"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : patient?.hasCommitted ? <Navigate to="/" replace /> : <OnboardingScreen />}
+              />
+              <Route
+                path="/skin-score"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <SkinScoreScreen />}
+              />
+              <Route
+                path="/skin-score-results"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <SkinScoreResults/>}
+              />
+              <Route
+                path="/weekly-photo"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <WeeklyPhotoScreen />}
+              />
+              <Route
+                path="/amPage"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <AMPage />}
+              />
+              <Route
+                path="/pmPage"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <PMPage />}
+              />
+              <Route
+                path="/transformation"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <TransformationPage />}
+              />
+              <Route
+                path="/journey"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <JourneyScreen />}
+              />
+              <Route
+                path="/photo-upload"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <PhotoUploadPage />}
+              />
+              <Route
+                path="/checkin-success"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <CheckInSuccessPage />}
+              />
+              <Route
+                path="/"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <MainApp />}
+              />
+            </>
+          )}
         </Routes>
-        
+
       </main>
     </div>
   );
