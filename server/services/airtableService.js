@@ -34,6 +34,7 @@ if (process.env.AIRTABLE_PAT && process.env.AIRTABLE_BASE_ID) {
  *   Dietician Call Status  | Single Select  | string ("Call Pending")
  *   Diet Plan Status       | Single Select  | string ("Diet Plan Shared")
  *   Diet Plan Date         | Date           | string ("2026-03-14")
+ *   Products               | Lookup/Multi   | array of strings (product names)
  *
  * NOTE: Lookup fields return ARRAYS even for single values.
  *       Use extractLookup() to safely get the first value.
@@ -61,6 +62,17 @@ function extractString(value) {
 function extractLookup(value) {
   if (Array.isArray(value)) return extractString(value[0]);
   return extractString(value);
+}
+
+/**
+ * Extract ALL values from a multi-value Airtable field (Linked Records, Multi-select, Lookup).
+ * Returns an array of plain strings — empty strings are filtered out.
+ */
+function extractArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(v => extractString(v)).filter(Boolean);
+  const s = extractString(value);
+  return s ? [s] : [];
 }
 
 /**
@@ -105,6 +117,7 @@ function mapRecord(record) {
     dieticianCallStatus: extractString(record.get('Dietician Call Status')),
     dietPlanStatus: extractString(record.get('Diet Plan Status')),
     dietPlanDate: record.get('Diet Plan Date') || null,
+    products: extractArray(record.get('Products')),
   };
 }
 
@@ -237,5 +250,6 @@ module.exports = {
   fetchDietPlans,
   fetchDietPlanById,
   fetchAllDietPlans,
-  fetchTeamMembers
+  fetchTeamMembers,
+  extractArray,
 };
