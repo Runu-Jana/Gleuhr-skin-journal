@@ -184,6 +184,10 @@ router.get('/dashboard', async (req, res) => {
     else if (hour >= 17) greetingTime = 'Good evening';
     const greeting = `${greetingTime}, ${dieticianName.split(' ')[0]}!`;
 
+    const onboardingPatients = enriched.filter(
+      item => !item.mongodb || (item.mongodb.currentDay <= 7)
+    );
+
     res.json({
       success: true,
       data: {
@@ -202,6 +206,8 @@ router.get('/dashboard', async (req, res) => {
           reorder,
           airtableOnly,
         },
+        allPatients: enriched,
+        onboardingCount: onboardingPatients.length,
         totalCount: dietPlans.length,
         inAppCount: inAppPatients.length,
       }
