@@ -98,6 +98,12 @@ const dailyCheckInSchema = new mongoose.Schema({
   symptoms: [{
     type: String
   }],
+  // 'some_routine' | 'just_sunscreen' | 'missed' | null
+  quickLogType: {
+    type: String,
+    enum: ['some_routine', 'just_sunscreen', 'missed', null],
+    default: null
+  },
   completed: {
     type: Boolean,
     default: false

@@ -46,6 +46,7 @@ export default function PMPage() {
   const [showCheckinSuccess, setShowCheckinSuccess] = useState(false);
   const [showQuickLogDrawer, setShowQuickLogDrawer] = useState(false);
   const [isQuickLogMode, setIsQuickLogMode] = useState(false);
+  const [quickLogType, setQuickLogType] = useState(null);
 
   // Check if AM routine is already logged today
   const checkTodayAMRoutine = async () => {
@@ -135,7 +136,7 @@ export default function PMPage() {
   }, [patient]);
 
   const handleSubmit = async () => {
-    // Validate required fields (skip validation in quick log mode)
+    // In quick log mode only skin mood is required; otherwise full fields required
     if (!isQuickLogMode) {
       if (waterIntake === 0) {
         alert('Please select your water intake for today');
@@ -146,7 +147,7 @@ export default function PMPage() {
         return;
       }
     }
-    if (!skinMood) {
+    if (!skinMood && !isQuickLogMode) {
       alert('Please select how your skin is feeling today');
       return;
     }
@@ -186,11 +187,12 @@ export default function PMPage() {
       amRoutine: amRoutine || existingCheckIn?.amRoutine || false,
       sunscreen: sunscreen || existingCheckIn?.sunscreen || false,
       // Add PM data
-      pmRoutine: true,
+      pmRoutine: isQuickLogMode ? false : true,
       dietFollowed: dietFollowedValue,
       triggerFoods,
       waterIntake,
       skinMood,
+      quickLogType: quickLogType || null,
       synced: false
     };
 
@@ -332,44 +334,62 @@ export default function PMPage() {
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
           <div className="px-4 sm:px-5 flex flex-col gap-3 sm:gap-3.5">
-            {/* AM Routine Status - Only show if not already logged today */}
+            {/* Quick Log button + AM checkbox — only when AM wasn't already logged */}
             {!hasAMRoutineToday && (
               <>
-                <div style={{ padding: '10px 12px', background: 'rgba(212, 160, 23, 0.08)', borderRadius: '12px', border: '1px solid rgba(212, 160, 23, 0.15)' }}>
+                {/* Tough day? Quick log row */}
+                <button
+                  onClick={() => setShowQuickLogDrawer(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    width: '100%', padding: '14px 16px', background: 'rgb(255,255,255)',
+                    border: '1.5px solid rgb(224,221,215)', borderRadius: '14px',
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: '14px', color: 'rgb(100,92,84)', fontFamily: 'Outfit, sans-serif' }}>
+                    Tough day? <strong style={{ color: 'rgb(25,23,22)' }}>Quick log</strong>
+                  </span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(180,174,168)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+
+                {/* AM checkbox */}
+                <div style={{ padding: '10px 12px', background: 'rgba(212,160,23,0.08)', borderRadius: '12px', border: '1px solid rgba(212,160,23,0.15)' }}>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <div
                       onClick={() => {
                         setAmRoutine(!amRoutine);
-                        if (amRoutine) setSunscreen(false); // uncheck sunscreen when unchecking AM
+                        if (amRoutine) setSunscreen(false);
                       }}
-                      style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204, 200, 192)', background: 'rgb(255, 255, 255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
+                      style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204,200,192)', background: 'rgb(255,255,255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
                     >
                       {amRoutine && (
                         <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                          <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
+                          <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
                     </div>
-                    <span style={{ fontSize: '12px', color: 'rgb(61, 57, 53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Completed AM routine this morning?</span>
+                    <span style={{ fontSize: '12px', color: 'rgb(61,57,53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Completed AM routine this morning?</span>
                   </label>
                 </div>
 
-                {/* Quick Logs — shown when AM routine checkbox is checked */}
+                {/* Sunscreen sub-checkbox when AM ticked */}
                 {amRoutine && (
-                  <div style={{ padding: '10px 12px', background: 'rgba(16, 185, 129, 0.06)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                    <p style={{ fontSize: '11px', fontWeight: '600', color: 'rgb(5, 150, 105)', fontFamily: 'Outfit, sans-serif', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Quick AM Log</p>
+                  <div style={{ padding: '10px 12px', background: 'rgba(16,185,129,0.06)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <div
                         onClick={() => setSunscreen(!sunscreen)}
-                        style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204, 200, 192)', background: 'rgb(255, 255, 255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
+                        style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204,200,192)', background: 'rgb(255,255,255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
                       >
                         {sunscreen && (
                           <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                            <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
+                            <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         )}
                       </div>
-                      <span style={{ fontSize: '12px', color: 'rgb(61, 57, 53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Applied sunscreen this morning?</span>
+                      <span style={{ fontSize: '12px', color: 'rgb(61,57,53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Applied sunscreen this morning?</span>
                     </label>
                   </div>
                 )}
@@ -471,26 +491,26 @@ export default function PMPage() {
             </div>
 
             {/* Submit Button */}
-            {!isQuickLogMode && (
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="w-full px-4.5 py-5 rounded-xl text-white border-none text-base font-semibold cursor-pointer font-sans mt-1 mb-4 transition-all"
-                style={{ 
-                  background: isSubmitting ? '#9ca3af' : '#c44033',
-                  boxShadow: 'rgba(196, 64, 51, 0.208) 0px 6px 20px'
-                }}
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Saving...</span>
-                  </div>
-                ) : (
-                  'Log PM ✓'
-                )}
-              </button>
-            )}
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="w-full px-4.5 py-5 rounded-xl text-white border-none text-base font-semibold cursor-pointer font-sans mt-1 mb-4 transition-all"
+              style={{
+                background: isSubmitting ? '#9ca3af' : '#c44033',
+                boxShadow: 'rgba(196, 64, 51, 0.208) 0px 6px 20px'
+              }}
+            >
+              {isSubmitting ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Saving...</span>
+                </div>
+              ) : isQuickLogMode ? (
+                'Save Quick Log ✓'
+              ) : (
+                'Log PM ✓'
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -542,6 +562,127 @@ export default function PMPage() {
             previousStreak={shieldRestoreData.previousStreak}
             newStreak={shieldRestoreData.newStreak}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Quick Log Drawer */}
+      <AnimatePresence>
+        {showQuickLogDrawer && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowQuickLogDrawer(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 40 }}
+            />
+            {/* Sheet */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              style={{
+                position: 'fixed', bottom: 0, left: 0, right: 0,
+                background: '#fff', borderRadius: '20px 20px 0 0',
+                padding: '12px 20px 40px', zIndex: 50,
+                boxShadow: '0 -8px 40px rgba(0,0,0,0.12)',
+              }}
+            >
+              {/* Drag handle */}
+              <div style={{ width: 40, height: 4, background: '#e0ddd8', borderRadius: 99, margin: '0 auto 20px' }} />
+
+              <h3 style={{ fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 20, color: '#191716', fontFamily: 'Outfit, sans-serif' }}>
+                Quick Log
+              </h3>
+
+              {/* Option: Did some routine */}
+              <button
+                onClick={() => {
+                  setQuickLogType('some_routine');
+                  setIsQuickLogMode(true);
+                  setShowQuickLogDrawer(false);
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, width: '100%',
+                  padding: '16px', borderRadius: 14, marginBottom: 12,
+                  background: '#f0fdf4', border: '1.5px solid #86efac', cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff', border: '1.5px solid #d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <rect x="1" y="1" width="16" height="16" rx="4" stroke="#10b981" strokeWidth="1.5" />
+                    <path d="M5 9l3 3 5-5" stroke="#10b981" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#191716', fontFamily: 'Outfit, sans-serif' }}>Did some routine</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Streak preserved</div>
+                </div>
+              </button>
+
+              {/* Option: Just sunscreen */}
+              <button
+                onClick={() => {
+                  setQuickLogType('just_sunscreen');
+                  setSunscreen(true);
+                  setIsQuickLogMode(true);
+                  setShowQuickLogDrawer(false);
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, width: '100%',
+                  padding: '16px', borderRadius: 14, marginBottom: 12,
+                  background: '#eff6ff', border: '1.5px solid #93c5fd', cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff', border: '1.5px solid #dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="4" fill="#3b82f6" />
+                    <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="#3b82f6" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#191716', fontFamily: 'Outfit, sans-serif' }}>Just sunscreen</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Streak preserved</div>
+                </div>
+              </button>
+
+              {/* Option: Couldn't today */}
+              <button
+                onClick={() => {
+                  setShowQuickLogDrawer(false);
+                  setShowShieldRestore(true);
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, width: '100%',
+                  padding: '16px', borderRadius: 14, marginBottom: 24,
+                  background: '#f9fafb', border: '1.5px solid #e5e7eb', cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff', border: '1.5px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <rect x="1" y="1" width="16" height="16" rx="4" stroke="#9ca3af" strokeWidth="1.5" />
+                    <path d="M5 9h8" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#191716', fontFamily: 'Outfit, sans-serif' }}>Couldn't today</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Shield used ({availableShields} left)</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setShowQuickLogDrawer(false)}
+                style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#9ca3af', padding: '8px 0', fontFamily: 'Outfit, sans-serif' }}
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
