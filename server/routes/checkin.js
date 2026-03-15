@@ -27,7 +27,8 @@ router.post('/', async (req, res) => {
       sleep,
       medications,
       notes,
-      symptoms
+      symptoms,
+      quickLogType
     } = req.body;
 
     // Validate required fields - support both patientId and patientPhone
@@ -64,17 +65,26 @@ router.post('/', async (req, res) => {
       date
     });
 
+    const hasAmRoutine = amRoutine === true || amRoutine === 'true';
+    const hasPmRoutine = pmRoutine === true || pmRoutine === 'true';
+    const validQuickLog = quickLogType && quickLogType !== 'missed';
+
+    // A day is COMPLETE only when:
+    //   • both AM + PM routines are done, OR
+    //   • AM routine confirmed + a valid quick log option (not "missed")
+    const isComplete = (hasAmRoutine && hasPmRoutine) || (hasAmRoutine && validQuickLog);
+
     const checkinData = {
       patientId: patient._id.toString(),
       patientPhone: patient.phone || patient.phoneNumber,
       dayOfJourney,
-      amRoutine: amRoutine || false,
-      pmRoutine: pmRoutine || false,
+      amRoutine: hasAmRoutine,
+      pmRoutine: hasPmRoutine,
       sunscreen: sunscreen || false,
       dietFollowed: dietFollowed || 'No',
       triggerFoods: triggerFoods || [],
       waterIntake: waterIntake || 0,
-      skinMood: skinMood || 'Okay',
+      skinMood: skinMood || 'okay',
       // Skin assessment fields
       skinScore: skinScore !== undefined ? skinScore : undefined,
       skinScores: skinScores || undefined,
@@ -85,8 +95,9 @@ router.post('/', async (req, res) => {
       medications: medications || [],
       symptoms: symptoms || [],
       notes: notes || '',
-      completed: true,
-      completedAt: new Date()
+      quickLogType: quickLogType || null,
+      completed: isComplete,
+      completedAt: isComplete ? new Date() : undefined
     };
 
     if (existingCheckin) {
@@ -178,9 +189,9 @@ async function updateStreak(phoneNumber, currentDay, patientId = null) {
     if (patientId) orClauses.push({ patientId });
     const allCheckIns = await DailyCheckIn.find({ $or: orClauses }).sort({ date: 1 });
 
-    // Dates with at least one completed routine
+    // Only fully-complete days count toward streak
     const activeDates = new Set(
-      allCheckIns.filter(c => c.amRoutine || c.pmRoutine).map(c => c.date)
+      allCheckIns.filter(c => c.completed === true).map(c => c.date)
     );
 
     if (activeDates.size === 0) return;
