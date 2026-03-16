@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Sun, Droplets, Utensils, Frown, Meh, Smile, Flame } from 'lucide-react';
+import { Shield, Flame } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient, savePatient } from '../utils/db';
-import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId } from '../utils/helpers';
+import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
 import ReorderBanner from './ReorderBanner';
@@ -26,8 +26,7 @@ export default function AMPage() {
   const progress = (day / 90) * 100;
   const shields = calculateShields(streakData?.streak || 0);
   const availableShields = streakData?.restorationShields?.available || shields || 0;
-  
-  // Determine shield color based on remaining count
+
   const getShieldColor = (count) => {
     if (count >= 3) return 'text-green-600 fill-green-600';
     if (count === 2) return 'text-yellow-600 fill-yellow-600';
@@ -44,32 +43,25 @@ export default function AMPage() {
   const [showShieldSuccess, setShowShieldSuccess] = useState(false);
   const [shieldRestoreData, setShieldRestoreData] = useState(null);
   const [showCheckinSuccess, setShowCheckinSuccess] = useState(false);
+  const [checkIns, setCheckIns] = useState([]);
+
+  const consistency = calculateConsistency(checkIns, patient?.startDate);
 
   const handleAMRoutineToggle = () => setAmRoutine(!amRoutine);
   const handleSunscreenToggle = () => setSunscreen(!sunscreen);
 
   const restoreStreakWithShield = async () => {
     if (!patient?.phone) return;
-    
     try {
       const response = await fetch('/api/streak/restore', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phoneNumber: patient.phone
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: patient.phone })
       });
-      
       const result = await response.json();
-      
       if (result.success) {
-        console.log('Streak restored with shield:', result);
         await refreshStreak();
         setShowShieldRestore(false);
-        
-        // Show success animation instead of alert
         setShieldRestoreData({
           streakRestored: true,
           shieldsRemaining: result.shieldsRemaining,
@@ -88,23 +80,12 @@ export default function AMPage() {
 
   useEffect(() => {
     const checkMilestone = async () => {
-      // Only redirect to skin-score on milestone days if not already completed
       const latestScore = await getLatestSkinScore(patient?.phoneNumber || patient?.phone);
       const today = new Date().toISOString().split('T')[0];
       const alreadyScoredToday = latestScore && latestScore.date === today;
-
       if (isMilestoneDay(day) && !alreadyScoredToday) {
         navigate('/skin-score');
       }
-      // Weekly photo reminders are handled by WeeklyPhotoPopup in App.js
-      // Temporarily disabled weekly photo redirect
-      // else if (isWeeklyPhotoDay(patient?.startDate)) {
-      //   const photos = await getWeeklyPhotos(patient?.phoneNumber || patient?.phone);
-      //   const alreadyPhotoed = photos?.some(p => p.date === today);
-      //   if (!alreadyPhotoed) {
-      //     navigate('/weekly-photo');
-      //   }
-      // }
     };
     if (patient) checkMilestone();
   }, [day, patient, navigate]);
@@ -113,12 +94,14 @@ export default function AMPage() {
     const loadToday = async () => {
       try {
         const today = await getTodayCheckIn(patient?.phoneNumber || patient?.phone);
-
         if (today && today.date === new Date().toISOString().split('T')[0]) {
           setAmRoutine(today.amRoutine);
           setSunscreen(today.sunscreen);
           setHasSubmitted(true);
         }
+        // Load all check-ins for consistency calculation
+        const allCheckIns = await getCheckIns(patient?.id);
+        setCheckIns(allCheckIns || []);
       } catch (error) {
         console.error('Error loading today check-in:', error);
       }
@@ -135,28 +118,21 @@ export default function AMPage() {
       alert('Please apply sunscreen before submitting');
       return;
     }
-    
     setIsSubmitting(true);
-    
-    // Get patient record to get patientId
     const phoneNumber = patient?.phoneNumber || patient?.phone;
-    
     if (!phoneNumber) {
       alert('No phone number found. Please check your patient data.');
       return;
     }
-    
     const patientRecord = await getPatient(phoneNumber);
     if (!patientRecord) {
       alert('Patient record not found. Please contact support.');
       return;
     }
-    
     const patientId = patientRecord.id;
-    
     const checkInData = {
       id: generateId(),
-      patientId: patientId,
+      patientId,
       patientPhone: phoneNumber,
       date: new Date().toISOString().split('T')[0],
       day,
@@ -164,65 +140,36 @@ export default function AMPage() {
       sunscreen,
       synced: false
     };
-
-    console.log('Submitting AM check-in data:', checkInData);
-
-    // Save to IndexedDB
     await saveCheckIn(checkInData);
-
-    // Try to save to MongoDB directly
     try {
       const response = await fetch('/api/checkin', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(checkInData)
       });
-      
       const result = await response.json();
-      console.log('MongoDB AM check-in save response:', result);
-      
       if (result.success) {
-        // Update local record as synced
         checkInData.synced = true;
         checkInData.id = result.id;
         await saveCheckIn(checkInData);
-        console.log('AM check-in saved to MongoDB successfully!');
       }
     } catch (apiError) {
       console.error('Failed to save AM check-in to MongoDB, queuing for sync:', apiError);
-      
-      // Queue for sync if API fails
-      if (isOnline) {
-        queueForSync('checkin', checkInData);
-      }
+      if (isOnline) queueForSync('checkin', checkInData);
     }
-
-    // Award points for AM routine
     awardPoints('am_routine');
-    
-    // Refresh streak with small delay to ensure server update is complete
     try {
-      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for server to update
+      await new Promise(resolve => setTimeout(resolve, 500));
       await refreshStreak();
     } catch (streakError) {
       console.error('Error refreshing streak:', streakError);
-      // Don't fail the entire submission if streak refresh fails
     }
-
-    // Check if current day is a milestone and show celebration
     if (isMilestoneDay(day)) {
       setShowCelebration(true);
       setTimeout(() => setShowCelebration(false), 5000);
     }
-
     setHasSubmitted(true);
     setIsSubmitting(false);
-
-    console.log('AM check-in submission completed!');
-
-    // Navigate to success page (same as PM page)
     navigate('/checkin-success', {
       state: {
         streak: day,
@@ -231,209 +178,128 @@ export default function AMPage() {
     });
   };
 
-  const milestones = [
-    { day: 1, label: 'Day 1', active: day >= 1 },
-    { day: 28, label: 'Day 28', active: day >= 28 },
-    { day: 56, label: 'Day 56', active: day >= 56 },
-    { day: 84, label: 'Day 84', active: day >= 84 },
-  ];
+  // ─── UI ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#faf8f5] pb-24">
-      {/* Header */}
-      <div className="bg-white px-6 py-4 border-b border-gray-100">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-full">
-              <Flame className="w-5 h-5 text-orange-500" />
-              <span className="font-bold text-orange-700">{streakData?.streak || 0}</span>
-              <span className="text-xs text-orange-600">day streak</span>
-            </div>
-            {streakData?.longestStreak > 0 && (
-              <div className="flex items-center gap-1 bg-purple-50 px-3 py-1.5 rounded-full">
-                <span className="font-bold text-purple-700">{streakData?.longestStreak}</span>
-                <span className="text-xs text-purple-600">best</span>
-              </div>
-            )}
-            {streakData?.restorationShields?.available > 0 && (
-              <div className="flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-full">
-                <Shield className={`w-4 h-4 ${getShieldColor(availableShields)}`} />
-                <span className={`font-bold ${availableShields >= 3 ? 'text-green-700' : availableShields === 2 ? 'text-yellow-700' : availableShields === 1 ? 'text-red-700' : 'text-gray-700'}`}>{streakData?.restorationShields?.available}</span>
-                <span className={`text-xs ${availableShields >= 3 ? 'text-green-600' : availableShields === 2 ? 'text-yellow-600' : availableShields === 1 ? 'text-red-600' : 'text-gray-600'}`}>shields</span>
-              </div>
-            )}
-            <div className="flex items-center gap-1">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Shield
-                  key={i}
-                  className={`w-5 h-5 ${i < availableShields ? getShieldColor(availableShields) : 'text-gray-300'}`}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/profile')}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </button>
-            <button
-              onClick={() => navigate('/settings')}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c-.94 1.543.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c.94-1.543-.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#ede9e4] pb-24">
 
-      <div className="px-4 py-6 space-y-6">
-        {/* Progress Ring */}
-        <div className="flex justify-center">
-          <div className="relative w-40 h-40">
-            <svg className="w-full h-full transform -rotate-90">
-              <circle cx="80" cy="80" r="70" fill="none" stroke="#e5e7eb" strokeWidth="12" />
-              <circle
-                cx="80"
-                cy="80"
-                r="70"
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth="12"
-                strokeDasharray={`${2 * Math.PI * 70}`}
-                strokeDashoffset={`${2 * Math.PI * 70 * (1 - progress / 100)}`}
-                className="transition-all duration-1000"
-              />
+      {/* Card */}
+      <div className="mx-4 mt-8 bg-white rounded-[28px] shadow-sm overflow-hidden">
+        <div className="px-6 pt-8 pb-7">
+
+          {/* MORNING CHECK-IN label */}
+          <p className="text-xs font-bold text-[#c44033] font-outfit uppercase tracking-[1.2px] mb-2">
+            Morning Check-in
+          </p>
+
+          {/* Day heading */}
+          <h1 className="text-[2.6rem] font-bold text-[#191716] font-crimson leading-none mb-7">
+            Day {day}
+          </h1>
+
+          {/* Streak card */}
+          <div className="bg-[#faf8f5] rounded-[16px] px-4 py-3.5 flex items-center gap-3.5 mb-3.5">
+            <div className="w-11 h-11 rounded-[14px] bg-[rgba(220,38,38,0.08)] flex items-center justify-center flex-shrink-0">
+              <Flame className="w-5 h-5 text-[#dc2626]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-[#191716] font-outfit leading-tight">
+                Your best streak{' '}
+                <span className="text-[#c44033] font-bold font-crimson text-xl">
+                  {streakData?.longestStreak || streakData?.streak || 0}
+                </span>
+                {' '}days
+              </p>
+              <p className="text-xs text-[#a39e95] font-outfit mt-0.5">
+                Red Hot flame · {consistency}% consistent
+              </p>
+            </div>
+            <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.06)] flex-shrink-0">
+              <Shield className={`w-3.5 h-3.5 ${getShieldColor(availableShields)}`} strokeWidth={1.3} />
+              <span className="text-sm font-bold text-[#c44033] font-outfit">{availableShields}</span>
+            </div>
+          </div>
+
+          {/* Tough day / Quick log row */}
+          <button
+            onClick={() => setShowShieldRestore(true)}
+            className="w-full flex items-center justify-between px-4 py-3.5 bg-[#faf8f5] rounded-[16px] mb-3.5"
+          >
+            <span className="text-sm text-[#7a756d] font-outfit">
+              Tough day? <span className="font-bold text-[#3d3935]">Quick log</span>
+            </span>
+            <svg className="w-4 h-4 text-[#b0ab9f]" fill="none" viewBox="0 0 16 16">
+              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-bold text-gray-900">{day}</span>
-              <span className="text-sm text-gray-500">of 90 days</span>
-            </div>
-          </div>
-        </div>
+          </button>
 
-        {/* Milestones */}
-        <div className="flex justify-between items-center px-2">
-          {milestones.map((milestone) => (
-            <div
-              key={milestone.day}
-              className={`flex-1 text-center ${
-                milestone.active ? 'text-blue-600' : 'text-gray-400'
+          {/* AM Routine toggle */}
+          <div className="bg-[#faf8f5] rounded-[16px] px-4 py-4 flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-[#191716] font-outfit">AM Routine Completed</span>
+            <button
+              onClick={handleAMRoutineToggle}
+              className={`w-[52px] h-[30px] rounded-full flex items-center px-[3px] flex-shrink-0 transition-colors duration-300 ${
+                amRoutine ? 'bg-[#c44033]' : 'bg-[#d4cfc9]'
               }`}
             >
-              <div className="w-2 h-2 mx-auto mb-1 rounded-full bg-current" />
-              <span className="text-xs">{milestone.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="max-w-md mx-auto">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-          <Sun className="w-6 h-6 inline mr-2" />
-          AM Routine
-        </h2>
-
-          {/* AM Routine Card */}
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Morning Routine</h3>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-4 border-b border-gray-100">
-                <span className="text-gray-700 font-medium">AM Routine</span>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleAMRoutineToggle} 
-                    className={`w-14 h-7 rounded-full transition-colors duration-200 cursor-pointer flex items-center px-1 ${
-                      amRoutine ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
-                  >
-                    <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${
-                      amRoutine ? 'translate-x-7' : 'translate-x-0'
-                    }`} />
-                  </button>
-                  <span className={`text-sm font-medium ${amRoutine ? 'text-green-600' : 'text-gray-500'}`}>
-                    {amRoutine ? 'Completed' : 'Not Started'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between py-4 border-b border-gray-100">
-                <span className="text-gray-700 font-medium">Sunscreen</span>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleSunscreenToggle}
-                    className={`w-14 h-7 rounded-full transition-colors duration-200 cursor-pointer flex items-center px-1 ${
-                      sunscreen ? 'bg-orange-500' : 'bg-gray-300'
-                    }`}
-                  >
-                    <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${
-                      sunscreen ? 'translate-x-7' : 'translate-x-0'
-                    }`} />
-                  </button>
-                  <span className={`text-sm font-medium ${sunscreen ? 'text-orange-600' : 'text-gray-500'}`}>
-                    {sunscreen ? 'Applied' : 'Not Applied'}
-                  </span>
-                </div>
-              </div>
-            </div>
+              <div className={`w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-300 ${
+                amRoutine ? 'translate-x-[22px]' : 'translate-x-0'
+              }`} />
+            </button>
           </div>
 
+          {/* Sunscreen toggle */}
+          <div className="bg-[#faf8f5] rounded-[16px] px-4 py-4 flex items-center justify-between mb-6">
+            <span className="text-sm font-semibold text-[#191716] font-outfit">Sunscreen Applied</span>
+            <button
+              onClick={handleSunscreenToggle}
+              className={`w-[52px] h-[30px] rounded-full flex items-center px-[3px] flex-shrink-0 transition-colors duration-300 ${
+                sunscreen ? 'bg-[#c44033]' : 'bg-[#d4cfc9]'
+              }`}
+            >
+              <div className={`w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-300 ${
+                sunscreen ? 'translate-x-[22px]' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+
+          {/* Submit button */}
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || hasSubmitted || !(amRoutine && sunscreen)}
+            className={`w-full py-4 rounded-[16px] font-semibold text-sm font-outfit transition-all ${
+              isSubmitting || hasSubmitted
+                ? 'bg-[#e4e0db] text-[#a39e95] cursor-not-allowed'
+                : amRoutine && sunscreen
+                ? 'bg-[#c44033] text-white shadow-[rgba(196,64,51,0.22)_0px_4px_14px] cursor-pointer'
+                : 'bg-[#e4e0db] text-[#a39e95] cursor-not-allowed'
+            }`}
+          >
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Saving...
+              </span>
+            ) : hasSubmitted ? (
+              'Completed ✓'
+            ) : (
+              'Log AM ✓'
+            )}
+          </button>
+
         </div>
-
-      {/* Submit Button - full width */}
-      <div className="px-4 mt-2 mb-6">
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting || hasSubmitted || !(amRoutine && sunscreen)}
-          className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-            isSubmitting || hasSubmitted
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : amRoutine && sunscreen
-              ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-              : amRoutine && !sunscreen
-              ? 'bg-amber-400 text-white cursor-not-allowed'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {isSubmitting ? (
-            <span className="flex items-center justify-center gap-2">
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Saving...
-            </span>
-          ) : hasSubmitted ? (
-            <span className="flex items-center justify-center">
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Completed
-            </span>
-          ) : amRoutine && !sunscreen ? (
-            <span className="flex items-center justify-center">
-              <Sun className="w-5 h-5 mr-2" />
-              Apply Sunscreen
-            </span>
-          ) : (
-            <span className="flex items-center justify-center">
-              <Sun className="w-5 h-5 mr-2" />
-              Log AM
-            </span>
-          )}
-        </button>
       </div>
-      
 
-     
-      {day >= 30 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
+      {day >= 30 && (
+        <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />
+      )}
 
-     
+      {/* Milestone celebration */}
       {showCelebration && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        >
           <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-8 text-center max-w-sm mx-4">
             <div className="text-6xl mb-4">🎉</div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">{streakData?.streak || 0} Day Streak!</h3>
@@ -444,32 +310,38 @@ export default function AMPage() {
 
       {/* Shield Restore Modal */}
       {showShieldRestore && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-6 text-center max-w-sm mx-4">
-            <div className="text-4xl mb-4">🛡️</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Restore Your Streak?</h3>
-            <p className="text-gray-600 mb-4">
-              Use a shield to restore your streak. You have {streakData?.restorationShields?.available || 0} shields available this month.
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4"
+        >
+          <motion.div
+            initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md bg-white rounded-[28px] px-5 pt-6 pb-8"
+          >
+            <div className="w-10 h-1 rounded-full bg-[#e0ddd7] mx-auto mb-6" />
+            <div className="text-4xl text-center mb-3">🛡️</div>
+            <h3 className="text-xl font-bold text-[#191716] font-crimson text-center mb-2">Restore Your Streak?</h3>
+            <p className="text-sm text-[#7a756d] font-outfit text-center mb-6">
+              Use a shield to restore your streak. You have {streakData?.restorationShields?.available || 0} shields available.
             </p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => setShowShieldRestore(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-              >
-                Cancel
-              </button>
+            <div className="flex flex-col gap-3">
               <button
                 onClick={restoreStreakWithShield}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                className="w-full py-3.5 rounded-[14px] bg-[#c44033] text-white font-semibold font-outfit text-sm"
               >
                 Use Shield
+              </button>
+              <button
+                onClick={() => setShowShieldRestore(false)}
+                className="w-full py-3.5 rounded-[14px] bg-[#f4f2ef] text-[#3d3935] font-semibold font-outfit text-sm"
+              >
+                Cancel
               </button>
             </div>
           </motion.div>
         </motion.div>
       )}
-      
-      {/* Shield Success Animation */}
+
       <AnimatePresence>
         {showShieldSuccess && shieldRestoreData && (
           <ShieldSuccessAnimation
@@ -481,7 +353,6 @@ export default function AMPage() {
         )}
       </AnimatePresence>
 
-      {/* Bottom Navigation */}
       <BottomNavigation />
     </div>
   );
