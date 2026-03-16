@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import { getSkinScores } from '../utils/db';
-import { calculateDay, getMilestoneLabel } from '../utils/helpers';
+import { getSkinScores, getCheckIns } from '../utils/db';
+import { calculateDay, getMilestoneLabel, calculateConsistency } from '../utils/helpers';
 import { Check, Lock, Star, MapPin, TrendingUp, Gift, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
@@ -10,10 +10,11 @@ import BottomNavigation from './BottomNavigation';
 export default function JourneyScreen() {
   const { patient } = useAuth();
   const [skinScores, setSkinScores] = useState([]);
+  const [checkIns, setCheckIns] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const currentDay = calculateDay(patient?.startDate);
-  const consistency = Math.round((currentDay / 90) * 100);
+  const consistency = calculateConsistency(checkIns, patient?.startDate);
   
   // Milestone data from the prototype
   const milestones = [
@@ -62,9 +63,17 @@ export default function JourneyScreen() {
   useEffect(() => {
     const loadScores = async () => {
       try {
+        // Load check-ins for real consistency calculation
+        try {
+          const localCheckIns = await getCheckIns(patient?.id);
+          setCheckIns(localCheckIns || []);
+        } catch {
+          setCheckIns([]);
+        }
+
         // First try to get from IndexedDB (offline data)
         const localScores = await getSkinScores(patient?.id);
-        
+
         // Also try to get latest scores from server using phone number
         try {
           const response = await fetch(`/api/skinscore/${patient?.phone}`, {
@@ -72,7 +81,7 @@ export default function JourneyScreen() {
               'Authorization': `Bearer ${patient?.token}`
             }
           });
-          
+
           if (response.ok) {
             const serverScores = await response.json();
             // Merge server scores with local scores, preferring server data

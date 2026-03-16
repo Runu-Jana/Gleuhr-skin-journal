@@ -74,86 +74,63 @@ export default function HomeScreen() {
     return { currentStreak, longestStreak: Math.max(longestStreak, currentStreak) };
   };
 
-  // Calculate calendar data from real check-ins
-  const getCalendarData = (checkIns) => {
+  // Calculate calendar data from real check-ins, respecting the patient's programme start date.
+  // Days before startDate are marked 'before-start' — not missed — because the programme
+  // hadn't begun yet. Only days from startDate onwards can be missed or completed.
+  const getCalendarData = (checkIns, startDate) => {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
     // Get first day of month and adjust for Monday-first calendar (0 = Monday, 6 = Sunday)
     let firstDay = new Date(year, month, 1).getDay();
-    // Convert from Sunday-first (0=Sunday) to Monday-first (0=Monday)
     firstDay = firstDay === 0 ? 6 : firstDay - 1;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
+
+    // Normalise startDate to a midnight local Date for day-level comparison
+    let startMidnight = null;
+    if (startDate) {
+      startMidnight = new Date(startDate);
+      startMidnight.setHours(0, 0, 0, 0);
+    }
+
     const calendar = [];
     for (let i = 0; i < firstDay; i++) {
       calendar.push(null);
     }
-    
+
     for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(year, month, i);
-      // Use UTC date to avoid timezone issues
       const dateStr = new Date(Date.UTC(year, month, i)).toISOString().split('T')[0];
       const isToday = i === now.getDate();
       const isPast = i < now.getDate();
       const isFuture = i > now.getDate();
-      
-      // Debug: Log today's date and current day being checked
-      if (i === now.getDate()) {
-        console.log('📅 Today check:', {
-          today: now.getDate(),
-          todayDateStr: new Date().toISOString().split('T')[0],
-          calendarDate: i,
-          calendarDateStr: dateStr,
-          isToday
-        });
-      }
-      
-      // Check if this day has check-in data
+
+      // Is this calendar date before the customer's programme started?
+      const dayMidnight = new Date(year, month, i);
+      const isBeforeStart = startMidnight && dayMidnight < startMidnight;
+
       let status = 'missed';
-      let hasAM = false;
-      let hasPM = false;
-      
-      if (checkIns && checkIns.length > 0) {
-        const dayCheckIn = checkIns.find(checkIn => checkIn.date === dateStr);
+
+      if (isBeforeStart) {
+        // Programme hadn't started — this is not a missed day
+        status = 'before-start';
+      } else if (checkIns && checkIns.length > 0) {
+        const dayCheckIn = checkIns.find(c => c.date === dateStr);
         if (dayCheckIn) {
-          hasAM = dayCheckIn.amRoutine || false;
-          hasPM = dayCheckIn.pmRoutine || false;
-          
-          if (hasAM && hasPM) {
-            status = 'done'; // Both AM and PM completed
-          } else if (hasAM || hasPM) {
-            status = 'partial'; // Only one routine completed
-          }
-          
-          // Debug: Log found check-in for today
-          if (i === now.getDate()) {
-            console.log('📝 Today check-in found:', {
-              date: dateStr,
-              hasAM,
-              hasPM,
-              status,
-              dayCheckIn
-            });
-          }
-        } else {
-          // Debug: Log no check-in found for today
-          if (i === now.getDate()) {
-            console.log('❌ No check-in found for today:', {
-              todayDateStr: dateStr,
-              availableCheckIns: checkIns.map(c => ({ date: c.date, amRoutine: c.amRoutine, pmRoutine: c.pmRoutine }))
-            });
-          }
+          const hasAM = dayCheckIn.amRoutine || false;
+          const hasPM = dayCheckIn.pmRoutine || false;
+          if (hasAM && hasPM) status = 'done';
+          else if (hasAM || hasPM) status = 'partial';
         }
       }
-      
-      if (isToday && isMorning) {
-        status = 'current'; // Current day being tracked
+
+      // Today in the morning: show as 'current' (pulsing indicator) if not already done/partial
+      if (isToday && isMorning && !isBeforeStart && status !== 'done' && status !== 'partial') {
+        status = 'current';
       }
-      
-      calendar.push({ day: i, status, isToday, isPast, isFuture });
+
+      calendar.push({ day: i, status, isToday, isPast, isFuture, isBeforeStart });
     }
-    
+
     return calendar;
   };
 
@@ -237,7 +214,7 @@ export default function HomeScreen() {
     };
   }, [patient]);
 
-  const calendarData = getCalendarData(checkIns);
+  const calendarData = getCalendarData(checkIns, patient?.startDate);
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const currentMonth = monthNames[new Date().getMonth()];
 
@@ -318,8 +295,13 @@ export default function HomeScreen() {
             <span className="text-base font-bold text-[#c44033] font-crimson">{currentSkinScore}</span>
             <span className="text-xs text-[#a39e95] font-outfit">/20</span>
           </div>
-          <div className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center">
-            <span className="text-base font-semibold text-[#c44033] font-crimson">P</span>
+          <div
+            onClick={() => navigate('/profile')}
+            className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+          >
+            <span className="text-base font-semibold text-[#c44033] font-crimson">
+              {(patient?.name || patient?.firstName || 'P').charAt(0).toUpperCase()}
+            </span>
           </div>
         </div>
       </div>
@@ -452,24 +434,31 @@ export default function HomeScreen() {
             <div
               key={index}
               className={`aspect-square rounded-[8px] flex items-center justify-center ${
-                dayData?.status === 'done' ? 'bg-[#1a8a4a] opacity-80' :
-                dayData?.status === 'partial' ? 'bg-[#d4a017] opacity-60' :
-                dayData?.status === 'current' ? 'bg-[#1a8a4a] opacity-80 shadow-[#c44033]_0px_0px_0px_2px' :
-                dayData?.isFuture ? 'bg-[#ede9e5] opacity-30' :
-                'bg-[#dc2626] opacity-40' // Red for missed days
+                !dayData ? '' :
+                dayData.status === 'before-start' ? 'bg-transparent' :
+                dayData.status === 'done'          ? 'bg-[#1a8a4a] opacity-80' :
+                dayData.status === 'partial'       ? 'bg-[#d4a017] opacity-60' :
+                dayData.status === 'current'       ? 'bg-[#c44033] opacity-90' :
+                dayData.isFuture                   ? 'bg-[#ede9e5] opacity-30' :
+                'bg-[#dc2626] opacity-40'
               }`}
             >
               <span className={`text-xs font-medium ${
-                dayData?.status === 'done' ? 'text-white' :
-                dayData?.status === 'partial' ? 'text-white' :
-                dayData?.status === 'current' ? 'text-white' :
-                dayData?.isFuture ? 'text-[#a39e95]' :
-                'text-white' // White text on red missed days
+                !dayData ? '' :
+                dayData.status === 'before-start' ? 'text-[#d4cfc9]' :
+                dayData.status === 'done'          ? 'text-white' :
+                dayData.status === 'partial'       ? 'text-white' :
+                dayData.status === 'current'       ? 'text-white' :
+                dayData.isFuture                   ? 'text-[#a39e95]' :
+                'text-white'
               }`}>
-                {dayData?.day}
+                {dayData?.status === 'current' ? '' : dayData?.day}
               </span>
               {dayData?.status === 'current' && (
-                <div className="w-1.5 h-1.5 rounded-[3px] bg-white"></div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="text-xs font-bold text-white leading-none">{dayData.day}</span>
+                  <div className="w-1 h-1 rounded-full bg-white opacity-80"></div>
+                </div>
               )}
             </div>
           ))}
@@ -484,7 +473,7 @@ export default function HomeScreen() {
         </div>
         <div className="relative px-1.5">
           <div className="absolute top-4 left-5.5 right-5.5 h-0.5 bg-[#e0ddd7] rounded-[2px]"></div>
-          <div className="absolute top-4 left-5.5 h-0.5 rounded-[2px] bg-gradient-to-r from-[#1a8a4a] to-[#c44033]" style={{width: '40%'}}></div>
+          <div className="absolute top-4 left-5.5 h-0.5 rounded-[2px] bg-gradient-to-r from-[#1a8a4a] to-[#c44033]" style={{width: `${Math.round((day / 90) * 100)}%`}}></div>
           <div className="flex justify-between relative">
             {journeyMilestones.map((milestone, index) => (
               <div key={milestone.week} className="flex flex-col items-center gap-1.5 w-10.5">

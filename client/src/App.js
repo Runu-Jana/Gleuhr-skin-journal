@@ -183,6 +183,10 @@ function AppRoutes() {
                 element={!isAuthenticated ? <Navigate to="/login" replace /> : <JourneyScreen />}
               />
               <Route
+                path="/profile"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <ProfileScreen />}
+              />
+              <Route
                 path="/photo-upload"
                 element={!isAuthenticated ? <Navigate to="/login" replace /> : <PhotoUploadPage />}
               />
