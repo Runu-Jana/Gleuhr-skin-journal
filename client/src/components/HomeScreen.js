@@ -295,8 +295,13 @@ export default function HomeScreen() {
             <span className="text-base font-bold text-[#c44033] font-crimson">{currentSkinScore}</span>
             <span className="text-xs text-[#a39e95] font-outfit">/20</span>
           </div>
-          <div className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center">
-            <span className="text-base font-semibold text-[#c44033] font-crimson">P</span>
+          <div
+            onClick={() => navigate('/profile')}
+            className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+          >
+            <span className="text-base font-semibold text-[#c44033] font-crimson">
+              {(patient?.name || patient?.firstName || 'P').charAt(0).toUpperCase()}
+            </span>
           </div>
         </div>
       </div>
