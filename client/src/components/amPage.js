@@ -201,7 +201,7 @@ export default function AMPage() {
 
       {/* Card */}
       <div className="mx-4 mt-8 bg-white rounded-[28px] shadow-sm overflow-hidden">
-        <div className="px-6 pt-8 pb-7">
+        <div className="px-5 pt-8 pb-8">
 
           {/* MORNING CHECK-IN label */}
           <p className="text-xs font-bold text-[#c44033] font-outfit uppercase tracking-[1.2px] mb-2">
@@ -209,14 +209,14 @@ export default function AMPage() {
           </p>
 
           {/* Day heading */}
-          <h1 className="text-[2.6rem] font-bold text-[#191716] font-crimson leading-none mb-7">
+          <h1 className="text-[2.6rem] font-bold text-[#191716] font-crimson leading-none mb-6">
             Day {day}
           </h1>
 
           {/* Streak card */}
-          <div className="bg-[#faf8f5] rounded-[16px] px-4 py-3.5 flex items-center gap-3.5 mb-3.5">
-            <div className="w-11 h-11 rounded-[14px] bg-[rgba(220,38,38,0.08)] flex items-center justify-center flex-shrink-0">
-              <Flame className="w-5 h-5 text-[#dc2626]" />
+          <div className="bg-white border border-[#ede9e4] rounded-[18px] px-4 py-4 flex items-center gap-3.5 mb-3">
+            <div className="w-11 h-11 rounded-[14px] bg-[rgba(196,64,51,0.08)] flex items-center justify-center flex-shrink-0">
+              <Flame className="w-5 h-5 text-[#c44033]" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-[#191716] font-outfit leading-tight">
@@ -239,7 +239,7 @@ export default function AMPage() {
           {/* Tough day / Quick log row */}
           <button
             onClick={() => setShowShieldRestore(true)}
-            className="w-full flex items-center justify-between px-4 py-3.5 bg-[#faf8f5] rounded-[16px] mb-3.5"
+            className="w-full flex items-center justify-between px-4 py-4 bg-white border border-[#ede9e4] rounded-[18px] mb-3"
           >
             <span className="text-sm text-[#7a756d] font-outfit">
               Tough day? <span className="font-bold text-[#3d3935]">Quick log</span>
@@ -250,7 +250,7 @@ export default function AMPage() {
           </button>
 
           {/* AM Routine toggle */}
-          <div className="bg-[#faf8f5] rounded-[16px] px-4 py-4 flex items-center justify-between mb-3">
+          <div className="bg-white border border-[#ede9e4] rounded-[18px] px-4 py-4 flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-[#191716] font-outfit">AM Routine Completed</span>
             <button
               onClick={handleAMRoutineToggle}
@@ -265,7 +265,7 @@ export default function AMPage() {
           </div>
 
           {/* Sunscreen toggle */}
-          <div className="bg-[#faf8f5] rounded-[16px] px-4 py-4 flex items-center justify-between mb-6">
+          <div className="bg-white border border-[#ede9e4] rounded-[18px] px-4 py-4 flex items-center justify-between mb-6">
             <span className="text-sm font-semibold text-[#191716] font-outfit">Sunscreen Applied</span>
             <button
               onClick={handleSunscreenToggle}
@@ -283,7 +283,7 @@ export default function AMPage() {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || hasSubmitted || !(amRoutine && sunscreen)}
-            className={`w-full py-4 rounded-[16px] font-semibold text-sm font-outfit transition-all ${
+            className={`w-full py-4 rounded-[18px] font-semibold text-sm font-outfit transition-all ${
               isSubmitting || hasSubmitted
                 ? 'bg-[#e4e0db] text-[#a39e95] cursor-not-allowed'
                 : amRoutine && sunscreen
