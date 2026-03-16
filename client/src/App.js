@@ -40,7 +40,7 @@ import { initDB } from './utils/db';
 import AMPage from './components/amPage';
 import PMPage from './components/pmPage';
 import { getTimeOfDay } from './utils/timeUtils';
-import { calculateDay, isWeeklyPhotoDay } from './utils/helpers';
+import { calculateDay, isWeeklyPhotoDay, getWeekNumber } from './utils/helpers';
 import SkinScoreAssessment from './components/SkinScoreAssessment';
 
 function AdminRoute({ children }) {
@@ -90,18 +90,17 @@ function App() {
 }
 
 function AppRoutes() {
-  const { isAuthenticated, patient, isLoading } = useAuth();
+  const { isAuthenticated, patient, isLoading, weeklyPhotos } = useAuth();
   const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
 
-  // Check if today is a weekly photo day (7, 14, 21, 28, etc.)
+  // Show weekly photo popup only if today is a photo day AND no photo uploaded yet this week
   useEffect(() => {
-    if (isAuthenticated && patient) {
-      // Show popup on weekly photo days (every 7th day from start)
-      if (isWeeklyPhotoDay(patient?.startDate)) {
-        setShowWeeklyPhotoPopup(true);
-      }
+    if (isAuthenticated && patient && isWeeklyPhotoDay(patient?.startDate)) {
+      const currentWeek = getWeekNumber(patient.startDate);
+      const alreadyUploaded = Array.isArray(weeklyPhotos) && weeklyPhotos.some(p => p.week === currentWeek);
+      if (!alreadyUploaded) setShowWeeklyPhotoPopup(true);
     }
-  }, [isAuthenticated, patient]);
+  }, [isAuthenticated, patient, weeklyPhotos]);
 
   const handleCloseWeeklyPhotoPopup = () => {
     setShowWeeklyPhotoPopup(false);
@@ -205,18 +204,17 @@ function AppRoutes() {
 }
 
 function MainApp() {
-  const { patient, streak: streakData } = useAuth();
+  const { patient, streak: streakData, weeklyPhotos } = useAuth();
   const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
 
-  // Check if today is a weekly photo day (7, 14, 21, 28, etc.)
+  // Show weekly photo popup only if today is a photo day AND no photo uploaded yet this week
   useEffect(() => {
-    if (patient) {
-      // Show popup on weekly photo days (every 7th day from start)
-      if (isWeeklyPhotoDay(patient?.startDate)) {
-        setShowWeeklyPhotoPopup(true);
-      }
+    if (patient && isWeeklyPhotoDay(patient?.startDate)) {
+      const currentWeek = getWeekNumber(patient.startDate);
+      const alreadyUploaded = Array.isArray(weeklyPhotos) && weeklyPhotos.some(p => p.week === currentWeek);
+      if (!alreadyUploaded) setShowWeeklyPhotoPopup(true);
     }
-  }, [patient]);
+  }, [patient, weeklyPhotos]);
 
   const handleCloseWeeklyPhotoPopup = () => {
     setShowWeeklyPhotoPopup(false);
