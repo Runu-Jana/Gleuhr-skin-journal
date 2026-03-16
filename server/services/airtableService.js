@@ -266,19 +266,41 @@ async function uploadPhotoToAirtable(phone, photoBase64, weekNumber) {
   if (!phone || !photoBase64) return null;
 
   try {
-    // 1. Find the Diet Plan record matching this phone number
-    const records = await new Promise((resolve, reject) => {
+    const normalizedPhone = normalizePhone(phone);
+    console.log(`uploadPhotoToAirtable: looking up phone ${phone} (normalized: ${normalizedPhone})`);
+
+    // 1. Find the Diet Plan record matching this phone number.
+    //    Phone Number may be stored as a number in Airtable, so we fetch
+    //    all records and do a normalized JS-side comparison (same as fetchDietPlans).
+    let matchedRecordId = null;
+    await new Promise((resolve, reject) => {
       base(DIET_PLAN_TABLE)
-        .select({ filterByFormula: `{Phone Number} = '${phone}'`, maxRecords: 1 })
-        .firstPage((err, recs) => (err ? reject(err) : resolve(recs)));
+        .select({ pageSize: 100 })
+        .eachPage(
+          (pageRecords, fetchNextPage) => {
+            for (const r of pageRecords) {
+              const rPhone = normalizePhone(String(r.get('Phone Number') || ''));
+              if (rPhone === normalizedPhone) {
+                matchedRecordId = r.id;
+                break;
+              }
+            }
+            if (matchedRecordId) {
+              resolve();
+            } else {
+              fetchNextPage();
+            }
+          },
+          (err) => (err ? reject(err) : resolve())
+        );
     });
 
-    if (!records || records.length === 0) {
+    if (!matchedRecordId) {
       console.warn(`uploadPhotoToAirtable: no Diet Plan record found for phone ${phone}`);
       return null;
     }
 
-    const recordId = records[0].id;
+    console.log(`uploadPhotoToAirtable: found record ${matchedRecordId}`);
 
     // 2. Convert base64 data-URI to a binary Buffer
     const mimeMatch = photoBase64.match(/^data:(image\/[\w+]+);base64,/);
@@ -286,24 +308,28 @@ async function uploadPhotoToAirtable(phone, photoBase64, weekNumber) {
     const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
     const rawBase64 = photoBase64.replace(/^data:image\/[\w+]+;base64,/, '');
     const imageBuffer = Buffer.from(rawBase64, 'base64');
+    const filename = `week-${weekNumber}.${ext}`;
 
     // 3. Upload directly to Airtable using the Content API
-    //    POST https://content.airtable.com/v0/{baseId}/{recordId}/{fieldName}/uploadAttachment
-    const fieldName = encodeURIComponent('Patient Photos');
-    const uploadUrl = `https://content.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${recordId}/${fieldName}/uploadAttachment`;
+    //    POST https://content.airtable.com/v0/{baseId}/{tableIdOrName}/{recordId}/{fieldIdOrName}/uploadAttachment
+    const tableEncoded = encodeURIComponent(DIET_PLAN_TABLE);
+    const fieldEncoded = encodeURIComponent('Patient Photos');
+    const uploadUrl = `https://content.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${tableEncoded}/${matchedRecordId}/${fieldEncoded}/uploadAttachment`;
+
+    console.log(`uploadPhotoToAirtable: uploading to ${uploadUrl}`);
 
     const response = await axios.post(uploadUrl, imageBuffer, {
       headers: {
         Authorization: `Bearer ${process.env.AIRTABLE_PAT}`,
         'Content-Type': contentType,
-        'x-airtable-application-id': process.env.AIRTABLE_BASE_ID,
+        'x-airtable-filename': filename,
       },
-      params: { filename: `week-${weekNumber}.${ext}` },
+      params: { filename },
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
     });
 
-    console.log(`✅ Photo uploaded to Airtable record ${recordId} (week ${weekNumber})`);
+    console.log(`✅ Photo uploaded to Airtable record ${matchedRecordId} (week ${weekNumber})`);
     return response.data;
   } catch (err) {
     const detail = err?.response?.data || err.message;
