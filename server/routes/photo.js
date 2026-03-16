@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const WeeklyPhoto = require('../models/WeeklyPhoto');
 const Patient = require('../models/Patient');
+const { uploadPhotoToAirtable } = require('../services/airtableService');
 
 // POST /api/photo - Upload weekly photo
 router.post('/', async (req, res) => {
@@ -82,6 +83,13 @@ router.post('/', async (req, res) => {
     );
 
     console.log(`Photo saved for patient ${pPhone}, week ${weekNum}, id: ${weeklyPhoto._id}`);
+
+    // Mirror the photo to Airtable "Patient Photos" field — non-blocking, failure is safe
+    if (photoData) {
+      uploadPhotoToAirtable(pPhone, photoData, weekNum).catch(err =>
+        console.error('Airtable photo mirror failed (non-fatal):', err.message)
+      );
+    }
 
     res.json({
       success: true,

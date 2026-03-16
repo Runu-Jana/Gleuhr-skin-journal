@@ -1,4 +1,5 @@
 const Airtable = require('airtable');
+const axios = require('axios');
 
 // Configure Airtable (only if credentials are provided)
 let base = null;
@@ -246,10 +247,76 @@ async function fetchDietPlanById(recordId) {
   });
 }
 
+/**
+ * Upload a weekly progress photo to the "Patient Photos" attachment field
+ * in the Airtable "Diet Plan" table, matched by the patient's phone number.
+ *
+ * Uses Airtable's direct-upload Content API so no public hosting URL is needed.
+ * Errors are caught and logged — a failure here never blocks the MongoDB save.
+ *
+ * @param {string} phone       - Patient phone number (used to find the Airtable record)
+ * @param {string} photoBase64 - Base-64 data URI (e.g. "data:image/jpeg;base64,...")
+ * @param {number} weekNumber  - Week number for the filename label
+ */
+async function uploadPhotoToAirtable(phone, photoBase64, weekNumber) {
+  if (!base) {
+    console.warn('Airtable not configured — skipping photo upload');
+    return null;
+  }
+  if (!phone || !photoBase64) return null;
+
+  try {
+    // 1. Find the Diet Plan record matching this phone number
+    const records = await new Promise((resolve, reject) => {
+      base(DIET_PLAN_TABLE)
+        .select({ filterByFormula: `{Phone Number} = '${phone}'`, maxRecords: 1 })
+        .firstPage((err, recs) => (err ? reject(err) : resolve(recs)));
+    });
+
+    if (!records || records.length === 0) {
+      console.warn(`uploadPhotoToAirtable: no Diet Plan record found for phone ${phone}`);
+      return null;
+    }
+
+    const recordId = records[0].id;
+
+    // 2. Convert base64 data-URI to a binary Buffer
+    const mimeMatch = photoBase64.match(/^data:(image\/[\w+]+);base64,/);
+    const contentType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
+    const rawBase64 = photoBase64.replace(/^data:image\/[\w+]+;base64,/, '');
+    const imageBuffer = Buffer.from(rawBase64, 'base64');
+
+    // 3. Upload directly to Airtable using the Content API
+    //    POST https://content.airtable.com/v0/{baseId}/{recordId}/{fieldName}/uploadAttachment
+    const fieldName = encodeURIComponent('Patient Photos');
+    const uploadUrl = `https://content.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${recordId}/${fieldName}/uploadAttachment`;
+
+    const response = await axios.post(uploadUrl, imageBuffer, {
+      headers: {
+        Authorization: `Bearer ${process.env.AIRTABLE_PAT}`,
+        'Content-Type': contentType,
+        'x-airtable-application-id': process.env.AIRTABLE_BASE_ID,
+      },
+      params: { filename: `week-${weekNumber}.${ext}` },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+    });
+
+    console.log(`✅ Photo uploaded to Airtable record ${recordId} (week ${weekNumber})`);
+    return response.data;
+  } catch (err) {
+    const detail = err?.response?.data || err.message;
+    console.error('uploadPhotoToAirtable error:', detail);
+    return null; // Non-fatal — MongoDB save already succeeded
+  }
+}
+
 module.exports = {
   fetchDietPlans,
   fetchDietPlanById,
   fetchAllDietPlans,
   fetchTeamMembers,
   extractArray,
+  uploadPhotoToAirtable,
 };
