@@ -5,7 +5,7 @@ import { getSmartRoute, getRoutingStatus } from '../utils/smartRouting';
 
 export default function SmartRouter({ targetRoute = null }) {
   const navigate = useNavigate();
-  const { patient } = useAuth();
+  const { patient, weeklyPhotos } = useAuth();
   const [isRouting, setIsRouting] = useState(true);
   const [routingStatus, setRoutingStatus] = useState(null);
 
@@ -18,15 +18,16 @@ export default function SmartRouter({ targetRoute = null }) {
 
       try {
         setIsRouting(true);
-        
+
         // If a specific target route is provided (like from WhatsApp deep link), use it
         if (targetRoute) {
           navigate(targetRoute);
           return;
         }
 
-        // Otherwise, use smart routing logic
-        const route = await getSmartRoute(patient);
+        // Otherwise, use smart routing logic — pass weeklyPhotos so the photo-day
+        // redirect check can use the already-loaded server data
+        const route = await getSmartRoute(patient, new Date(), weeklyPhotos);
         const status = await getRoutingStatus(patient);
         
         setRoutingStatus(status);
@@ -72,7 +73,7 @@ export default function SmartRouter({ targetRoute = null }) {
 // Hook for smart routing
 export function useSmartRouting() {
   const navigate = useNavigate();
-  const { patient } = useAuth();
+  const { patient, weeklyPhotos } = useAuth();
 
   const navigateSmart = async (targetRoute = null) => {
     try {
@@ -88,7 +89,7 @@ export function useSmartRouting() {
       }
 
       // Otherwise, use smart routing logic
-      const route = await getSmartRoute(patient);
+      const route = await getSmartRoute(patient, new Date(), weeklyPhotos);
       navigate(route);
       
     } catch (error) {

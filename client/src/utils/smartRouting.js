@@ -1,37 +1,46 @@
-import { getTodayCheckIn } from './db';
-import { isWeeklyPhotoDay } from './helpers';
+import { getTodayCheckIn, getWeeklyPhotos } from './db';
+import { isWeeklyPhotoDay, getWeekNumber } from './helpers';
 
 // Smart routing logic for QR codes and home screen icon
-export async function getSmartRoute(patient, currentTime = new Date()) {
+export async function getSmartRoute(patient, currentTime = new Date(), weeklyPhotos = null) {
   if (!patient) return '/login';
-  
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   // Get today's check-in status
   const todayCheckIn = await getTodayCheckIn(patient.phoneNumber);
   const amDone = todayCheckIn?.amRoutine || false;
   const pmDone = todayCheckIn?.pmRoutine || false;
-  
+
   // Get PM reminder time (default to 9:30 PM if not set)
   const pmReminderTime = patient.pmReminderTime || '21:30';
   const [pmHour, pmMinute] = pmReminderTime.split(':').map(Number);
-  
+
   // Check if current time is before or after PM reminder time
   const currentHour = currentTime.getHours();
   const currentMinute = currentTime.getMinutes();
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
   const pmReminderInMinutes = pmHour * 60 + pmMinute;
   const isBeforePMReminder = currentTimeInMinutes < pmReminderInMinutes;
-  
+
   // Check if it's a photo day and both routines are done
   const isPhotoDay = isWeeklyPhotoDay(patient.startDate);
   const bothDone = amDone && pmDone;
-  
-  // Apply routing logic
+
+  // Only redirect to weekly-photo if no photo has been uploaded for this week yet
   if (isPhotoDay && bothDone) {
-    // Photo day, both done → Photo capture screen
-    return '/weekly-photo';
+    const currentWeek = getWeekNumber(patient.startDate);
+    // Prefer the already-loaded list (from AuthContext); fall back to IndexedDB
+    let photos = weeklyPhotos;
+    if (!Array.isArray(photos)) {
+      const phone = patient.phone || patient.phoneNumber;
+      photos = await getWeeklyPhotos(phone).catch(() => []);
+    }
+    const alreadyUploaded = photos.some(p => p.week === currentWeek);
+    if (!alreadyUploaded) {
+      return '/weekly-photo';
+    }
   }
   
   if (isBeforePMReminder) {
