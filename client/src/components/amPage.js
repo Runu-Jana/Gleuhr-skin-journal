@@ -93,8 +93,24 @@ export default function AMPage() {
   useEffect(() => {
     const loadToday = async () => {
       try {
-        const today = await getTodayCheckIn(patient?.phoneNumber || patient?.phone);
-        if (today && today.date === new Date().toISOString().split('T')[0]) {
+        const phone = patient?.phone || patient?.phoneNumber;
+        const todayDate = new Date().toISOString().split('T')[0];
+
+        // 1. IndexedDB lookup using correct patientId (MongoDB ObjectId)
+        let today = await getTodayCheckIn(patient?.id);
+
+        // 2. Server fallback — covers new device or cleared IndexedDB
+        if (!today && phone) {
+          try {
+            const res = await fetch(`/api/checkin/${phone}`);
+            if (res.ok) {
+              const checkins = await res.json();
+              today = checkins.find(c => c.date === todayDate);
+            }
+          } catch { /* non-fatal */ }
+        }
+
+        if (today?.date === todayDate) {
           setAmRoutine(today.amRoutine);
           setSunscreen(today.sunscreen);
           setHasSubmitted(true);
@@ -107,7 +123,7 @@ export default function AMPage() {
       }
     };
     loadToday();
-  }, [patient?.phoneNumber]);
+  }, [patient]);
 
   const handleSubmit = async () => {
     if (!amRoutine) {
