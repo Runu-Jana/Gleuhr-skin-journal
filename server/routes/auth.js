@@ -35,14 +35,6 @@ router.post('/send-verification', async (req, res) => {
       return res.status(400).json({ error: 'Invalid country code' });
     }
 
-    // Check if patient exists
-    const patient = await Patient.findOne({
-      $or: [{ phoneNumber }, { phone: phoneNumber }]
-    });
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found. Please contact your coach.' });
-    }
-
     // Generate a real random OTP; use fixed code only in development
     const verificationCode = process.env.NODE_ENV === 'development'
       ? '123456'
@@ -147,7 +139,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Find patient by phone number
-    const patient = await Patient.findOne({
+    let patient = await Patient.findOne({
       $or: [{ phoneNumber }, { phone: phoneNumber }]
     });
 
@@ -155,7 +147,36 @@ router.post('/register', async (req, res) => {
 
     // Auto-create patient if not found
     if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+      isNewUser = true;
+
+      // Enrich with Airtable data if available (non-blocking on failure)
+      let airtableName = '';
+      let airtableDietician = '';
+      try {
+        const { fetchDietPlans } = require('../services/airtableService');
+        const plans = await fetchDietPlans({ customerPhone: phoneNumber });
+        if (plans && plans.length > 0) {
+          airtableName      = plans[0].customerName  || '';
+          airtableDietician = plans[0].dieticianName || '';
+        }
+      } catch (atErr) {
+        console.warn('Airtable lookup skipped during auto-register:', atErr.message);
+      }
+
+      patient = await Patient.create({
+        name:         airtableName || 'New Patient',
+        fullName:     airtableName || 'New Patient',
+        phoneNumber,
+        phone:        phoneNumber,
+        coachName:    airtableDietician || '',
+        startDate:    new Date(),
+        isActive:     true,
+        hasCommitted: false,
+        currentDay:   1,
+        totalPoints:  0,
+        level:        1,
+        achievements: [],
+      });
     }
 
     // Generate persistent auth token (90 days)
