@@ -290,11 +290,13 @@ export default function HomeScreen() {
           </h2>
         </div>
         <div className="flex items-center gap-2.5">
-          <div className="px-3 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.03)] border border-[rgba(196,64,51,0.08)] cursor-pointer flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-[#7a756d] font-outfit">Score</span>
-            <span className="text-base font-bold text-[#c44033] font-crimson">{currentSkinScore}</span>
-            <span className="text-xs text-[#a39e95] font-outfit">/20</span>
-          </div>
+          {currentSkinScore > 0 && (
+            <div className="px-3 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.03)] border border-[rgba(196,64,51,0.08)] cursor-pointer flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-[#7a756d] font-outfit">Score</span>
+              <span className="text-base font-bold text-[#c44033] font-crimson">{currentSkinScore}</span>
+              <span className="text-xs text-[#a39e95] font-outfit">/20</span>
+            </div>
+          )}
           <div
             onClick={() => navigate('/profile')}
             className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
