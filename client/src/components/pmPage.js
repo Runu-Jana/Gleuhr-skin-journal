@@ -431,9 +431,10 @@ export default function PMPage() {
             )}
 
             {/* PM Routine Toggle */}
-            <button 
-              onClick={() => setPmRoutine(!pmRoutine)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '14px 16px', background: 'rgb(255, 255, 255)', border: '1.5px solid rgb(224, 221, 215)', borderRadius: '14px', cursor: 'pointer', transition: '0.25s' }}
+            <button
+              onClick={() => !hasSubmitted && setPmRoutine(!pmRoutine)}
+              disabled={hasSubmitted}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '14px 16px', background: 'rgb(255, 255, 255)', border: '1.5px solid rgb(224, 221, 215)', borderRadius: '14px', cursor: hasSubmitted ? 'default' : 'pointer', transition: '0.25s' }}
             >
               <span style={{ fontSize: '14px', fontWeight: '600', color: 'rgb(25, 23, 22)', fontFamily: 'crimson, sans-serif', letterSpacing: '-0.2px' }}>PM Routine Completed</span>
               <div style={{ width: '44px', height: '26px', borderRadius: '13px', padding: '2px', background: pmRoutine ? '#10b981' : 'rgb(204, 200, 192)', transition: 'background 0.25s', display: 'flex', alignItems: 'center' }}>
@@ -449,10 +450,11 @@ export default function PMPage() {
                   {['Yes ✓', 'Mostly', 'Not today'].map((option) => (
                     <button
                       key={option}
-                      onClick={() => setDietFollowed(option)}
-                      className={`flex-1 px-2 py-2.5 sm:px-3 sm:py-3.5 rounded-xl border cursor-pointer text-xs sm:text-sm transition-all ${
-                        dietFollowed === option 
-                          ? 'bg-green-50 border-green-300 text-green-700 font-medium' 
+                      onClick={() => !hasSubmitted && setDietFollowed(option)}
+                      disabled={hasSubmitted}
+                      className={`flex-1 px-2 py-2.5 sm:px-3 sm:py-3.5 rounded-xl border text-xs sm:text-sm transition-all ${hasSubmitted ? 'cursor-default' : 'cursor-pointer'} ${
+                        dietFollowed === option
+                          ? 'bg-green-50 border-green-300 text-green-700 font-medium'
                           : 'bg-white border-gray-300 text-gray-500'
                       }`}
                     >
@@ -476,10 +478,11 @@ export default function PMPage() {
                   ].map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => setWaterIntake(option.value)}
-                      className={`flex-1 px-1 py-3 rounded-xl border cursor-pointer flex flex-col items-center gap-1.5 transition-all ${
-                        waterIntake === option.value 
-                          ? 'bg-blue-50 border-blue-300' 
+                      onClick={() => !hasSubmitted && setWaterIntake(option.value)}
+                      disabled={hasSubmitted}
+                      className={`flex-1 px-1 py-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${hasSubmitted ? 'cursor-default' : 'cursor-pointer'} ${
+                        waterIntake === option.value
+                          ? 'bg-blue-50 border-blue-300'
                           : 'bg-white border-gray-300'
                       }`}
                     >
@@ -510,10 +513,11 @@ export default function PMPage() {
                 ].map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => setSkinMood(option.value)}
-                    className={`flex-1 px-2 py-3.5 rounded-xl border cursor-pointer flex flex-col items-center gap-1.25 transition-all ${
-                      skinMood === option.value 
-                        ? 'bg-green-50 border-green-300' 
+                    onClick={() => !hasSubmitted && setSkinMood(option.value)}
+                    disabled={hasSubmitted}
+                    className={`flex-1 px-2 py-3.5 rounded-xl border flex flex-col items-center gap-1.25 transition-all ${hasSubmitted ? 'cursor-default' : 'cursor-pointer'} ${
+                      skinMood === option.value
+                        ? 'bg-green-50 border-green-300'
                         : 'bg-white border-gray-300'
                     }`}
                   >
@@ -527,11 +531,11 @@ export default function PMPage() {
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full px-4.5 py-5 rounded-xl text-white border-none text-base font-semibold cursor-pointer font-sans mt-1 mb-4 transition-all"
+              disabled={isSubmitting || hasSubmitted}
+              className={`w-full px-4.5 py-5 rounded-xl text-white border-none text-base font-semibold font-sans mt-1 mb-4 transition-all ${isSubmitting || hasSubmitted ? 'cursor-default' : 'cursor-pointer'}`}
               style={{
-                background: isSubmitting ? '#9ca3af' : '#c44033',
-                boxShadow: 'rgba(196, 64, 51, 0.208) 0px 6px 20px'
+                background: isSubmitting || hasSubmitted ? '#9ca3af' : '#c44033',
+                boxShadow: isSubmitting || hasSubmitted ? 'none' : 'rgba(196, 64, 51, 0.208) 0px 6px 20px'
               }}
             >
               {isSubmitting ? (
@@ -539,6 +543,8 @@ export default function PMPage() {
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   <span>Saving...</span>
                 </div>
+              ) : hasSubmitted ? (
+                'Completed ✓'
               ) : isQuickLogMode ? (
                 'Save Quick Log ✓'
               ) : (
