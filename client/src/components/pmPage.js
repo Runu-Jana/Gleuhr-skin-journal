@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
 import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
-import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId } from '../utils/helpers';
+import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
 import BottomNavigation from './BottomNavigation';
 
@@ -47,6 +47,16 @@ export default function PMPage() {
   const [showQuickLogDrawer, setShowQuickLogDrawer] = useState(false);
   const [isQuickLogMode, setIsQuickLogMode] = useState(false);
   const [quickLogType, setQuickLogType] = useState(null);
+  const [consistency, setConsistency] = useState(0);
+
+  useEffect(() => {
+    const fetchConsistency = async () => {
+      if (!patient?.id || !patient?.startDate) return;
+      const checkIns = await getCheckIns(patient.id);
+      setConsistency(calculateConsistency(checkIns, patient.startDate));
+    };
+    fetchConsistency();
+  }, [patient?.id, patient?.startDate]);
 
   // Check if AM routine is already logged today.
   // Uses patient.id (MongoDB ObjectId) as the IndexedDB patientId key,
@@ -341,7 +351,7 @@ export default function PMPage() {
                     <span className="xs:inline">Red Hot flame</span>
                     <span className="xs:inline">⚆</span>
                     <span className="w-1 h-1 rounded-full bg-gray-300 hidden xs:inline"></span>
-                    <span>{Math.round(progress)}% consistent</span>
+                    <span>{consistency}% consistent</span>
                   </div>
                 </div>
               </div>
