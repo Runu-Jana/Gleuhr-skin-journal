@@ -70,268 +70,308 @@ function ReasonBadge({ reason }) {
   );
 }
 
-// ── Stat card ───────────────────────────────────────────────────────────────
+// ── Stat card (right panel) ─────────────────────────────────────────────────
 function StatCard({ label, value, color }) {
   return (
     <div style={{
-      flex: '1 1 140px', background: '#fff', borderRadius: 12,
-      padding: '18px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      flex: '1 1 120px', background: '#fff', borderRadius: 12,
+      padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       borderLeft: `4px solid ${color}`,
     }}>
-      <div style={{ fontSize: 28, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color }}>{value}</div>
       <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>{label}</div>
     </div>
   );
 }
 
-// ── Patient card ────────────────────────────────────────────────────────────
-function PatientCard({ item, onViewDetails }) {
-  const { airtable, mongodb, reason, action } = item;
-  const name = safeStr(mongodb?.name) || safeStr(airtable?.customerName) || '—';
-  const tp = safeStr(airtable?.treatmentPlan);
-  const currentDay = mongodb?.currentDay;
-  const streak = mongodb?.streak?.currentStreak || 0;
-  const consistency = mongodb?.consistency?.overall;
-  const phone = safeStr(airtable?.customerPhone);
+// ── Left panel patient card (dark theme) ────────────────────────────────────
+function PatientCardLeft({ item, isSelected, onClick }) {
+  const { airtable, mongodb, reason } = item;
+  const name    = safeStr(mongodb?.name) || safeStr(airtable?.customerName) || '—';
+  const currentDay   = mongodb?.currentDay;
+  const consistency  = mongodb?.consistency?.overall;
+  const avatarColor  = getAvatarColor(name);
+  const initials     = getInitials(name);
 
-  const avatarColor = getAvatarColor(name);
-  const initials = getInitials(name);
-  const consistencyColor = consistency == null ? '#888'
-    : consistency >= 70 ? '#16a34a'
-    : consistency >= 50 ? '#d97706'
-    : '#dc2626';
+  const consistencyColor = consistency == null
+    ? 'rgba(255,255,255,0.4)'
+    : consistency >= 70 ? '#4ade80'
+    : consistency >= 50 ? '#fbbf24'
+    : '#f87171';
 
   return (
-    <div style={{
-      background: '#fff', borderRadius: 12, padding: '13px 16px',
-      marginBottom: 8, border: '1px solid #eee',
-      display: 'flex', alignItems: 'center', gap: 12,
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        padding: '11px 14px',
+        borderRadius: 10,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 11,
+        marginBottom: 3,
+        background: isSelected ? 'rgba(196,64,51,0.22)' : 'rgba(255,255,255,0.05)',
+        borderLeft: `3px solid ${isSelected ? '#c44033' : 'transparent'}`,
+        transition: 'background 0.15s',
+      }}
+      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; }}
+      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+    >
       {/* Avatar */}
       <div style={{
-        width: 38, height: 38, borderRadius: 10, background: avatarColor,
+        width: 34, height: 34, borderRadius: 9, background: avatarColor,
         color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 13, fontWeight: 700, flexShrink: 0,
+        fontSize: 12, fontWeight: 700, flexShrink: 0,
       }}>
         {initials}
       </div>
 
       {/* Name + meta */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>{name}</div>
-        <div style={{ fontSize: 12, color: '#888', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-          {tp && <span>{tp}</span>}
-          {currentDay != null && <span>· Day {currentDay}</span>}
-          {streak > 0 && <span>· 🔥{streak}</span>}
+        <div style={{
+          fontSize: 13, fontWeight: 600, color: '#fff',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {name}
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2, display: 'flex', gap: 6 }}>
+          {currentDay != null && <span>Day {currentDay}</span>}
           {consistency != null && (
-            <span style={{ color: consistencyColor, fontWeight: 600 }}>
-              {consistency}%
-            </span>
+            <span style={{ color: consistencyColor, fontWeight: 600 }}>{consistency}%</span>
           )}
         </div>
       </div>
 
-      {/* Badge + action + arrow */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        {reason && <ReasonBadge reason={reason} />}
-        {action && (
-          <span style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>
-            {action}
-          </span>
-        )}
-        {phone && (
-          <button
-            onClick={() => onViewDetails(phone)}
-            style={{
-              background: 'none', border: '1px solid #e5e7eb', borderRadius: 8,
-              cursor: 'pointer', color: '#888', fontSize: 14, padding: '4px 8px',
-              lineHeight: 1,
-            }}
-          >
-            →
-          </button>
-        )}
-      </div>
+      {/* Reason dot / mini badge */}
+      {reason && (
+        <div style={{
+          fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
+          background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.65)',
+          flexShrink: 0, maxWidth: 76, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {reason}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Queue section ────────────────────────────────────────────────────────────
-function Section({ icon, label, items, onViewDetails }) {
+// ── Left panel section ────────────────────────────────────────────────────
+function SectionLeft({ icon, label, items, selectedPhone, onSelect }) {
   if (!items || items.length === 0) return null;
   return (
-    <div style={{ marginBottom: 28 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ fontSize: 14 }}>{icon}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#555', letterSpacing: '0.05em' }}>
-          {label}
-        </span>
+    <div style={{ marginBottom: 20 }}>
+      <div style={{
+        fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)',
+        letterSpacing: '0.08em', marginBottom: 8, paddingLeft: 4,
+        display: 'flex', alignItems: 'center', gap: 5,
+      }}>
+        <span>{icon}</span>
+        <span>{label}</span>
       </div>
       {items.map((item, i) => (
-        <PatientCard key={item.airtable?.id || i} item={item} onViewDetails={onViewDetails} />
+        <PatientCardLeft
+          key={item.airtable?.id || i}
+          item={item}
+          isSelected={selectedPhone === safeStr(item.airtable?.customerPhone)}
+          onClick={() => onSelect(safeStr(item.airtable?.customerPhone))}
+        />
       ))}
     </div>
   );
 }
 
-// ── Consistency bar (modal) ─────────────────────────────────────────────────
+// ── Consistency bar (right panel detail) ────────────────────────────────────
 function ConsistencyBar({ label, value }) {
   const color = value >= 75 ? '#16a34a' : value >= 50 ? '#ca8a04' : '#dc2626';
   return (
-    <div style={{ marginBottom: 6 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#666', marginBottom: 3 }}>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 4 }}>
         <span>{label}</span>
         <span style={{ fontWeight: 600, color }}>{value}%</span>
       </div>
-      <div style={{ background: '#f0f0f0', borderRadius: 99, height: 5, overflow: 'hidden' }}>
+      <div style={{ background: '#f0f0f0', borderRadius: 99, height: 6, overflow: 'hidden' }}>
         <div style={{ width: `${value}%`, background: color, height: '100%', borderRadius: 99, transition: 'width 0.4s' }} />
       </div>
     </div>
   );
 }
 
-// ── Patient Detail Modal ────────────────────────────────────────────────────
-function PatientDetailModal({ phone, onClose }) {
-  const [data, setData] = useState(null);
+// ── Right panel: patient detail (inline, no modal) ──────────────────────────
+function PatientDetailPanel({ phone }) {
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
 
   useEffect(() => {
+    setData(null);
+    setLoading(true);
+    setError('');
     api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/details`)
       .then(res => setData(res.data.data))
       .catch(err => setError(err.response?.data?.error || 'Failed to load'))
       .finally(() => setLoading(false));
   }, [phone]);
 
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-        zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
-      }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{
-        background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560,
-        maxHeight: '90vh', overflowY: 'auto', padding: 28,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Patient Details</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}>×</button>
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#aaa' }}>
+        <div>
+          <div style={{ width: 28, height: 28, border: '3px solid #c44033', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 10px' }} />
+          Loading patient…
         </div>
+      </div>
+    );
+  }
 
-        {loading && <div style={{ textAlign: 'center', color: '#888', padding: 32 }}>Loading...</div>}
-        {error && <div style={{ color: '#dc2626', padding: 16 }}>{error}</div>}
+  if (error) {
+    return <div style={{ color: '#dc2626', padding: 20 }}>{error}</div>;
+  }
 
-        {data && (
-          <>
-            <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
-              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{data.patient.name}</div>
-              <div style={{ fontSize: 13, color: '#888' }}>
-                {data.patient.phone} · Day {data.patient.currentDay} of 90
+  if (!data) return null;
+
+  return (
+    <div style={{ maxWidth: 680 }}>
+
+      {/* Patient header card */}
+      <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 14, background: getAvatarColor(data.patient.name),
+            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, fontWeight: 700, flexShrink: 0,
+          }}>
+            {getInitials(data.patient.name)}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a' }}>{data.patient.name}</div>
+            <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>
+              {data.patient.phone} · Day {data.patient.currentDay} of 90
+            </div>
+            {data.patient.skinConcern && (
+              <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>
+                {data.patient.skinConcern}
               </div>
-              {data.patient.skinConcern && (
-                <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
-                  Concern: {data.patient.skinConcern}
-                </div>
+            )}
+          </div>
+          {data.dietPlan && (
+            <div style={{ textAlign: 'right' }}>
+              {data.dietPlan.dieticianCallStatus && (
+                <ReasonBadge reason={data.dietPlan.dieticianCallStatus} />
               )}
             </div>
-
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-              {[
-                { label: 'Streak',      value: `🔥 ${data.streak.currentStreak}`, color: '#ea580c' },
-                { label: 'Points',      value: `⭐ ${data.patient.totalPoints}`,  color: '#eab308' },
-                { label: 'Consistency', value: `${data.consistency.overall}%`,    color: '#16a34a' },
-              ].map(s => (
-                <div key={s.label} style={{
-                  flex: '1 1 100px', background: '#f9fafb', borderRadius: 10,
-                  padding: '12px 14px', textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: s.color }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Consistency (all-time)</div>
-              <ConsistencyBar label="Overall Check-in" value={data.consistency.overall} />
-              <ConsistencyBar label="Sunscreen" value={data.consistency.sunscreen} />
-              <ConsistencyBar label="Diet" value={data.consistency.diet} />
-            </div>
-
-            {data.dietPlan && (
-              <div style={{ background: '#eff6ff', borderRadius: 10, padding: '12px 16px', marginBottom: 20 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#2563eb', marginBottom: 6 }}>Diet Plan (Airtable)</div>
-                <div style={{ fontSize: 13 }}>
-                  <div>Call Status: <strong>{safeStr(data.dietPlan.dieticianCallStatus) || '—'}</strong></div>
-                  <div>Plan Status: <strong>{safeStr(data.dietPlan.dietPlanStatus) || '—'}</strong></div>
-                  {data.dietPlan.dietPlanDate && <div>Plan Date: <strong>{data.dietPlan.dietPlanDate}</strong></div>}
-                </div>
-              </div>
-            )}
-
-            {data.weekGrid && data.weekGrid.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>This Week</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {data.weekGrid.map((day, i) => (
-                    <div key={i} style={{ flex: 1, textAlign: 'center' }}>
-                      <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4 }}>{day.dayLabel}</div>
-                      <div style={{
-                        width: 28, height: 28, borderRadius: '50%', margin: '0 auto',
-                        background: day.isFuture ? '#f3f4f6' : day.amCompleted ? '#c44033' : '#e5e7eb',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 10, color: day.amCompleted ? '#fff' : '#9ca3af',
-                      }}>
-                        {!day.isFuture && (day.amCompleted ? '✓' : '—')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {data.dietPlan?.products && data.dietPlan.products.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Products</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {data.dietPlan.products.map((p, i) => (
-                    <span key={i} style={{
-                      fontSize: 12, padding: '4px 12px', borderRadius: 99,
-                      background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb',
-                    }}>
-                      {p}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {data.reorder?.planEndDate && (
-              <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px', fontSize: 13 }}>
-                Plan ends: <strong>{data.reorder.planEndDate}</strong>
-                {data.reorder.daysRemaining > 0 && (
-                  <span style={{ color: '#888', marginLeft: 8 }}>({data.reorder.daysRemaining} days left)</span>
-                )}
-              </div>
-            )}
-          </>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        {[
+          { label: 'Streak',      value: `🔥 ${data.streak.currentStreak}`, color: '#ea580c' },
+          { label: 'Points',      value: `⭐ ${data.patient.totalPoints}`,  color: '#eab308' },
+          { label: 'Consistency', value: `${data.consistency.overall}%`,    color: '#16a34a' },
+        ].map(s => (
+          <div key={s.label} style={{
+            flex: 1, background: '#fff', borderRadius: 12,
+            padding: '14px 16px', textAlign: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: '#999', marginTop: 3 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Consistency bars */}
+      <div style={{ background: '#fff', borderRadius: 14, padding: '18px 22px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 14 }}>Consistency (all-time)</div>
+        <ConsistencyBar label="Overall Check-in" value={data.consistency.overall} />
+        <ConsistencyBar label="Sunscreen"         value={data.consistency.sunscreen} />
+        <ConsistencyBar label="Diet"              value={data.consistency.diet} />
+      </div>
+
+      {/* Diet plan info */}
+      {data.dietPlan && (
+        <div style={{ background: '#eff6ff', borderRadius: 14, padding: '16px 20px', marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#2563eb', marginBottom: 10 }}>Diet Plan (Airtable)</div>
+          <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div>Call Status: <strong>{safeStr(data.dietPlan.dieticianCallStatus) || '—'}</strong></div>
+            <div>Plan Status: <strong>{safeStr(data.dietPlan.dietPlanStatus) || '—'}</strong></div>
+            {data.dietPlan.dietPlanDate && <div>Plan Date: <strong>{data.dietPlan.dietPlanDate}</strong></div>}
+          </div>
+        </div>
+      )}
+
+      {/* This week grid */}
+      {data.weekGrid && data.weekGrid.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 22px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 14 }}>This Week</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {data.weekGrid.map((day, i) => (
+              <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#aaa', marginBottom: 6 }}>{day.dayLabel}</div>
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%', margin: '0 auto',
+                  background: day.isFuture ? '#f3f4f6' : day.amCompleted ? '#c44033' : '#e5e7eb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, color: day.amCompleted ? '#fff' : '#9ca3af',
+                }}>
+                  {!day.isFuture && (day.amCompleted ? '✓' : '—')}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Products */}
+      {data.dietPlan?.products && data.dietPlan.products.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 22px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 10 }}>Products</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {data.dietPlan.products.map((p, i) => (
+              <span key={i} style={{
+                fontSize: 12, padding: '5px 14px', borderRadius: 99,
+                background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb',
+              }}>
+                {p}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Plan end */}
+      {data.reorder?.planEndDate && (
+        <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '14px 18px', fontSize: 13 }}>
+          Plan ends: <strong>{data.reorder.planEndDate}</strong>
+          {data.reorder.daysRemaining > 0 && (
+            <span style={{ color: '#888', marginLeft: 8 }}>({data.reorder.daysRemaining} days left)</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Main Dashboard ──────────────────────────────────────────────────────────
+// ── Right panel: empty state ─────────────────────────────────────────────────
+function EmptyState() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#bbb', userSelect: 'none' }}>
+      <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }}>👤</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: '#ccc' }}>Select a patient</div>
+      <div style={{ fontSize: 13, marginTop: 6, color: '#bbb' }}>Click any patient on the left to view their details</div>
+    </div>
+  );
+}
+
+// ── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DieticianDashboard() {
-  const [dashData, setDashData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [dashData, setDashData]     = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState('');
   const [selectedPhone, setSelectedPhone] = useState(null);
-  const [activeTab, setActiveTab] = useState('queue');
+  const [activeTab, setActiveTab]   = useState('queue');
 
   const name = localStorage.getItem('dieticianName') || 'Dietician';
 
@@ -360,12 +400,9 @@ export default function DieticianDashboard() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', color: '#888' }}>
-          <div style={{
-            width: 36, height: 36, border: '3px solid #c44033', borderTopColor: 'transparent',
-            borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
-          }} />
+      <div style={{ minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)' }}>
+          <div style={{ width: 36, height: 36, border: '3px solid #c44033', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
           Loading your dashboard…
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -409,59 +446,105 @@ export default function DieticianDashboard() {
     ...(queue?.reorder || []),
   ].length;
 
-  const today = new Date();
+  const today  = new Date();
   const dateStr = today.toLocaleDateString('en-US', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
   const TABS = [
-    { id: 'queue',      label: "Today's Queue", count: queueCount,                               icon: '📋' },
-    { id: 'all',        label: 'All Patients',  count: totalCount || 0,                          icon: null },
-    { id: 'onboarding', label: 'Onboarding',    count: onboardingCount ?? onboardingPatients.length, icon: null },
+    { id: 'queue',      label: "Today's Queue", count: queueCount },
+    { id: 'all',        label: 'All Patients',  count: totalCount || 0 },
+    { id: 'onboarding', label: 'Onboarding',    count: onboardingCount ?? onboardingPatients.length },
   ];
 
-  return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-
-      {/* Dark header */}
-      <div style={{
-        background: '#1a1a2e', color: '#fff', padding: '16px 28px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>
-            {greeting || `Good morning, ${name.split(' ')[0]}!`}
+  // ── Render left panel content based on active tab ─────────────────────────
+  function LeftPanelContent() {
+    if (activeTab === 'queue' && queue) {
+      const isEmpty = queueCount === 0 && (queue.airtableOnly || []).length === 0;
+      if (isEmpty) {
+        return (
+          <div style={{ textAlign: 'center', padding: '48px 16px', color: 'rgba(255,255,255,0.4)' }}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>✅</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>All caught up!</div>
           </div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
-            {dateStr} · {totalCount || 0} active patients
+        );
+      }
+      return (
+        <>
+          <SectionLeft icon="🔴" label="URGENT"    items={queue.urgent}        selectedPhone={selectedPhone} onSelect={setSelectedPhone} />
+          <SectionLeft icon="🟡" label="FLAGGED"   items={queue.flagged}       selectedPhone={selectedPhone} onSelect={setSelectedPhone} />
+          <SectionLeft icon="📞" label="CALLS"     items={queue.scheduledCalls} selectedPhone={selectedPhone} onSelect={setSelectedPhone} />
+          <SectionLeft icon="✅" label="REORDER"   items={queue.reorder}       selectedPhone={selectedPhone} onSelect={setSelectedPhone} />
+          <SectionLeft icon="⚪" label="NOT IN APP" items={queue.airtableOnly}  selectedPhone={selectedPhone} onSelect={setSelectedPhone} />
+        </>
+      );
+    }
+
+    if (activeTab === 'all') {
+      const sorted = (allPatients || []).slice().sort((a, b) => {
+        const na = safeStr(a.mongodb?.name) || safeStr(a.airtable?.customerName);
+        const nb = safeStr(b.mongodb?.name) || safeStr(b.airtable?.customerName);
+        return na.localeCompare(nb);
+      });
+      return sorted.map((item, i) => {
+        const status = queueStatusMap[item.airtable?.id] || { reason: 'On Track', action: '' };
+        const phone  = safeStr(item.airtable?.customerPhone);
+        return (
+          <PatientCardLeft
+            key={item.airtable?.id || i}
+            item={{ ...item, ...status }}
+            isSelected={selectedPhone === phone}
+            onClick={() => setSelectedPhone(phone)}
+          />
+        );
+      });
+    }
+
+    if (activeTab === 'onboarding') {
+      return onboardingPatients.map((item, i) => {
+        const isNew  = item.mongodb && item.mongodb.currentDay <= 7;
+        const phone  = safeStr(item.airtable?.customerPhone);
+        return (
+          <PatientCardLeft
+            key={item.airtable?.id || i}
+            item={{ ...item, reason: isNew ? 'New Patient' : 'Not in App' }}
+            isSelected={selectedPhone === phone}
+            onClick={() => setSelectedPhone(phone)}
+          />
+        );
+      });
+    }
+
+    return null;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+
+      {/* ── LEFT PANEL: 40% dark ─────────────────────────────────────────── */}
+      <div style={{
+        width: '40%', minWidth: 300, background: '#1a1a2e',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        borderRight: '1px solid rgba(255,255,255,0.07)',
+      }}>
+
+        {/* Left top: brand + dietician name */}
+        <div style={{ padding: '22px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#c44033', letterSpacing: '0.1em', marginBottom: 4 }}>
+            GLEUHR
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
+            {name.startsWith('Dt') ? name : `Dt. ${name.split(' ')[0]}`}
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+            {totalCount || 0} active patients
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            padding: '7px 18px', fontSize: 13, fontWeight: 500,
-            background: 'rgba(255,255,255,0.1)', color: '#fff',
-            border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, cursor: 'pointer',
-          }}
-        >
-          Logout
-        </button>
-      </div>
-
-      <div style={{ padding: '24px 28px 48px', maxWidth: 900, margin: '0 auto' }}>
-
-        {/* Stat cards */}
-        {stats && (
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 28 }}>
-            <StatCard label="Need Attention"   value={stats.needAttention}          color="#dc2626" />
-            <StatCard label="Calls Today"      value={stats.callsToday}             color="#d97706" />
-            <StatCard label="Avg Consistency"  value={`${stats.avgConsistency}%`}   color="#16a34a" />
-            <StatCard label="Reorder Due"      value={stats.reorderDue}             color="#2563eb" />
-          </div>
-        )}
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', padding: '12px 12px 0', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           {TABS.map(tab => {
             const active = activeTab === tab.id;
             return (
@@ -469,19 +552,19 @@ export default function DieticianDashboard() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: '8px 18px 10px', border: 'none', background: 'transparent',
-                  cursor: 'pointer', fontSize: 14, fontWeight: active ? 700 : 400,
-                  color: active ? '#1a1a1a' : '#888',
-                  borderBottom: active ? '2px solid #1a1a2e' : '2px solid transparent',
-                  marginBottom: -1, whiteSpace: 'nowrap',
+                  flex: 1, padding: '7px 4px 9px', border: 'none', background: 'transparent',
+                  cursor: 'pointer', fontSize: 12, fontWeight: active ? 700 : 400,
+                  color: active ? '#fff' : 'rgba(255,255,255,0.45)',
+                  borderBottom: `2px solid ${active ? '#c44033' : 'transparent'}`,
+                  marginBottom: -1, whiteSpace: 'nowrap', transition: 'all 0.15s',
                 }}
               >
-                {tab.icon ? `${tab.icon} ` : ''}{tab.label}
+                {tab.label}
                 <span style={{
-                  marginLeft: 6, fontSize: 12, fontWeight: 600,
-                  background: active ? '#1a1a2e' : '#e5e7eb',
-                  color: active ? '#fff' : '#555',
-                  padding: '1px 7px', borderRadius: 99,
+                  marginLeft: 5, fontSize: 10, fontWeight: 600,
+                  background: active ? '#c44033' : 'rgba(255,255,255,0.12)',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.6)',
+                  padding: '1px 6px', borderRadius: 99,
                 }}>
                   {tab.count}
                 </span>
@@ -490,91 +573,66 @@ export default function DieticianDashboard() {
           })}
         </div>
 
-        {/* TODAY'S QUEUE */}
-        {activeTab === 'queue' && queue && (
-          <>
-            <Section icon="🔴" label="URGENT — IMMEDIATE ACTION"   items={queue.urgent}        onViewDetails={setSelectedPhone} />
-            <Section icon="🟡" label="FLAGGED — ADDRESS THIS WEEK" items={queue.flagged}        onViewDetails={setSelectedPhone} />
-            <Section icon="📞" label="SCHEDULED CALLS"             items={queue.scheduledCalls} onViewDetails={setSelectedPhone} />
-            <Section icon="✅" label="REORDER CONVERSATIONS"        items={queue.reorder}        onViewDetails={setSelectedPhone} />
-            <Section icon="⚪" label="NOT IN APP"                   items={queue.airtableOnly}   onViewDetails={setSelectedPhone} />
-            {queueCount === 0 && (queue.airtableOnly || []).length === 0 && (
-              <div style={{ textAlign: 'center', padding: 48, color: '#888' }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
-                <div style={{ fontSize: 16, fontWeight: 600 }}>All caught up!</div>
-                <div style={{ fontSize: 13, marginTop: 6 }}>No patients need attention right now.</div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ALL PATIENTS */}
-        {activeTab === 'all' && (
-          <>
-            {(allPatients || []).length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 48, color: '#888' }}>No patients found.</div>
-            ) : (
-              <>
-                <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>
-                  All {(allPatients || []).length} patients assigned to you
-                </div>
-                {(allPatients || [])
-                  .slice()
-                  .sort((a, b) => {
-                    const na = safeStr(a.mongodb?.name) || safeStr(a.airtable?.customerName);
-                    const nb = safeStr(b.mongodb?.name) || safeStr(b.airtable?.customerName);
-                    return na.localeCompare(nb);
-                  })
-                  .map((item, i) => {
-                    const status = queueStatusMap[item.airtable?.id] || { reason: 'On Track', action: '' };
-                    return (
-                      <PatientCard
-                        key={item.airtable?.id || i}
-                        item={{ ...item, ...status }}
-                        onViewDetails={setSelectedPhone}
-                      />
-                    );
-                  })}
-              </>
-            )}
-          </>
-        )}
-
-        {/* ONBOARDING */}
-        {activeTab === 'onboarding' && (
-          <>
-            {onboardingPatients.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 48, color: '#888' }}>No patients onboarding right now.</div>
-            ) : (
-              <>
-                <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>
-                  Patients in their first week or not yet in the app
-                </div>
-                {onboardingPatients.map((item, i) => {
-                  const isNew = item.mongodb && item.mongodb.currentDay <= 7;
-                  return (
-                    <PatientCard
-                      key={item.airtable?.id || i}
-                      item={{
-                        ...item,
-                        reason: isNew ? 'New Patient' : 'Not in App',
-                        action: isNew ? 'Welcome call' : 'Verify registration',
-                      }}
-                      onViewDetails={setSelectedPhone}
-                    />
-                  );
-                })}
-              </>
-            )}
-          </>
-        )}
+        {/* Scrollable patient list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 10px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+          <LeftPanelContent />
+        </div>
       </div>
 
-      {selectedPhone && (
-        <PatientDetailModal phone={selectedPhone} onClose={() => setSelectedPhone(null)} />
-      )}
+      {/* ── RIGHT PANEL: 60% light ────────────────────────────────────────── */}
+      <div style={{ flex: 1, background: '#f5f6f8', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        {/* Right top: dark header bar */}
+        <div style={{
+          background: '#1a1a2e', padding: '16px 28px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>
+              {greeting || `Good morning, ${name.split(' ')[0]}!`}
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+              {dateStr}
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: '7px 18px', fontSize: 13, fontWeight: 500,
+              background: 'rgba(255,255,255,0.1)', color: '#fff',
+              border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, cursor: 'pointer',
+            }}
+          >
+            Logout
+          </button>
+        </div>
+
+        {/* Stats strip */}
+        {stats && (
+          <div style={{ padding: '16px 24px 0', display: 'flex', gap: 12, flexShrink: 0 }}>
+            <StatCard label="Need Attention"  value={stats.needAttention}         color="#dc2626" />
+            <StatCard label="Calls Today"     value={stats.callsToday}            color="#d97706" />
+            <StatCard label="Avg Consistency" value={`${stats.avgConsistency}%`}  color="#16a34a" />
+            <StatCard label="Reorder Due"     value={stats.reorderDue}            color="#2563eb" />
+          </div>
+        )}
+
+        {/* Detail area */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 32px' }}>
+          {selectedPhone
+            ? <PatientDetailPanel phone={selectedPhone} />
+            : <EmptyState />
+          }
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 99px; }
+      `}</style>
     </div>
   );
 }

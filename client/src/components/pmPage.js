@@ -48,11 +48,29 @@ export default function PMPage() {
   const [isQuickLogMode, setIsQuickLogMode] = useState(false);
   const [quickLogType, setQuickLogType] = useState(null);
 
-  // Check if AM routine is already logged today
+  // Check if AM routine is already logged today.
+  // Uses patient.id (MongoDB ObjectId) as the IndexedDB patientId key,
+  // then falls back to the server if IndexedDB is empty (new device / cleared storage).
   const checkTodayAMRoutine = async () => {
     try {
-      const todayCheckIn = await getTodayCheckIn(patient?.phoneNumber);
-      if (todayCheckIn && todayCheckIn.amRoutine) {
+      const phone = patient?.phone || patient?.phoneNumber;
+      const today = new Date().toISOString().split('T')[0];
+
+      // 1. IndexedDB lookup (patientId is the MongoDB ObjectId stored in patient.id)
+      let todayCheckIn = await getTodayCheckIn(patient?.id);
+
+      // 2. Server fallback — covers new device or cleared IndexedDB
+      if (!todayCheckIn && phone) {
+        try {
+          const res = await fetch(`/api/checkin/${phone}`);
+          if (res.ok) {
+            const checkins = await res.json();
+            todayCheckIn = checkins.find(c => c.date === today);
+          }
+        } catch { /* non-fatal — stay with no data */ }
+      }
+
+      if (todayCheckIn?.amRoutine) {
         setHasAMRoutineToday(true);
         setAmRoutine(todayCheckIn.amRoutine);
         setSunscreen(todayCheckIn.sunscreen || false);
@@ -120,10 +138,26 @@ export default function PMPage() {
   }, [day, patient, navigate]);
 
   useEffect(() => {
-    // Load today's PM check-in if exists
+    // Load today's PM check-in if already submitted
     const loadToday = async () => {
-      const today = await getTodayCheckIn(patient?.phoneNumber);
-      if (today && today.pmRoutine) {
+      const phone = patient?.phone || patient?.phoneNumber;
+      const todayDate = new Date().toISOString().split('T')[0];
+
+      // 1. IndexedDB lookup using correct patientId key
+      let today = await getTodayCheckIn(patient?.id);
+
+      // 2. Server fallback
+      if (!today && phone) {
+        try {
+          const res = await fetch(`/api/checkin/${phone}`);
+          if (res.ok) {
+            const checkins = await res.json();
+            today = checkins.find(c => c.date === todayDate);
+          }
+        } catch { /* non-fatal */ }
+      }
+
+      if (today?.pmRoutine) {
         setPmRoutine(today.pmRoutine);
         setDietFollowed(today.dietFollowed);
         setTriggerFoods(today.triggerFoods || []);
