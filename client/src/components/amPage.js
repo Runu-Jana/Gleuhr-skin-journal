@@ -220,14 +220,19 @@ export default function AMPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-[#191716] font-outfit leading-tight">
-                Your best streak{' '}
-                <span className="text-[#c44033] font-bold font-crimson text-xl">
-                  {streakData?.longestStreak || streakData?.streak || 0}
-                </span>
-                {' '}days
+                {(() => {
+                  const current = streakData?.streak || 0;
+                  const milestones = [7, 14, 28, 56, 84, 90];
+                  const next = milestones.find(m => m > current);
+                  if (!next) return 'You completed the journey! 🎉';
+                  const daysLeft = next - current;
+                  return daysLeft === 1
+                    ? <><span className="text-[#c44033] font-bold font-crimson text-xl">1</span> day to {next}-day milestone!</>
+                    : <><span className="text-[#c44033] font-bold font-crimson text-xl">{daysLeft}</span> days to {next}-day milestone</>;
+                })()}
               </p>
               <p className="text-xs text-[#a39e95] font-outfit mt-0.5">
-                Red Hot flame · {consistency}% consistent
+                Current streak: <span className="font-semibold text-[#191716]">{streakData?.streak || 0}</span> days · {consistency}% consistent
               </p>
             </div>
             <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.06)] flex-shrink-0">
