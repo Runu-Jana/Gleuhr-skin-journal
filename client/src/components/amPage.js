@@ -200,7 +200,7 @@ export default function AMPage() {
     <div className="min-h-screen bg-[#ede9e4] pb-24">
 
       {/* Card */}
-      <div className="mx-4 mt-8 bg-white rounded-[28px] shadow-sm overflow-hidden">
+      <div className="mx-4 mt-14 bg-white rounded-[28px] shadow-sm overflow-hidden">
         <div className="px-5 pt-8 pb-8">
 
           {/* MORNING CHECK-IN label */}
@@ -235,19 +235,6 @@ export default function AMPage() {
               <span className="text-sm font-bold text-[#c44033] font-outfit">{availableShields}</span>
             </div>
           </div>
-
-          {/* Tough day / Quick log row */}
-          <button
-            onClick={() => setShowShieldRestore(true)}
-            className="w-full flex items-center justify-between px-4 py-4 bg-white border border-[#ede9e4] rounded-[18px] mb-3"
-          >
-            <span className="text-sm text-[#7a756d] font-outfit">
-              Tough day? <span className="font-bold text-[#3d3935]">Quick log</span>
-            </span>
-            <svg className="w-4 h-4 text-[#b0ab9f]" fill="none" viewBox="0 0 16 16">
-              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
 
           {/* AM Routine toggle */}
           <div className="bg-white border border-[#ede9e4] rounded-[18px] px-4 py-4 flex items-center justify-between mb-3">

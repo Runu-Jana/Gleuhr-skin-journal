@@ -399,7 +399,7 @@ export default function HomeScreen() {
       </div>
 
       {/* Reorder Banner */}
-      <div className="mx-0 my-4 px-5 py-4 bg-gradient-to-br from-[rgba(196,64,51,0.03)] to-[rgba(196,64,51,0.016)] rounded-[16px] border border-[rgba(196,64,51,0.094)] flex justify-between items-center">
+      <div className="mx-5 my-4 px-5 py-4 bg-gradient-to-br from-[rgba(196,64,51,0.03)] to-[rgba(196,64,51,0.016)] rounded-[16px] border border-[rgba(196,64,51,0.094)] flex justify-between items-center">
         <div className="flex-1 mr-3">
           <p className="text-sm font-semibold text-[#c44033] font-outfit">Products running low</p>
           <p className="text-xs text-[#5c574f] font-outfit mt-0.5 leading-[1.4]">A gap resets your melanin suppression.</p>
