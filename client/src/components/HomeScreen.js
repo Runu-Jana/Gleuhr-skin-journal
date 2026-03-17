@@ -318,9 +318,11 @@ export default function HomeScreen() {
             <div className="text-sm font-semibold text-[#191716] font-crimson tracking-[-0.2px]">
               Current streak <span className="text-[#c44033] font-crimson text-xl font-bold ml-1">{localStreak.currentStreak || streakData?.streak || 0}</span> <span className="text-xs text-[#7a756d] font-crimson">days</span>
             </div>
-            <div className="text-xs text-[#a39e95] font-crimson mt-0.5 mb-0.5">
-              Best: <span className="font-semibold text-[#191716]">{localStreak.longestStreak || streakData?.longestStreak || 0}</span> days
-            </div>
+            {(localStreak.currentStreak || streakData?.streak || 0) === 0 && (localStreak.longestStreak || streakData?.longestStreak || 0) > 0 && (
+              <div className="text-xs text-[#a39e95] font-crimson mt-0.5 mb-0.5">
+                Best: <span className="font-semibold text-[#191716]">{localStreak.longestStreak || streakData?.longestStreak || 0}</span> days
+              </div>
+            )}
             <div className="text-xs text-[#a39e95] font-outfit mt-0.5 flex items-center gap-1.5">
               <span>Red Hot flame</span>
               <span className="w-0.5 h-0.5 rounded-[2px] bg-[#ccc8c0]"></span>
