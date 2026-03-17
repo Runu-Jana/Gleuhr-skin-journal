@@ -222,7 +222,10 @@ export default function AMPage() {
               <p className="text-sm font-semibold text-[#191716] font-outfit leading-tight">
                 {(() => {
                   const current = streakData?.streak || 0;
-                  if (current === 0) return 'Log today to start your streak 🔥';
+                  if (current === 0) {
+                    if (hasSubmitted) return 'Amazing! Log your PM routine tonight to build your streak 🌙';
+                    return 'Log today to start your streak 🔥';
+                  }
                   const milestones = [7, 14, 28, 56, 84, 90];
                   const next = milestones.find(m => m > current);
                   if (!next) return 'You completed the journey! 🎉';
