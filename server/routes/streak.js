@@ -36,10 +36,17 @@ router.get('/:phone', async (req, res) => {
     });
 
     if (!streak) {
+      const currentMonth = new Date().toISOString().slice(0, 7);
       return res.json({
         streak: 0,
         longestStreak: 0,
         shields: 0,
+        restorationShields: {
+          available: 3,
+          monthly: 3,
+          used: 0,
+          lastResetMonth: currentMonth
+        },
         lastCheckin: null,
         day: patient.currentDay || 1
       });
