@@ -523,9 +523,9 @@ export default function DieticianDashboard() {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* ── LEFT PANEL: 40% dark ─────────────────────────────────────────── */}
+      {/* ── LEFT PANEL: 20% dark ─────────────────────────────────────────── */}
       <div style={{
-        width: '40%', minWidth: 300, background: '#1a1a2e',
+        width: '20%', minWidth: 300, background: '#1a1a2e',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
         borderRight: '1px solid rgba(255,255,255,0.07)',
       }}>
