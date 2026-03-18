@@ -574,7 +574,7 @@ function PatientDetailPanel({ phone, onBack }) {
               padding: '9px 18px', cursor: 'pointer', fontWeight: 600, fontSize: 13,
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              🔥 Log Call
+              📞 Log Call
             </button>
           </div>
         </div>
