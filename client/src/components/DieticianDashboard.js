@@ -285,16 +285,47 @@ function PatientDetailPanel({ phone, onBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [noteText, setNoteText]   = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+  const [notes, setNotes]         = useState([]);
+  const [showAllNotes, setShowAllNotes] = useState(false);
+  const [notesLoading, setNotesLoading] = useState(false);
+
+  const fetchNotes = () => {
+    setNotesLoading(true);
+    api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/notes`)
+      .then(res => setNotes(res.data.notes || []))
+      .catch(() => {})
+      .finally(() => setNotesLoading(false));
+  };
 
   useEffect(() => {
     setData(null);
     setLoading(true);
     setError('');
+    setNoteText('');
+    setNotes([]);
+    setShowAllNotes(false);
     api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/details`)
       .then(res => setData(res.data.data))
       .catch(err => setError(err.response?.data?.error || 'Failed to load'))
       .finally(() => setLoading(false));
-  }, [phone]);
+    fetchNotes();
+  }, [phone]); // eslint-disable-line
+
+  const handleSaveNote = async () => {
+    if (!noteText.trim()) return;
+    setSavingNote(true);
+    try {
+      await api.post(`/api/dietician/patient/${encodeURIComponent(phone)}/notes`, { note: noteText });
+      setNoteText('');
+      fetchNotes();
+    } catch (e) {
+      alert('Failed to save note');
+    } finally {
+      setSavingNote(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -410,13 +441,6 @@ function PatientDetailPanel({ phone, onBack }) {
                     <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Shields</div>
                   </div>
                 </div>
-                <button style={{
-                  border: '1.5px solid #c44033', color: '#c44033', background: '#fff',
-                  borderRadius: 99, padding: '6px 16px', fontSize: 12, cursor: 'pointer',
-                  fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5,
-                }}>
-                  🔥 Restore Shield
-                </button>
               </div>
             )}
 
@@ -441,13 +465,59 @@ function PatientDetailPanel({ phone, onBack }) {
               <SectionHeading label="COACH NOTES" />
               <textarea
                 rows={4}
-                placeholder="Add notes about this patient…"
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                placeholder="Add a note about this patient…"
                 style={{
                   width: '100%', border: '1px solid #e5e7eb', borderRadius: 8,
                   padding: '10px 12px', fontSize: 13, color: '#444', resize: 'vertical',
                   fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
                 }}
               />
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button
+                  onClick={handleSaveNote}
+                  disabled={savingNote || !noteText.trim()}
+                  style={{
+                    background: noteText.trim() ? '#c44033' : '#e5e7eb',
+                    color: noteText.trim() ? '#fff' : '#aaa',
+                    border: 'none', borderRadius: 8, padding: '8px 18px',
+                    fontSize: 13, fontWeight: 600, cursor: noteText.trim() ? 'pointer' : 'default',
+                  }}
+                >
+                  {savingNote ? 'Saving…' : 'Save Note'}
+                </button>
+                <button
+                  onClick={() => { setShowAllNotes(v => !v); if (!showAllNotes) fetchNotes(); }}
+                  style={{
+                    background: 'transparent', color: '#c44033',
+                    border: '1.5px solid #c44033', borderRadius: 8, padding: '8px 18px',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {showAllNotes ? 'Hide Notes' : 'Show All Notes'}
+                </button>
+              </div>
+
+              {/* All notes list */}
+              {showAllNotes && (
+                <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {notesLoading && <div style={{ color: '#aaa', fontSize: 13 }}>Loading…</div>}
+                  {!notesLoading && notes.length === 0 && (
+                    <div style={{ color: '#bbb', fontSize: 13 }}>No notes saved yet.</div>
+                  )}
+                  {notes.map((n, i) => (
+                    <div key={n._id || i} style={{ background: '#fafafa', borderRadius: 8, padding: '10px 14px', borderLeft: '3px solid #e5e7eb' }}>
+                      <div style={{ fontSize: 11, color: '#aaa', marginBottom: 5 }}>
+                        {new Date(n.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {' · '}{new Date(n.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        {n.dieticianName && <span style={{ marginLeft: 8, color: '#bbb' }}>· {n.dieticianName}</span>}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#444', lineHeight: 1.5 }}>{n.note}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Airtable-only notice (left column) */}
