@@ -162,15 +162,20 @@ router.get('/:phone', async (req, res) => {
       day: record.dayOfJourney,
       amRoutine: record.amRoutine,
       pmRoutine: record.pmRoutine,
+      sunscreen: record.sunscreen,
+      dietFollowed: record.dietFollowed,
+      triggerFoods: record.triggerFoods,
+      waterIntake: record.waterIntake,
+      skinMood: record.skinMood,
       skinScore: record.skinScore,
       skinScores: record.skinScores,
       mood: record.mood,
       energy: record.energy,
       sleep: record.sleep,
-      waterIntake: record.waterIntake,
       medications: record.medications,
       notes: record.notes,
       symptoms: record.symptoms,
+      quickLogType: record.quickLogType,
       completed: record.completed
     }));
 

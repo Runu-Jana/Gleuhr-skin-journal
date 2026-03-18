@@ -404,6 +404,75 @@ router.get('/patient/:phone/details', async (req, res) => {
 });
 
 /**
+ * GET /api/dietician/patient/:phone/diet
+ * Diet & Compliance data: plan history, trigger foods, water intake, compliance %.
+ */
+router.get('/patient/:phone/diet', async (req, res) => {
+  try {
+    const { phone } = req.params;
+    const phoneVariants = getPhoneVariants(phone);
+    const patientOr  = phoneVariants.flatMap(v => [{ phoneNumber: v }, { phone: v }]);
+    const checkInOr  = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
+
+    const [patient, checkIns14] = await Promise.all([
+      Patient.findOne({ $or: patientOr }).populate('dietPlan').lean(),
+      DailyCheckIn.find({ $or: checkInOr }).sort({ date: -1 }).limit(14).lean(),
+    ]);
+
+    // Trigger food frequency (last 14 days)
+    const foodCount = {};
+    checkIns14.forEach(c => {
+      (c.triggerFoods || []).forEach(food => {
+        if (food) foodCount[food] = (foodCount[food] || 0) + 1;
+      });
+    });
+    const triggerFoodFrequency = Object.entries(foodCount)
+      .map(([food, days]) => ({ food, days }))
+      .sort((a, b) => b.days - a.days);
+
+    // Water intake distribution — saved as 1/2/3/4 (< 1L, 1-2L, 2-3L, 3L+)
+    const waterBuckets = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    let waterTotal = 0, waterCount = 0;
+    checkIns14.forEach(c => {
+      if (c.waterIntake >= 1 && c.waterIntake <= 4) {
+        waterBuckets[c.waterIntake]++;
+        waterTotal += c.waterIntake;
+        waterCount++;
+      }
+    });
+    const waterAvg = waterCount > 0 ? Math.round(waterTotal / waterCount) : 0;
+
+    // Diet compliance — Yes = 1.0, Partial = 0.5, No = 0
+    const daysWithData = checkIns14.filter(c => c.dietFollowed && c.dietFollowed !== 'skipped').length;
+    const dietScore = checkIns14.reduce((sum, c) => {
+      if (c.dietFollowed === 'Yes') return sum + 1;
+      if (c.dietFollowed === 'Partial') return sum + 0.5;
+      return sum;
+    }, 0);
+    const dietCompliance = daysWithData > 0 ? Math.round((dietScore / daysWithData) * 100) : 0;
+
+    // Diet plan history from Patient.dietPlan
+    const dietPlanHistory = patient?.dietPlan ? [{
+      version: patient.dietPlan.version || 'v1',
+      category: patient.dietPlan.category || 'Standard',
+      restrictions: patient.dietPlan.restrictions || [],
+      recommendations: patient.dietPlan.recommendations || [],
+      isActive: patient.dietPlan.isActive !== false,
+      createdAt: patient.dietPlan.createdAt,
+      notes: patient.dietPlan.notes || '',
+    }] : [];
+
+    res.json({
+      success: true,
+      data: { dietPlanHistory, triggerFoodFrequency, waterIntake: { buckets: waterBuckets, average: waterAvg }, dietCompliance },
+    });
+  } catch (error) {
+    console.error('Dietician patient diet error:', error);
+    res.status(500).json({ error: 'Failed to fetch diet data' });
+  }
+});
+
+/**
  * GET /api/dietician/patient/:phone/notes
  * Return all coach notes for a patient (newest first).
  */
