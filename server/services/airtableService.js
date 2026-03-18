@@ -5,9 +5,11 @@ const axios = require('axios');
 let base = null;
 const DIET_PLAN_TABLE = process.env.AIRTABLE_DIET_PLAN_TABLE || 'Diet Plan';
 const TREATMENT_PLAN_TABLE = process.env.AIRTABLE_TREATMENT_PLAN_TABLE || 'Treatment Plan';
+const PRODUCTS_TABLE = process.env.AIRTABLE_PRODUCTS_TABLE || 'Products';
 
-// In-memory cache for Treatment Plan record lookups (record ID → name)
+// In-memory caches for linked-record lookups (record ID → resolved name)
 const treatmentPlanCache = {};
+const productNameCache = {};
 
 console.log('Airtable Configuration Check:');
 console.log('AIRTABLE_PAT exists:', !!process.env.AIRTABLE_PAT);
@@ -29,7 +31,7 @@ if (process.env.AIRTABLE_PAT && process.env.AIRTABLE_BASE_ID) {
  *   Field Name             | Type           | API Returns
  *   -----------------------|----------------|----------------------------------
  *   ID                     | Auto-number    | number
- *   Treatment Plan         | Text           | string ("TP-2368")
+ *   Treatment Plan         | Linked Record  | array of record IDs (to Treatment Plan table → "Treatment ID" formula field)
  *   Customer               | Linked Record  | array of record IDs (to Contact table)
  *   Dial Code              | Single Select  | string ("91")
  *   Name                   | Lookup         | array of strings (from Contact table)
@@ -39,7 +41,7 @@ if (process.env.AIRTABLE_PAT && process.env.AIRTABLE_BASE_ID) {
  *   Dietician Call Status  | Single Select  | string ("Call Pending")
  *   Diet Plan Status       | Single Select  | string ("Diet Plan Shared")
  *   Diet Plan Date         | Date           | string ("2026-03-14")
- *   Products               | Lookup/Multi   | array of strings (product names)
+ *   Products               | Linked Record  | array of record IDs (to Products table → "Product Name" field)
  *
  * NOTE: Lookup fields return ARRAYS even for single values.
  *       Use extractLookup() to safely get the first value.
@@ -127,7 +129,8 @@ function mapRecord(record) {
 }
 
 /**
- * Resolve a linked Treatment Plan record ID to its human-readable name (e.g. "TP-2112").
+ * Resolve a linked Treatment Plan record ID to its "Treatment ID" value (e.g. "TP-2112").
+ * The Treatment Plan table has a formula field called "Treatment ID".
  * Falls back to the raw record ID if the fetch fails.
  */
 async function fetchTreatmentPlanName(recordId) {
@@ -141,12 +144,9 @@ async function fetchTreatmentPlanName(recordId) {
     const record = await new Promise((resolve, reject) =>
       base(TREATMENT_PLAN_TABLE).find(id, (err, rec) => err ? reject(err) : resolve(rec))
     );
-    // Try common primary-field names used by Treatment Plan tables
     const name =
+      record.get('Treatment ID') ||
       record.get('Name') ||
-      record.get('Treatment Plan') ||
-      record.get('Title') ||
-      record.get('ID') ||
       id;
     treatmentPlanCache[id] = String(name);
     return treatmentPlanCache[id];
@@ -155,6 +155,52 @@ async function fetchTreatmentPlanName(recordId) {
     treatmentPlanCache[id] = id;
     return id;
   }
+}
+
+/**
+ * Resolve a linked Product record ID to its "Product Name" value.
+ * Falls back to the raw record ID if the fetch fails.
+ */
+async function fetchProductName(recordId) {
+  if (!base || !recordId) return '';
+  const id = String(recordId).trim();
+  if (!id.startsWith('rec')) return id; // already a plain name
+
+  if (productNameCache[id] !== undefined) return productNameCache[id];
+
+  try {
+    const record = await new Promise((resolve, reject) =>
+      base(PRODUCTS_TABLE).find(id, (err, rec) => err ? reject(err) : resolve(rec))
+    );
+    const name =
+      record.get('Product Name') ||
+      record.get('Name') ||
+      id;
+    productNameCache[id] = String(name);
+    return productNameCache[id];
+  } catch (e) {
+    console.warn('Could not fetch Product record:', id, e.message);
+    productNameCache[id] = id;
+    return id;
+  }
+}
+
+/**
+ * Resolve all linked record IDs in a mapped diet plan record.
+ * Resolves Treatment Plan ID → "TP-XXXX" and Product IDs → product names.
+ */
+async function resolveLinkedRecords(record) {
+  // Resolve Treatment Plan
+  if (record.treatmentPlan && record.treatmentPlan.startsWith('rec')) {
+    record.treatmentPlan = await fetchTreatmentPlanName(record.treatmentPlan);
+  }
+  // Resolve Products
+  if (record.products && record.products.length > 0) {
+    record.products = await Promise.all(
+      record.products.map(p => p.startsWith('rec') ? fetchProductName(p) : Promise.resolve(p))
+    );
+  }
+  return record;
 }
 
 const TEAM_TABLE = process.env.AIRTABLE_TEAM_TABLE || 'Team';
@@ -207,12 +253,8 @@ async function fetchAllDietPlans() {
         (err) => err ? reject(err) : resolve(records)
       );
   });
-  // Resolve linked Treatment Plan record IDs to human-readable names
-  await Promise.all(records.map(async (r) => {
-    if (r.treatmentPlan && r.treatmentPlan.startsWith('rec')) {
-      r.treatmentPlan = await fetchTreatmentPlanName(r.treatmentPlan);
-    }
-  }));
+  // Resolve linked record IDs (Treatment Plan + Products) to human-readable names
+  await Promise.all(records.map(r => resolveLinkedRecords(r)));
   return records;
 }
 
@@ -227,7 +269,7 @@ async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
 
   const records = [];
 
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     base(DIET_PLAN_TABLE)
       .select({
         pageSize: 100,
@@ -256,12 +298,8 @@ async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
         }
       );
   });
-  // Resolve linked Treatment Plan record IDs to human-readable names
-  await Promise.all(records.map(async (r) => {
-    if (r.treatmentPlan && r.treatmentPlan.startsWith('rec')) {
-      r.treatmentPlan = await fetchTreatmentPlanName(r.treatmentPlan);
-    }
-  }));
+  // Resolve linked record IDs (Treatment Plan + Products) to human-readable names
+  await Promise.all(records.map(r => resolveLinkedRecords(r)));
   return records;
 }
 
