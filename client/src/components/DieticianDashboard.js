@@ -279,6 +279,189 @@ function SectionHeading({ label }) {
   );
 }
 
+// ── Diet & Compliance tab ────────────────────────────────────────────────────
+const WATER_LABELS = { 1: '< 1L', 2: '1–2L', 3: '2–3L', 4: '3L+' };
+
+function DietComplianceTab({ phone, card }) {
+  const [dietData, setDietData] = useState(null);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    setDietData(null);
+    setLoading(true);
+    api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/diet`)
+      .then(res => setDietData(res.data.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [phone]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#aaa' }}>
+        <div style={{ width: 24, height: 24, border: '3px solid #c44033', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      </div>
+    );
+  }
+
+  const { dietPlanHistory = [], triggerFoodFrequency = [], waterIntake = {}, dietCompliance = 0 } = dietData || {};
+  const maxTriggerDays = triggerFoodFrequency[0]?.days || 1;
+
+  // Colour for trigger food bar based on frequency
+  const triggerColor = (days) => days >= 7 ? '#dc2626' : days >= 4 ? '#d97706' : '#ca8a04';
+
+  // Water bucket widths (% of total days logged)
+  const totalWaterLogs = Object.values(waterIntake.buckets || {}).reduce((a, b) => a + b, 0) || 1;
+  const avgBucket = waterIntake.average || 0;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '55% 1fr', gap: 16 }}>
+
+      {/* ── Left: Diet Plan History ── */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <SectionHeading label="DIET PLAN HISTORY" />
+          <button style={{
+            background: '#c44033', color: '#fff', border: 'none',
+            borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}>
+            + Log Diet Change
+          </button>
+        </div>
+
+        {dietPlanHistory.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#bbb', padding: '30px 0', fontSize: 13 }}>
+            No diet plan recorded yet.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {dietPlanHistory.map((plan, i) => (
+              <div key={i} style={{
+                border: `1.5px solid ${plan.isActive ? '#c4b5fd' : '#e5e7eb'}`,
+                borderRadius: 12, padding: '14px 16px',
+                background: plan.isActive ? 'rgba(196,181,253,0.07)' : '#fafafa',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#555' }}>
+                    v{i + 1}
+                  </span>
+                  {plan.isActive && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                      background: '#ede9fe', color: '#7c3aed', letterSpacing: '0.05em',
+                    }}>
+                      ACTIVE
+                    </span>
+                  )}
+                  {plan.createdAt && (
+                    <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aaa' }}>
+                      {new Date(plan.createdAt).toISOString().split('T')[0]}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 8 }}>
+                  {plan.category}
+                </div>
+                {plan.restrictions.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {plan.restrictions.map((r, j) => (
+                      <span key={j} style={{
+                        fontSize: 11, padding: '3px 10px', borderRadius: 99,
+                        background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe',
+                      }}>
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {plan.notes && (
+                  <div style={{ fontSize: 12, color: '#888', fontStyle: 'italic' }}>
+                    "{plan.notes}"
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Right: Trigger Foods + Water + Compliance ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Trigger Food Frequency */}
+        <div style={card}>
+          <SectionHeading label="TRIGGER FOOD FREQUENCY (14 DAYS)" />
+          {triggerFoodFrequency.length === 0 ? (
+            <div style={{ color: '#bbb', fontSize: 13 }}>No trigger foods reported.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {triggerFoodFrequency.map(({ food, days }) => (
+                <div key={food}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                    <span style={{ color: '#444', fontWeight: 500 }}>{food}</span>
+                    <span style={{ fontWeight: 700, color: triggerColor(days) }}>{days} days</span>
+                  </div>
+                  <div style={{ background: '#f0f0f0', borderRadius: 99, height: 7, overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${(days / 14) * 100}%`,
+                      background: triggerColor(days),
+                      height: '100%', borderRadius: 99, transition: 'width 0.4s',
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Water Intake (Avg) */}
+        <div style={card}>
+          <SectionHeading label="WATER INTAKE (AVG)" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[1, 2, 3, 4].map(bucket => {
+              const isActive = bucket === avgBucket;
+              return (
+                <div key={bucket} style={{
+                  flex: 1, textAlign: 'center', padding: '10px 6px', borderRadius: 10,
+                  border: `1.5px solid ${isActive ? '#3b82f6' : '#e5e7eb'}`,
+                  background: isActive ? '#eff6ff' : '#fafafa',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: isActive ? 700 : 400, color: isActive ? '#2563eb' : '#aaa' }}>
+                    {WATER_LABELS[bucket]}
+                  </div>
+                  {totalWaterLogs > 1 && (
+                    <div style={{ fontSize: 10, color: '#bbb', marginTop: 3 }}>
+                      {waterIntake.buckets?.[bucket] || 0}d
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Diet Compliance */}
+        <div style={card}>
+          <SectionHeading label="DIET COMPLIANCE" />
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#444', marginBottom: 5 }}>
+              <span>Overall</span>
+              <span style={{ fontWeight: 700, color: dietCompliance >= 70 ? '#16a34a' : '#c44033' }}>
+                {dietCompliance}%
+              </span>
+            </div>
+            <div style={{ background: '#f0f0f0', borderRadius: 99, height: 7, overflow: 'hidden' }}>
+              <div style={{
+                width: `${dietCompliance}%`,
+                background: '#c44033', height: '100%', borderRadius: 99, transition: 'width 0.4s',
+              }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Right panel: patient detail ──────────────────────────────────────────────
 function PatientDetailPanel({ phone, onBack }) {
   const [data, setData]       = useState(null);
@@ -643,8 +826,13 @@ function PatientDetailPanel({ phone, onBack }) {
         </div>
       )}
 
+      {/* ── Diet & Compliance tab ── */}
+      {activeTab === 'diet' && (
+        <DietComplianceTab phone={phone} card={card} />
+      )}
+
       {/* ── Other tabs (placeholder) ── */}
-      {activeTab !== 'overview' && (
+      {(activeTab === 'photos' || activeTab === 'calls') && (
         <div style={{ background: '#fff', borderRadius: 14, padding: '40px', textAlign: 'center', color: '#bbb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#ccc' }}>Coming soon</div>
