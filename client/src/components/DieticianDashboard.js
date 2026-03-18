@@ -752,9 +752,9 @@ export default function DieticianDashboard() {
   });
 
   const TABS = [
-    { id: 'queue',      label: "Today's Queue", count: queueCount },
-    { id: 'all',        label: 'All Patients',  count: totalCount || 0 },
-    { id: 'onboarding', label: 'Onboarding',    count: onboardingCount ?? onboardingPatients.length },
+    { id: 'queue',      label: "Today's Queue", shortLabel: 'Queue',      count: queueCount },
+    { id: 'all',        label: 'All Patients',  shortLabel: 'All',        count: totalCount || 0 },
+    { id: 'onboarding', label: 'Onboarding',   shortLabel: 'Onboarding', count: onboardingCount ?? onboardingPatients.length },
   ];
 
   // ── Render left panel content based on active tab ─────────────────────────
@@ -836,7 +836,7 @@ export default function DieticianDashboard() {
             GLEUHR
           </div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
-            {name.startsWith('Dt') ? name : `Dt. ${name.split(' ')[0]}`}
+            {`Dt. ${name.replace(/^Dt\.?\s*/i, '').split(' ')[0]}`}
           </div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
             {totalCount || 0} active patients
@@ -844,7 +844,7 @@ export default function DieticianDashboard() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', padding: '12px 12px 0', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ display: 'flex', padding: '10px 10px 0', gap: 2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           {TABS.map(tab => {
             const active = activeTab === tab.id;
             return (
@@ -852,19 +852,20 @@ export default function DieticianDashboard() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  flex: 1, padding: '7px 4px 9px', border: 'none', background: 'transparent',
-                  cursor: 'pointer', fontSize: 12, fontWeight: active ? 700 : 400,
+                  flex: 1, padding: '6px 4px 8px', border: 'none', background: 'transparent',
+                  cursor: 'pointer', fontSize: 11, fontWeight: active ? 700 : 400,
                   color: active ? '#fff' : 'rgba(255,255,255,0.45)',
                   borderBottom: `2px solid ${active ? '#c44033' : 'transparent'}`,
                   marginBottom: -1, whiteSpace: 'nowrap', transition: 'all 0.15s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 }}
               >
-                {tab.label}
+                {tab.shortLabel || tab.label}
                 <span style={{
-                  marginLeft: 5, fontSize: 10, fontWeight: 600,
+                  fontSize: 10, fontWeight: 700,
                   background: active ? '#c44033' : 'rgba(255,255,255,0.12)',
-                  color: active ? '#fff' : 'rgba(255,255,255,0.6)',
-                  padding: '1px 6px', borderRadius: 99,
+                  color: active ? '#fff' : 'rgba(255,255,255,0.55)',
+                  padding: '1px 5px', borderRadius: 99, flexShrink: 0,
                 }}>
                   {tab.count}
                 </span>
