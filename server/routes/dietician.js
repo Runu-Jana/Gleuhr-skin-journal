@@ -5,6 +5,7 @@ const Streak = require('../models/Streak');
 const DailyCheckIn = require('../models/DailyCheckIn');
 const SkinScore = require('../models/SkinScore');
 const WeeklyPhoto = require('../models/WeeklyPhoto');
+const CoachNote = require('../models/CoachNote');
 const { fetchAllDietPlans, fetchDietPlans } = require('../services/airtableService');
 const dieticianAuth = require('../middleware/dieticianAuth');
 
@@ -399,6 +400,43 @@ router.get('/patient/:phone/details', async (req, res) => {
   } catch (error) {
     console.error('Dietician patient details error:', error);
     res.status(500).json({ error: 'Failed to fetch patient details' });
+  }
+});
+
+/**
+ * GET /api/dietician/patient/:phone/notes
+ * Return all coach notes for a patient (newest first).
+ */
+router.get('/patient/:phone/notes', async (req, res) => {
+  try {
+    const phoneVariants = getPhoneVariants(req.params.phone);
+    const notes = await CoachNote.find({ patientPhone: { $in: phoneVariants } })
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ success: true, notes });
+  } catch (err) {
+    console.error('Fetch notes error:', err);
+    res.status(500).json({ error: 'Failed to fetch notes' });
+  }
+});
+
+/**
+ * POST /api/dietician/patient/:phone/notes
+ * Save a new coach note for a patient.
+ */
+router.post('/patient/:phone/notes', async (req, res) => {
+  try {
+    const { note } = req.body;
+    if (!note || !note.trim()) return res.status(400).json({ error: 'Note is empty' });
+    const saved = await CoachNote.create({
+      patientPhone: req.params.phone,
+      dieticianName: req.dietician?.name || '',
+      note: note.trim(),
+    });
+    res.json({ success: true, note: saved });
+  } catch (err) {
+    console.error('Save note error:', err);
+    res.status(500).json({ error: 'Failed to save note' });
   }
 });
 
