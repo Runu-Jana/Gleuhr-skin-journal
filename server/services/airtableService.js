@@ -4,6 +4,10 @@ const axios = require('axios');
 // Configure Airtable (only if credentials are provided)
 let base = null;
 const DIET_PLAN_TABLE = process.env.AIRTABLE_DIET_PLAN_TABLE || 'Diet Plan';
+const TREATMENT_PLAN_TABLE = process.env.AIRTABLE_TREATMENT_PLAN_TABLE || 'Treatment Plan';
+
+// In-memory cache for Treatment Plan record lookups (record ID → name)
+const treatmentPlanCache = {};
 
 console.log('Airtable Configuration Check:');
 console.log('AIRTABLE_PAT exists:', !!process.env.AIRTABLE_PAT);
@@ -122,6 +126,37 @@ function mapRecord(record) {
   };
 }
 
+/**
+ * Resolve a linked Treatment Plan record ID to its human-readable name (e.g. "TP-2112").
+ * Falls back to the raw record ID if the fetch fails.
+ */
+async function fetchTreatmentPlanName(recordId) {
+  if (!base || !recordId) return '';
+  const id = String(recordId).trim();
+  if (!id.startsWith('rec')) return id; // already a plain name/text
+
+  if (treatmentPlanCache[id] !== undefined) return treatmentPlanCache[id];
+
+  try {
+    const record = await new Promise((resolve, reject) =>
+      base(TREATMENT_PLAN_TABLE).find(id, (err, rec) => err ? reject(err) : resolve(rec))
+    );
+    // Try common primary-field names used by Treatment Plan tables
+    const name =
+      record.get('Name') ||
+      record.get('Treatment Plan') ||
+      record.get('Title') ||
+      record.get('ID') ||
+      id;
+    treatmentPlanCache[id] = String(name);
+    return treatmentPlanCache[id];
+  } catch (e) {
+    console.warn('Could not fetch Treatment Plan record:', id, e.message);
+    treatmentPlanCache[id] = id;
+    return id;
+  }
+}
+
 const TEAM_TABLE = process.env.AIRTABLE_TEAM_TABLE || 'Team';
 
 /**
@@ -161,7 +196,7 @@ async function fetchTeamMembers() {
 async function fetchAllDietPlans() {
   if (!base) return [];
   const records = [];
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     base(DIET_PLAN_TABLE)
       .select({ pageSize: 100, sort: [{ field: 'ID', direction: 'desc' }] })
       .eachPage(
@@ -172,6 +207,13 @@ async function fetchAllDietPlans() {
         (err) => err ? reject(err) : resolve(records)
       );
   });
+  // Resolve linked Treatment Plan record IDs to human-readable names
+  await Promise.all(records.map(async (r) => {
+    if (r.treatmentPlan && r.treatmentPlan.startsWith('rec')) {
+      r.treatmentPlan = await fetchTreatmentPlanName(r.treatmentPlan);
+    }
+  }));
+  return records;
 }
 
 async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
@@ -214,6 +256,13 @@ async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
         }
       );
   });
+  // Resolve linked Treatment Plan record IDs to human-readable names
+  await Promise.all(records.map(async (r) => {
+    if (r.treatmentPlan && r.treatmentPlan.startsWith('rec')) {
+      r.treatmentPlan = await fetchTreatmentPlanName(r.treatmentPlan);
+    }
+  }));
+  return records;
 }
 
 /**
@@ -343,6 +392,7 @@ module.exports = {
   fetchDietPlanById,
   fetchAllDietPlans,
   fetchTeamMembers,
+  fetchTreatmentPlanName,
   extractArray,
   uploadPhotoToAirtable,
 };

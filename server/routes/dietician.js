@@ -252,7 +252,34 @@ router.get('/patient/:phone/details', async (req, res) => {
     ]);
 
     if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+      // Patient not in MongoDB — return Airtable-only data so the UI can still show details
+      const airtablePlan = airtablePlans.length > 0 ? airtablePlans[0] : null;
+      return res.json({
+        success: true,
+        data: {
+          airtableOnly: true,
+          patient: {
+            id: null,
+            name: airtablePlan?.customerName || 'Unknown',
+            phone: airtablePlan?.fullPhone || airtablePlan?.customerPhone || phone,
+            email: '',
+            skinConcern: '',
+            planType: '',
+            startDate: null,
+            currentDay: null,
+            totalPoints: 0,
+            level: 1,
+            products: [],
+          },
+          dietPlan: airtablePlan,
+          streak: null,
+          consistency: null,
+          reorder: { planEndDate: null, daysRemaining: 0 },
+          weekGrid: [],
+          skinTrajectory: [],
+          last7Moods: [],
+        }
+      });
     }
 
     const currentStreak = streak?.currentStreak || 0;

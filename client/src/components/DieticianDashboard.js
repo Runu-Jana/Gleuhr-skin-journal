@@ -181,27 +181,110 @@ function SectionLeft({ icon, label, items, selectedPhone, onSelect }) {
   );
 }
 
-// ── Consistency bar (right panel detail) ────────────────────────────────────
+// ── Consistency bar ──────────────────────────────────────────────────────────
 function ConsistencyBar({ label, value }) {
   const color = value >= 75 ? '#16a34a' : value >= 50 ? '#ca8a04' : '#dc2626';
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 4 }}>
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#444', marginBottom: 5 }}>
         <span>{label}</span>
-        <span style={{ fontWeight: 600, color }}>{value}%</span>
+        <span style={{ fontWeight: 700, color }}>{value}%</span>
       </div>
-      <div style={{ background: '#f0f0f0', borderRadius: 99, height: 6, overflow: 'hidden' }}>
-        <div style={{ width: `${value}%`, background: color, height: '100%', borderRadius: 99, transition: 'width 0.4s' }} />
+      <div style={{ background: '#f0f0f0', borderRadius: 99, height: 7, overflow: 'hidden' }}>
+        <div style={{ width: `${value}%`, background: '#c44033', height: '100%', borderRadius: 99, transition: 'width 0.4s' }} />
       </div>
     </div>
   );
 }
 
-// ── Right panel: patient detail (inline, no modal) ──────────────────────────
-function PatientDetailPanel({ phone }) {
+// ── Skin score mini bar chart ────────────────────────────────────────────────
+function SkinScoreChart({ data }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, minHeight: 80 }}>
+      {data.map(({ day, totalScore }) => (
+        <div key={day} style={{ flex: 1, textAlign: 'center' }}>
+          {totalScore != null ? (
+            <>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#c44033', marginBottom: 6 }}>{totalScore}</div>
+              <div style={{ height: 48, background: 'rgba(196,64,51,0.12)', borderRadius: 6, display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: `${Math.max(10, (totalScore / 20) * 100)}%`, background: 'rgba(196,64,51,0.35)', borderRadius: 4 }} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ color: '#ccc', marginBottom: 6, fontSize: 16 }}>—</div>
+              <div style={{ height: 48 }} />
+            </>
+          )}
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Day {day}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── This week grid (AM + PM rows) ────────────────────────────────────────────
+function WeekGrid({ weekGrid, last7Moods }) {
+  const Check = ({ val, isFuture }) => {
+    if (isFuture) return <span style={{ color: '#ccc', fontSize: 13 }}>—</span>;
+    if (val === true)  return <span style={{ color: '#16a34a', fontSize: 15 }}>✓</span>;
+    if (val === false) return <span style={{ color: '#dc2626', fontSize: 15 }}>✗</span>;
+    return <span style={{ color: '#ccc', fontSize: 13 }}>—</span>;
+  };
+  const moodEmoji = (m) => ({ happy: '😄', good: '😊', neutral: '😐', sad: '😞', bad: '😟' }[m] || '—');
+  return (
+    <div>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+        <div style={{ width: 28, fontSize: 11, color: '#bbb' }} />
+        {weekGrid.map((d, i) => (
+          <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#999' }}>{d.dayLabel}</div>
+        ))}
+      </div>
+      {/* AM row */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+        <div style={{ width: 28, fontSize: 11, color: '#888', fontWeight: 600 }}>AM</div>
+        {weekGrid.map((d, i) => (
+          <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+            <Check val={d.amCompleted} isFuture={d.isFuture} />
+          </div>
+        ))}
+      </div>
+      {/* PM row */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ width: 28, fontSize: 11, color: '#888', fontWeight: 600 }}>PM</div>
+        {weekGrid.map((d, i) => (
+          <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+            <Check val={d.pmCompleted} isFuture={d.isFuture} />
+          </div>
+        ))}
+      </div>
+      {/* Skin Mood */}
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#aaa', letterSpacing: '0.08em', marginBottom: 8 }}>SKIN MOOD (7 DAYS)</div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {(last7Moods || []).map((mood, i) => (
+          <div key={i} style={{ fontSize: 20 }}>{moodEmoji(mood)}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Section heading ──────────────────────────────────────────────────────────
+function SectionHeading({ label }) {
+  return (
+    <div style={{ fontSize: 10, fontWeight: 700, color: '#aaa', letterSpacing: '0.1em', marginBottom: 14 }}>
+      {label}
+    </div>
+  );
+}
+
+// ── Right panel: patient detail ──────────────────────────────────────────────
+function PatientDetailPanel({ phone, onBack }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     setData(null);
@@ -216,7 +299,7 @@ function PatientDetailPanel({ phone }) {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#aaa' }}>
-        <div>
+        <div style={{ textAlign: 'center' }}>
           <div style={{ width: 28, height: 28, border: '3px solid #c44033', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 10px' }} />
           Loading patient…
         </div>
@@ -230,124 +313,271 @@ function PatientDetailPanel({ phone }) {
 
   if (!data) return null;
 
-  return (
-    <div style={{ maxWidth: 680 }}>
+  const { patient, dietPlan, streak, consistency, reorder, weekGrid, skinTrajectory, last7Moods, airtableOnly } = data;
+  const daysAbsent = streak?.daysAbsent || 0;
+  const card = { background: '#fff', borderRadius: 14, padding: '18px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
-      {/* Patient header card */}
-      <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
+  return (
+    <div style={{ maxWidth: 1020 }}>
+
+      {/* ← Back */}
+      {onBack && (
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#888', marginBottom: 14, padding: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+          ← Back to queue
+        </button>
+      )}
+
+      {/* ── Header ── */}
+      <div style={{ ...card, marginBottom: 16, padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Avatar */}
           <div style={{
-            width: 52, height: 52, borderRadius: 14, background: getAvatarColor(data.patient.name),
+            width: 56, height: 56, borderRadius: 14, background: getAvatarColor(patient.name),
             color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, fontWeight: 700, flexShrink: 0,
           }}>
-            {getInitials(data.patient.name)}
+            {getInitials(patient.name)}
           </div>
+
+          {/* Name + meta */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a' }}>{data.patient.name}</div>
-            <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>
-              {data.patient.phone} · Day {data.patient.currentDay} of 90
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>{patient.name}</div>
+            <div style={{ fontSize: 13, color: '#777', display: 'flex', flexWrap: 'wrap', gap: '0 14px' }}>
+              {dietPlan?.treatmentPlan && <span style={{ fontWeight: 600, color: '#555' }}>{dietPlan.treatmentPlan}</span>}
+              {patient.phone && <span>{patient.phone}</span>}
+              {patient.currentDay != null && <span>Day {patient.currentDay}/90</span>}
+              {patient.skinConcern && <span>{patient.skinConcern}</span>}
             </div>
-            {data.patient.skinConcern && (
-              <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>
-                {data.patient.skinConcern}
+          </div>
+
+          {/* Badges + Log Call */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            {airtableOnly && <ReasonBadge reason="Not in App" />}
+            {!airtableOnly && daysAbsent >= 7 && <ReasonBadge reason="7 Days Absent" />}
+            {!airtableOnly && daysAbsent >= 2 && daysAbsent < 7 && <ReasonBadge reason={`${daysAbsent} Days Missed`} />}
+            <button style={{
+              background: '#c44033', color: '#fff', border: 'none', borderRadius: 9,
+              padding: '9px 18px', cursor: 'pointer', fontWeight: 600, fontSize: 13,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              🔥 Log Call
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Tabs ── */}
+      <div style={{ display: 'flex', background: '#fff', borderRadius: 12, padding: '4px 6px', marginBottom: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', gap: 2 }}>
+        {['Overview', 'Diet & Compliance', 'Photos & Ratings', 'Call History'].map((tab, i) => {
+          const key = ['overview', 'diet', 'photos', 'calls'][i];
+          const active = activeTab === key;
+          return (
+            <button key={key} onClick={() => setActiveTab(key)} style={{
+              flex: 1, padding: '8px 12px', border: 'none', borderRadius: 9,
+              cursor: 'pointer', fontWeight: active ? 600 : 400, fontSize: 13,
+              background: active ? '#f0f0f0' : 'transparent',
+              color: active ? '#1a1a1a' : '#999',
+              transition: 'all 0.15s',
+            }}>
+              {tab}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Overview tab ── */}
+      {activeTab === 'overview' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '55% 1fr', gap: 16 }}>
+
+          {/* ── Left column ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Streak & Shields */}
+            {!airtableOnly && streak && (
+              <div style={card}>
+                <SectionHeading label="STREAK & SHIELDS" />
+                <div style={{ display: 'flex', gap: 28, alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 26 }}>🔥 <span style={{ fontSize: 22, fontWeight: 700 }}>{streak.currentStreak || 'O'}</span></div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Current</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: '#1a1a1a' }}>{streak.longestStreak}</div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Best</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 22 }}>🛡️ <span style={{ fontWeight: 700 }}>{streak.shields}</span></div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Shields</div>
+                  </div>
+                </div>
+                <button style={{
+                  border: '1.5px solid #c44033', color: '#c44033', background: '#fff',
+                  borderRadius: 99, padding: '6px 16px', fontSize: 12, cursor: 'pointer',
+                  fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5,
+                }}>
+                  🔥 Restore Shield
+                </button>
+              </div>
+            )}
+
+            {/* Skin Score Trajectory */}
+            {!airtableOnly && skinTrajectory && skinTrajectory.length > 0 && (
+              <div style={card}>
+                <SectionHeading label="SKIN SCORE TRAJECTORY" />
+                <SkinScoreChart data={skinTrajectory} />
+              </div>
+            )}
+
+            {/* This Week */}
+            {!airtableOnly && weekGrid && weekGrid.length > 0 && (
+              <div style={card}>
+                <SectionHeading label="THIS WEEK" />
+                <WeekGrid weekGrid={weekGrid} last7Moods={last7Moods} />
+              </div>
+            )}
+
+            {/* Coach Notes */}
+            <div style={card}>
+              <SectionHeading label="COACH NOTES" />
+              <textarea
+                rows={4}
+                placeholder="Add notes about this patient…"
+                style={{
+                  width: '100%', border: '1px solid #e5e7eb', borderRadius: 8,
+                  padding: '10px 12px', fontSize: 13, color: '#444', resize: 'vertical',
+                  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* Airtable-only notice (left column) */}
+            {airtableOnly && (
+              <div style={{ background: '#fafafa', borderRadius: 14, padding: '20px 22px', border: '1.5px dashed #e5e7eb', textAlign: 'center', color: '#aaa' }}>
+                <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#777', marginBottom: 6 }}>Not registered in app yet</div>
+                <div style={{ fontSize: 13 }}>Streak, consistency and weekly data will appear once the patient logs in.</div>
               </div>
             )}
           </div>
-          {data.dietPlan && (
-            <div style={{ textAlign: 'right' }}>
-              {data.dietPlan.dieticianCallStatus && (
-                <ReasonBadge reason={data.dietPlan.dieticianCallStatus} />
-              )}
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Stats row */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-        {[
-          { label: 'Streak',      value: `🔥 ${data.streak.currentStreak}`, color: '#ea580c' },
-          { label: 'Points',      value: `⭐ ${data.patient.totalPoints}`,  color: '#eab308' },
-          { label: 'Consistency', value: `${data.consistency.overall}%`,    color: '#16a34a' },
-        ].map(s => (
-          <div key={s.label} style={{
-            flex: 1, background: '#fff', borderRadius: 12,
-            padding: '14px 16px', textAlign: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-          }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: '#999', marginTop: 3 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
+          {/* ── Right column ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Consistency bars */}
-      <div style={{ background: '#fff', borderRadius: 14, padding: '18px 22px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 14 }}>Consistency (all-time)</div>
-        <ConsistencyBar label="Overall Check-in" value={data.consistency.overall} />
-        <ConsistencyBar label="Sunscreen"         value={data.consistency.sunscreen} />
-        <ConsistencyBar label="Diet"              value={data.consistency.diet} />
-      </div>
+            {/* Consistency Breakdown */}
+            {!airtableOnly && consistency && (
+              <div style={card}>
+                <SectionHeading label="CONSISTENCY BREAKDOWN" />
+                <ConsistencyBar label="Overall"   value={consistency.overall} />
+                <ConsistencyBar label="Sunscreen" value={consistency.sunscreen} />
+                <ConsistencyBar label="Diet"      value={consistency.diet} />
+              </div>
+            )}
 
-      {/* Diet plan info */}
-      {data.dietPlan && (
-        <div style={{ background: '#eff6ff', borderRadius: 14, padding: '16px 20px', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#2563eb', marginBottom: 10 }}>Diet Plan (Airtable)</div>
-          <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div>Call Status: <strong>{safeStr(data.dietPlan.dieticianCallStatus) || '—'}</strong></div>
-            <div>Plan Status: <strong>{safeStr(data.dietPlan.dietPlanStatus) || '—'}</strong></div>
-            {data.dietPlan.dietPlanDate && <div>Plan Date: <strong>{data.dietPlan.dietPlanDate}</strong></div>}
-          </div>
-        </div>
-      )}
-
-      {/* This week grid */}
-      {data.weekGrid && data.weekGrid.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 22px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 14 }}>This Week</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {data.weekGrid.map((day, i) => (
-              <div key={i} style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: '#aaa', marginBottom: 6 }}>{day.dayLabel}</div>
+            {/* Reorder Status */}
+            {!airtableOnly && reorder?.planEndDate && (
+              <div style={card}>
+                <SectionHeading label="REORDER STATUS (AUTO-DETECTED)" />
+                {/* Status badge */}
                 <div style={{
-                  width: 32, height: 32, borderRadius: '50%', margin: '0 auto',
-                  background: day.isFuture ? '#f3f4f6' : day.amCompleted ? '#c44033' : '#e5e7eb',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, color: day.amCompleted ? '#fff' : '#9ca3af',
+                  background: reorder.daysRemaining > 14 ? '#f0fdf4' : '#fef2f2',
+                  borderRadius: 8, padding: '9px 14px', marginBottom: 14,
                 }}>
-                  {!day.isFuture && (day.amCompleted ? '✓' : '—')}
+                  <span style={{ fontWeight: 700, color: reorder.daysRemaining > 14 ? '#16a34a' : '#dc2626', fontSize: 14 }}>
+                    {reorder.daysRemaining > 14 ? 'On Track' : 'Reorder Soon'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#666' }}>Plan ends</span>
+                    <span style={{ fontWeight: 700 }}>{reorder.planEndDate}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#666' }}>Days remaining</span>
+                    <span style={{ fontWeight: 600, color: '#16a34a' }}>{reorder.daysRemaining} days</span>
+                  </div>
+                  {/* Progress bar */}
+                  <div style={{ background: '#f0f0f0', borderRadius: 99, height: 6, margin: '2px 0' }}>
+                    <div style={{
+                      width: `${Math.min(100, ((90 - reorder.daysRemaining) / 90) * 100)}%`,
+                      background: '#c44033', height: '100%', borderRadius: 99,
+                    }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#666' }}>Banner shown in app</span>
+                    <span>{reorder.daysRemaining <= 30 ? '☑' : '—'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#666' }}>Banner clicked</span>
+                    <span style={{ color: '#666' }}>No</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#666' }}>New Treatment Plan (Airtable)</span>
+                    <span style={{ color: dietPlan?.treatmentPlan ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                      {dietPlan?.treatmentPlan ? `✓ ${dietPlan.treatmentPlan}` : '✗ Not yet'}
+                    </span>
+                  </div>
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Products */}
+            {dietPlan?.products && dietPlan.products.length > 0 && (
+              <div style={card}>
+                <SectionHeading label="PRODUCTS" />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {dietPlan.products.map((p, i) => (
+                    <span key={i} style={{
+                      fontSize: 12, padding: '5px 14px', borderRadius: 99,
+                      background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb',
+                    }}>
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Airtable-only: show available info */}
+            {airtableOnly && dietPlan && (
+              <div style={card}>
+                <SectionHeading label="AIRTABLE RECORD" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+                  {dietPlan.treatmentPlan && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#666' }}>Treatment Plan</span>
+                      <span style={{ fontWeight: 700 }}>{dietPlan.treatmentPlan}</span>
+                    </div>
+                  )}
+                  {dietPlan.dieticianCallStatus && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#666' }}>Call Status</span>
+                      <ReasonBadge reason={dietPlan.dieticianCallStatus} />
+                    </div>
+                  )}
+                  {dietPlan.dietPlanStatus && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#666' }}>Plan Status</span>
+                      <span style={{ fontWeight: 600 }}>{dietPlan.dietPlanStatus}</span>
+                    </div>
+                  )}
+                  {dietPlan.dietPlanDueDate && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#666' }}>Plan Date</span>
+                      <span>{dietPlan.dietPlanDueDate}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Products */}
-      {data.dietPlan?.products && data.dietPlan.products.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 22px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 10 }}>Products</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {data.dietPlan.products.map((p, i) => (
-              <span key={i} style={{
-                fontSize: 12, padding: '5px 14px', borderRadius: 99,
-                background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb',
-              }}>
-                {p}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Plan end */}
-      {data.reorder?.planEndDate && (
-        <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '14px 18px', fontSize: 13 }}>
-          Plan ends: <strong>{data.reorder.planEndDate}</strong>
-          {data.reorder.daysRemaining > 0 && (
-            <span style={{ color: '#888', marginLeft: 8 }}>({data.reorder.daysRemaining} days left)</span>
-          )}
+      {/* ── Other tabs (placeholder) ── */}
+      {activeTab !== 'overview' && (
+        <div style={{ background: '#fff', borderRadius: 14, padding: '40px', textAlign: 'center', color: '#bbb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#ccc' }}>Coming soon</div>
         </div>
       )}
     </div>
@@ -621,7 +851,7 @@ export default function DieticianDashboard() {
         {/* Detail area */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 32px' }}>
           {selectedPhone
-            ? <PatientDetailPanel phone={selectedPhone} />
+            ? <PatientDetailPanel phone={selectedPhone} onBack={() => setSelectedPhone(null)} />
             : <EmptyState />
           }
         </div>
