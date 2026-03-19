@@ -469,104 +469,76 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* Journey Section */}
-      <div className="mx-5 my-8 p-4.5 bg-[#faf9f7] rounded-[20px] border border-[#ede9e5]">
-        <div className="flex justify-between items-center mb-4 p-2">
-          <p className="text-xs font-bold text-[#c44033] font-outfit uppercase tracking-[1px]">Your Journey</p>
-          <p className="text-xs text-[#7a756d] font-outfit">Day {day} of 90</p>
-        </div>
-        <div className="relative px-1.5">
-          <div className="absolute top-4 left-5.5 right-5.5 h-0.5 bg-[#e0ddd7] rounded-[2px]"></div>
-          <div className="absolute top-4 left-5.5 h-0.5 rounded-[2px] bg-gradient-to-r from-[#1a8a4a] to-[#c44033]" style={{width: `${Math.round((day / 90) * 100)}%`}}></div>
-          <div className="flex justify-between relative">
-            {journeyMilestones.map((milestone, index) => (
-              <div key={milestone.week} className="flex flex-col items-center gap-1.5 w-10.5">
-                <div 
-                  className={`w-8 h-8 rounded-[16px] border flex items-center justify-center shadow transition-all ${
-                    milestone.current 
-                      ? 'w-9 h-9 bg-white border-2.5 border-[#c44033] shadow-[rgba(196,64,51,0.082)_0px_0px_0px_4px,rgba(0,0,0,0.08)_0px_2px_8px]' 
-                      : milestone.completed 
-                      ? 'bg-[#1a8a4a] border' 
-                      : 'bg-[#f4f2ef] border-2 border-[#e0ddd7]'
-                  }`}
-                >
-                  {milestone.current ? (
-                    <span className="text-xs font-bold text-[#c44033] font-playfair">✨</span>
-                  ) : milestone.completed ? (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M3 7l3 3 5-6" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  ) : (
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <rect x="2" y="5.5" width="8" height="5" rx="1" stroke="#a39e95" strokeWidth={1} />
-                      <path d="M4 5.5V4a2 2 0 114 0v1.5" stroke="#a39e95" strokeWidth={1} />
-                    </svg>
-                  )}
-                </div>
-                <span className={`text-xs font-semibold text-center leading-[1.2] font-outfit ${
-                  milestone.current ? 'text-[#c44033]' : 
-                  milestone.completed ? 'text-[#1a8a4a]' : 
-                  'text-[#a39e95] font-normal'
-                }`}>
-                  {milestone.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-5 px-4 py-3.5 bg-white rounded-[14px] border border-[#ede9e5] flex justify-between items-center">
-          <div className="flex-1">
-            <p className="text-xs text-[#c44033] font-bold font-outfit uppercase tracking-[0.8px]">Next: Transformation Card</p>
-            <p className="text-xs text-[#7a756d] font-outfit mt-0.5">Shareable before/after</p>
-            <div className="mt-2 h-1.5 bg-[#f4f2ef] rounded-[3px] overflow-hidden">
-              <div className="h-1.5 bg-gradient-to-r from-[#1a8a4a] to-[#c44033] rounded-[3px] w-0 transition-all duration-600"></div>
-            </div>
-          </div>
-          <div className="text-right ml-4">
-            <span className="text-xl font-bold text-[#c44033] font-playfair">{consistency}%</span>
-            <p className="text-xs text-[#1a8a4a] font-outfit font-semibold">On track ✓</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Promise Section */}
+      {/* Journey + Promise — merged dark card */}
       <div className="mx-5 my-8 rounded-[20px] overflow-hidden bg-[#191716] relative">
         <div className="absolute -top-7.5 -right-5 w-25 h-25 rounded-[50px] bg-[rgba(196,64,51,0.08)]"></div>
         <div className="absolute -bottom-5 -left-5 w-17.5 h-17.5 rounded-[35px] bg-[rgba(196,64,51,0.05)]"></div>
         <div className="px-6 py-5 relative">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-[8px] bg-[rgba(196,64,51,0.15)] flex items-center justify-center">
-              <span className="text-xs">🤝</span>
+
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-[8px] bg-[rgba(196,64,51,0.15)] flex items-center justify-center">
+                <span className="text-xs">🤝</span>
+              </div>
+              <span className="text-xs font-bold text-[rgba(255,255,255,0.45)] font-outfit uppercase tracking-[1.2px]">Your Journey · Day {day}</span>
             </div>
-            <span className="text-xs font-bold text-[rgba(255,255,255,0.45)] font-outfit uppercase tracking-[1.2px]">Your Promise · Day {day}</span>
+            <span className="text-xs text-[rgba(255,255,255,0.3)] font-outfit">of 90</span>
           </div>
+
+          {/* Quote */}
           <p className="text-base text-[rgba(255,255,255,0.85)] font-playfair leading-[1.55] italic font-normal mb-5">
             "I commit to giving my skin 90 days of consistent care."
           </p>
-          <div className="flex items-center gap-4 mb-5">
-            <div className="relative w-14 h-14 flex-shrink-0">
-              <svg width="56" height="56" viewBox="0 0 56 56">
-                <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3.5" />
-                <circle
-                  cx="28"
-                  cy="28"
-                  r="24"
-                  fill="none"
-                  stroke="#c44033"
-                  strokeWidth="3.5"
-                  strokeDasharray={`${(progress / 100) * 150} 150`}
-                  strokeLinecap="round"
-                  transform="rotate(-90 28 28)"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-sm font-bold text-white font-playfair">{Math.round(progress)}%</span>
-              </div>
+
+          {/* Milestone timeline — dark themed */}
+          <div className="relative px-1 mb-5">
+            <div className="absolute top-4 left-5 right-5 h-0.5 bg-[rgba(255,255,255,0.08)] rounded-[2px]"></div>
+            <div
+              className="absolute top-4 left-5 h-0.5 rounded-[2px]"
+              style={{
+                width: `${Math.min(Math.round((day / 90) * 100), 100)}%`,
+                background: 'linear-gradient(to right, #1a8a4a, #c44033)'
+              }}
+            ></div>
+            <div className="flex justify-between relative">
+              {journeyMilestones.map((milestone) => (
+                <div key={milestone.week} className="flex flex-col items-center gap-1.5 w-10">
+                  <div
+                    className={`w-8 h-8 rounded-[16px] flex items-center justify-center transition-all ${
+                      milestone.current
+                        ? 'bg-[rgba(255,255,255,0.12)] border-2 border-[#c44033] shadow-[rgba(196,64,51,0.3)_0px_0px_0px_3px]'
+                        : milestone.completed
+                        ? 'bg-[#1a8a4a]'
+                        : 'bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.12)]'
+                    }`}
+                  >
+                    {milestone.current ? (
+                      <span className="text-xs">✨</span>
+                    ) : milestone.completed ? (
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M3 7l3 3 5-6" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <rect x="2" y="5.5" width="8" height="5" rx="1" stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+                        <path d="M4 5.5V4a2 2 0 114 0v1.5" stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+                      </svg>
+                    )}
+                  </div>
+                  <span className={`text-xs text-center leading-[1.2] font-outfit ${
+                    milestone.current ? 'text-[#c44033] font-semibold' :
+                    milestone.completed ? 'text-[#1a8a4a] font-semibold' :
+                    'text-[rgba(255,255,255,0.3)] font-normal'
+                  }`}>
+                    {milestone.label}
+                  </span>
+                </div>
+              ))}
             </div>
-            <p className="text-xs text-[rgba(255,255,255,0.7)] font-outfit leading-[1.5] flex-1">
-              Day {day} of your 90-day journey. You're keeping your promise to your skin.
-            </p>
           </div>
+
+          {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             <div className="px-3 py-3 rounded-[10px] bg-[rgba(255,255,255,0.06)] text-center">
               <span className="text-base font-bold text-white font-playfair block">{day}</span>
@@ -581,6 +553,7 @@ export default function HomeScreen() {
               <span className="text-xs text-[rgba(255,255,255,0.4)] font-outfit block">consistent</span>
             </div>
           </div>
+
         </div>
       </div>
 
