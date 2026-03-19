@@ -539,7 +539,7 @@ export default function HomeScreen() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="px-3 py-3 rounded-[10px] bg-[rgba(255,255,255,0.06)] text-center">
               <span className="text-base font-bold text-white font-playfair block">{day}</span>
               <span className="text-xs text-[rgba(255,255,255,0.4)] font-outfit block">days logged</span>
@@ -547,10 +547,6 @@ export default function HomeScreen() {
             <div className="px-3 py-3 rounded-[10px] bg-[rgba(255,255,255,0.06)] text-center">
               <span className="text-base font-bold text-white font-playfair block">{photosCount}</span>
               <span className="text-xs text-[rgba(255,255,255,0.4)] font-outfit block">photos taken</span>
-            </div>
-            <div className="px-3 py-3 rounded-[10px] bg-[rgba(255,255,255,0.06)] text-center">
-              <span className="text-base font-bold text-white font-playfair block">{Math.round(consistency)}%</span>
-              <span className="text-xs text-[rgba(255,255,255,0.4)] font-outfit block">consistent</span>
             </div>
           </div>
 
