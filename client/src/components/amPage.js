@@ -197,10 +197,10 @@ export default function AMPage() {
   // ─── UI ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#ede9e4] pb-24">
+    <div className="min-h-screen bg-[#ede9e4] pb-24 pt-2">
 
       {/* Card */}
-      <div className="mx-4 mt-14 bg-white rounded-[28px] shadow-sm overflow-hidden">
+      <div className="mx-4 mt-8 bg-white rounded-[28px] shadow-sm overflow-hidden">
         <div className="px-5 pt-8 pb-8">
 
           {/* MORNING CHECK-IN label */}

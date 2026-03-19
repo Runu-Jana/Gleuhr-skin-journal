@@ -570,11 +570,11 @@ function PatientDetailPanel({ phone, onBack }) {
             {!airtableOnly && daysAbsent >= 7 && <ReasonBadge reason="7 Days Absent" />}
             {!airtableOnly && daysAbsent >= 2 && daysAbsent < 7 && <ReasonBadge reason={`${daysAbsent} Days Missed`} />}
             <button style={{
-              background: '#c44033', color: '#fff', border: 'none', borderRadius: 9,
+              background: '#8DBF6E', color: '#000', border: 'none', borderRadius: 9,
               padding: '9px 18px', cursor: 'pointer', fontWeight: 600, fontSize: 13,
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              🔥 Log Call
+              📞 Log Call
             </button>
           </div>
         </div>

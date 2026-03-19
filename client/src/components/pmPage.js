@@ -359,17 +359,7 @@ export default function PMPage() {
                 <Shield className={`w-3 h-3 sm:w-4 sm:h-4 ${getShieldColor(availableShields)}`} />
                 <span className={`text-xs sm:text-sm font-bold ${availableShields >= 3 ? 'text-green-700' : availableShields === 2 ? 'text-yellow-700' : availableShields === 1 ? 'text-red-700' : 'text-gray-700'}`}>{streakData?.restorationShields?.available}</span>
                 <span className={`text-xs ${availableShields >= 3 ? 'text-green-600' : availableShields === 2 ? 'text-yellow-600' : availableShields === 1 ? 'text-red-600' : 'text-gray-600'} hidden sm:inline`}>shields</span>
-                {streakData?.streak === 0 && availableShields > 0 && (
-                  <button 
-                    onClick={() => setShowShieldRestore(true)}
-                    className={`ml-1 ${availableShields >= 3 ? 'text-green-600 hover:text-green-700' : availableShields === 2 ? 'text-yellow-600 hover:text-yellow-700' : availableShields === 1 ? 'text-red-600 hover:text-red-700' : 'text-gray-600 hover:text-gray-700'}`}
-                    title="Use shield to restore streak"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </button>
-                )}
+               
               </div>
             </div>
           </div>
