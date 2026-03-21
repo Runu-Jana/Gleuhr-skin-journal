@@ -188,7 +188,19 @@ export default function HomeScreen() {
           const activeDates = new Set(
             checkIns.filter(c => c.amRoutine || c.pmRoutine || c.shieldRestored).map(c => c.date)
           );
-          const brokeStreak = !activeDates.has(yesterdayStr) && activeDates.size > 0 && computed.longestStreak > 0;
+
+          // If a shield was used for yesterday this session, never re-trigger the popup.
+          // gleuhrShieldRestoredDate is set in App.js onRestore and only applies
+          // to the specific date that was restored (auto-expires the next calendar day).
+          const shieldRestoredDate = localStorage.getItem('gleuhrShieldRestoredDate');
+          const shieldAlreadyUsedForYesterday = shieldRestoredDate === yesterdayStr;
+
+          const brokeStreak =
+            !shieldAlreadyUsedForYesterday &&
+            !activeDates.has(yesterdayStr) &&
+            activeDates.size > 0 &&
+            computed.longestStreak > 0;
+
           setMissedYesterday(brokeStreak);
           // Persist for BottomNavigation (which has no access to checkIns)
           localStorage.setItem('gleuhrMissedYesterday', brokeStreak ? '1' : '0');
