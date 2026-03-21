@@ -43,6 +43,18 @@ router.post('/send-verification', async (req, res) => {
     // Store verification code with expiry
     await whatsappService.storeVerificationCode(phoneNumber, verificationCode);
 
+    // Look up customer name from Airtable Diet Plan table (Name lookup field)
+    let customerName = null;
+    try {
+      const { fetchDietPlans } = require('../services/airtableService');
+      const plans = await fetchDietPlans({ customerPhone: phoneNumber });
+      if (plans && plans.length > 0) {
+        customerName = plans[0].customerName || null;
+      }
+    } catch (atErr) {
+      console.warn('Airtable name lookup skipped on send-verification:', atErr.message);
+    }
+
     // Send WhatsApp message
     const result = await whatsappService.sendOTP(phoneNumber, verificationCode, countryCode || '91');
 
@@ -53,6 +65,7 @@ router.post('/send-verification', async (req, res) => {
         success: true,
         messageId: result.messageId,
         fallback: result.fallback || false,
+        customerName,
         // In development, always return the code for testing
         ...(process.env.NODE_ENV === 'development' && { code: verificationCode })
       });

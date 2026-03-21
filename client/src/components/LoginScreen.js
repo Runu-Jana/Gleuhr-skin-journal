@@ -33,6 +33,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [customerName, setCustomerName] = useState('');
   const { loginWithWhatsApp } = useAuth();
   const navigate = useNavigate();
 
@@ -61,6 +62,9 @@ export default function LoginScreen() {
       if (response.data.success) {
         setStep('verification');
         setCountdown(60);
+        if (response.data.customerName) {
+          setCustomerName(response.data.customerName);
+        }
         if (response.data.code) {
           console.log('Development verification code:', response.data.code);
         }
@@ -257,9 +261,22 @@ export default function LoginScreen() {
               </>
             ) : (
               <>
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">Verify WhatsApp Code</h2>
+                {customerName && (
+                  <div className="flex items-center gap-3 mb-4 p-3 bg-[#fdf4f3] rounded-xl border border-[#f0d0cd]">
+                    <div className="w-9 h-9 rounded-full bg-[#c44033] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {customerName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{customerName}</p>
+                      <p className="text-xs text-gray-500">{fullPhone}</p>
+                    </div>
+                  </div>
+                )}
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                  {customerName ? `Welcome, ${customerName.split(' ')[0]}!` : 'Verify WhatsApp Code'}
+                </h2>
                 <p className="text-sm text-gray-500 mb-6">
-                  Enter 6-digit code sent via WhatsApp to <span className="font-medium text-gray-700">{fullPhone}</span>
+                  Enter the 6-digit code sent via WhatsApp{!customerName && <> to <span className="font-medium text-gray-700">{fullPhone}</span></>}
                 </p>
 
                 <form onSubmit={handleVerifyWhatsAppCode} className="space-y-4">
@@ -314,6 +331,7 @@ export default function LoginScreen() {
                       onClick={() => {
                         setStep('phone');
                         setPhoneNumber('');
+                        setCustomerName('');
                       }}
                       className="text-sm text-gray-500 hover:text-gray-700"
                     >
