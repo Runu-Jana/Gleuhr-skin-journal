@@ -104,6 +104,12 @@ const dailyCheckInSchema = new mongoose.Schema({
     enum: ['some_routine', 'just_sunscreen', 'missed', null],
     default: null
   },
+  // True when this day was saved by a shield restoration (not a real log).
+  // amRoutine / pmRoutine will be false — dieticians can see the gap.
+  shieldRestored: {
+    type: Boolean,
+    default: false
+  },
   completed: {
     type: Boolean,
     default: false

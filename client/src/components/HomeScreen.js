@@ -39,8 +39,9 @@ export default function HomeScreen() {
   const calculateStreakFromCheckIns = (checkIns) => {
     if (!checkIns || checkIns.length === 0) return { currentStreak: 0, longestStreak: 0 };
 
+    // Count both real logs and shield-restored days
     const activeDates = new Set(
-      checkIns.filter(c => c.amRoutine || c.pmRoutine).map(c => c.date)
+      checkIns.filter(c => c.amRoutine || c.pmRoutine || c.shieldRestored).map(c => c.date)
     );
     if (activeDates.size === 0) return { currentStreak: 0, longestStreak: 0 };
 
@@ -118,7 +119,8 @@ export default function HomeScreen() {
         if (dayCheckIn) {
           const hasAM = dayCheckIn.amRoutine || false;
           const hasPM = dayCheckIn.pmRoutine || false;
-          if (hasAM && hasPM) status = 'done';
+          if (dayCheckIn.shieldRestored) status = 'shield-restored';
+          else if (hasAM && hasPM) status = 'done';
           else if (hasAM || hasPM) status = 'partial';
         }
       }
@@ -178,12 +180,13 @@ export default function HomeScreen() {
           const computed = calculateStreakFromCheckIns(checkIns);
           setLocalStreak(computed);
 
-          // Detect missed yesterday: no active check-in for yesterday but user has prior history
+          // Detect missed yesterday: no active check-in for yesterday but user has prior history.
+          // Shield-restored days count as active (streak was not broken for that day).
           const today = new Date();
           const yest = new Date(today); yest.setDate(today.getDate() - 1);
           const yesterdayStr = yest.toISOString().split('T')[0];
           const activeDates = new Set(
-            checkIns.filter(c => c.amRoutine || c.pmRoutine).map(c => c.date)
+            checkIns.filter(c => c.amRoutine || c.pmRoutine || c.shieldRestored).map(c => c.date)
           );
           const brokeStreak = !activeDates.has(yesterdayStr) && activeDates.size > 0 && computed.longestStreak > 0;
           setMissedYesterday(brokeStreak);
@@ -435,8 +438,8 @@ export default function HomeScreen() {
               <span className="text-xs text-[#a39e95] font-outfit">Done</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-[3px] bg-[#d4a017]"></div>
-              <span className="text-xs text-[#a39e95] font-outfit">Partial</span>
+              <div className="w-2 h-2 rounded-[3px] bg-[#c5a84e]"></div>
+              <span className="text-xs text-[#a39e95] font-outfit">Shield</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-[3px] bg-[#e0ddd7]"></div>
@@ -453,23 +456,25 @@ export default function HomeScreen() {
           {calendarData.map((dayData, index) => (
             <div
               key={index}
-              className={`aspect-square rounded-[8px] flex items-center justify-center ${
+              className={`aspect-square rounded-[8px] flex items-center justify-center relative ${
                 !dayData ? '' :
-                dayData.status === 'before-start' ? 'bg-transparent' :
-                dayData.status === 'done'          ? 'bg-[#1a8a4a] opacity-80' :
-                dayData.status === 'partial'       ? 'bg-[#d4a017] opacity-60' :
-                dayData.status === 'current'       ? 'bg-[#c44033] opacity-90' :
-                dayData.isFuture                   ? 'bg-[#ede9e5] opacity-30' :
+                dayData.status === 'before-start'    ? 'bg-transparent' :
+                dayData.status === 'done'             ? 'bg-[#1a8a4a] opacity-80' :
+                dayData.status === 'shield-restored'  ? 'bg-[#c5a84e] opacity-85' :
+                dayData.status === 'partial'          ? 'bg-[#d4a017] opacity-60' :
+                dayData.status === 'current'          ? 'bg-[#c44033] opacity-90' :
+                dayData.isFuture                      ? 'bg-[#ede9e5] opacity-30' :
                 'bg-[#dc2626] opacity-40'
               }`}
             >
               <span className={`text-xs font-medium ${
                 !dayData ? '' :
-                dayData.status === 'before-start' ? 'text-[#d4cfc9]' :
-                dayData.status === 'done'          ? 'text-white' :
-                dayData.status === 'partial'       ? 'text-white' :
-                dayData.status === 'current'       ? 'text-white' :
-                dayData.isFuture                   ? 'text-[#a39e95]' :
+                dayData.status === 'before-start'   ? 'text-[#d4cfc9]' :
+                dayData.status === 'done'            ? 'text-white' :
+                dayData.status === 'shield-restored' ? 'text-white' :
+                dayData.status === 'partial'         ? 'text-white' :
+                dayData.status === 'current'         ? 'text-white' :
+                dayData.isFuture                     ? 'text-[#a39e95]' :
                 'text-white'
               }`}>
                 {dayData?.status === 'current' ? '' : dayData?.day}
@@ -479,6 +484,9 @@ export default function HomeScreen() {
                   <span className="text-xs font-bold text-white leading-none">{dayData.day}</span>
                   <div className="w-1 h-1 rounded-full bg-white opacity-80"></div>
                 </div>
+              )}
+              {dayData?.status === 'shield-restored' && (
+                <span className="absolute -top-0.5 -right-0.5 text-[8px] leading-none">🛡️</span>
               )}
             </div>
           ))}

@@ -176,7 +176,8 @@ router.get('/:phone', async (req, res) => {
       notes: record.notes,
       symptoms: record.symptoms,
       quickLogType: record.quickLogType,
-      completed: record.completed
+      completed: record.completed,
+      shieldRestored: record.shieldRestored || false,
     }));
 
     res.json(checkinData);
@@ -194,9 +195,9 @@ async function updateStreak(phoneNumber, currentDay, patientId = null) {
     if (patientId) orClauses.push({ patientId });
     const allCheckIns = await DailyCheckIn.find({ $or: orClauses }).sort({ date: 1 });
 
-    // Only fully-complete days count toward streak
+    // Fully-complete days AND shield-restored days count toward streak
     const activeDates = new Set(
-      allCheckIns.filter(c => c.completed === true).map(c => c.date)
+      allCheckIns.filter(c => c.completed === true || c.shieldRestored === true).map(c => c.date)
     );
 
     if (activeDates.size === 0) return;

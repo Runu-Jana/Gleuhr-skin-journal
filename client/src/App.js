@@ -39,6 +39,8 @@ import DieticianDashboard from './components/DieticianDashboard';
 
 // Utils
 import { initDB } from './utils/db';
+import { saveCheckIn } from './utils/db';
+import { generateId } from './utils/helpers';
 import AMPage from './components/amPage';
 import PMPage from './components/pmPage';
 import { getTimeOfDay } from './utils/timeUtils';
@@ -296,6 +298,30 @@ function MainApp() {
             });
             const result = await res.json();
             if (result.success) {
+              // ── 1. Clear the "missed yesterday" flag so the popup never
+              //       re-triggers until the streak breaks again.
+              localStorage.setItem('gleuhrMissedYesterday', '0');
+
+              // ── 2. Persist the shield-restored check-in to IndexedDB so
+              //       HomeScreen calendar picks it up without a full reload.
+              const yesterday = new Date();
+              yesterday.setDate(yesterday.getDate() - 1);
+              const yesterdayStr = yesterday.toISOString().split('T')[0];
+              const patientIdLocal = patient?.id || patient?._id;
+              if (patientIdLocal) {
+                await saveCheckIn({
+                  id: result.shieldCheckinId || generateId(),
+                  patientId: patientIdLocal,
+                  patientPhone: phone,
+                  date: yesterdayStr,
+                  amRoutine: false,
+                  pmRoutine: false,
+                  shieldRestored: true,
+                  completed: true,
+                  synced: true,
+                });
+              }
+
               await refreshStreak();
               setShowStreakPopup(false);
               setShieldAnimationData({

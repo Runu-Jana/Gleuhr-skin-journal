@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Streak = require('../models/Streak');
 const Patient = require('../models/Patient');
+const DailyCheckIn = require('../models/DailyCheckIn');
 
 // GET /api/streak/:phone - Get current streak data by phone
 router.get('/:phone', async (req, res) => {
@@ -142,7 +143,44 @@ router.post('/restore', async (req, res) => {
     const previousStreak = streak.currentStreak || 0;
     const restoredStreak = Math.max(1, previousStreak + 1);
 
-    // Update streak and shield usage
+    // ── Create a "shield-restored" DailyCheckIn for the missed day ────────────
+    // The record has amRoutine/pmRoutine = false so dieticians can see the gap,
+    // but completed = true so streak counters count the day.
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const patientIdStr = patient._id.toString();
+    const patientPhone = patient.phone || patient.phoneNumber;
+    const dayOfJourney = streak.day || patient.currentDay || 1;
+
+    let shieldCheckin;
+    const existingCheckin = await DailyCheckIn.findOne({
+      patientId: patientIdStr,
+      date: yesterdayStr
+    });
+
+    if (existingCheckin) {
+      shieldCheckin = await DailyCheckIn.findByIdAndUpdate(
+        existingCheckin._id,
+        { shieldRestored: true, completed: true, completedAt: new Date() },
+        { new: true }
+      );
+    } else {
+      shieldCheckin = await DailyCheckIn.create({
+        patientId: patientIdStr,
+        patientPhone,
+        date: yesterdayStr,
+        dayOfJourney,
+        amRoutine: false,
+        pmRoutine: false,
+        sunscreen: false,
+        shieldRestored: true,
+        completed: true,
+        completedAt: new Date(),
+      });
+    }
+
+    // ── Update streak record and shield usage ─────────────────────────────────
     await Streak.findByIdAndUpdate(streak._id, {
       currentStreak: restoredStreak,
       shields: {
@@ -158,7 +196,8 @@ router.post('/restore', async (req, res) => {
       message: 'Streak restored successfully!',
       previousStreak: previousStreak,
       restoredStreak: restoredStreak,
-      shieldsRemaining: availableShields - 1
+      shieldsRemaining: availableShields - 1,
+      shieldCheckinId: shieldCheckin?._id?.toString(),
     });
 
   } catch (error) {
