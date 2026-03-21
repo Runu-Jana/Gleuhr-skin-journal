@@ -25,6 +25,7 @@ import StreakRestorationPopup from './components/StreakRestorationPopup';
 import CheckInSuccessPage from './components/CheckInSuccessPage';
 import TransformationPage from './components/TransformationPage';
 import BottomNavigation from './components/BottomNavigation';
+import ShieldSuccessAnimation from './components/ShieldSuccessAnimation';
 import EnhancedOfflineIndicator from './components/EnhancedOfflineIndicator';
 import InstallPrompt from './components/InstallPrompt';
 import GleuhrInsider from './components/GleuhrInsider';
@@ -209,7 +210,7 @@ function AppRoutes() {
 }
 
 function MainApp() {
-  const { patient, streak: streakData, weeklyPhotos } = useAuth();
+  const { patient, streak: streakData, refreshStreak, weeklyPhotos } = useAuth();
   const navigate = useNavigate();
   const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
 
@@ -217,6 +218,10 @@ function MainApp() {
   const [showStreakPopup, setShowStreakPopup] = useState(false);
   const [streakPopupPath, setStreakPopupPath] = useState('/amPage');
   const [streakPopupPrev, setStreakPopupPrev] = useState(0);
+
+  // ── Shield success animation (shown after restore) ──────────────────────────
+  const [showShieldAnimation, setShowShieldAnimation] = useState(false);
+  const [shieldAnimationData, setShieldAnimationData] = useState(null);
 
   // Expose globals so HomeScreen & BottomNavigation can fire the popup
   // without prop-drilling.
@@ -280,6 +285,35 @@ function MainApp() {
         isVisible={showStreakPopup}
         previousStreak={streakPopupPrev}
         shields={streakData?.restorationShields?.available || 0}
+        onRestore={async () => {
+          const phone = patient?.phone || patient?.phoneNumber;
+          if (!phone) return;
+          try {
+            const res = await fetch('/api/streak/restore', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phoneNumber: phone }),
+            });
+            const result = await res.json();
+            if (result.success) {
+              await refreshStreak();
+              setShowStreakPopup(false);
+              setShieldAnimationData({
+                streakRestored: true,
+                shieldsRemaining: result.shieldsRemaining,
+                previousStreak: result.previousStreak,
+                newStreak: result.restoredStreak,
+                redirectPath: streakPopupPath,
+              });
+              setShowShieldAnimation(true);
+            } else {
+              alert(result.error || 'No shields available this month');
+            }
+          } catch (err) {
+            console.error('Shield restore error:', err);
+            alert('Failed to restore streak. Please try again.');
+          }
+        }}
         onContinue={() => {
           setShowStreakPopup(false);
           // Navigate after a short delay so exit animation plays
@@ -287,6 +321,17 @@ function MainApp() {
         }}
         onClose={() => setShowStreakPopup(false)}
       />
+
+      {/* Shield Success Animation */}
+      {showShieldAnimation && shieldAnimationData && (
+        <ShieldSuccessAnimation
+          streakRestored={shieldAnimationData.streakRestored}
+          shieldsRemaining={shieldAnimationData.shieldsRemaining}
+          previousStreak={shieldAnimationData.previousStreak}
+          newStreak={shieldAnimationData.newStreak}
+          redirectPath={shieldAnimationData.redirectPath}
+        />
+      )}
     </>
   );
 }

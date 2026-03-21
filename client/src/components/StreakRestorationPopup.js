@@ -12,7 +12,7 @@ import { Flame, X, ArrowRight, ShieldCheck } from 'lucide-react';
  * Props:
  *   isVisible        boolean
  *   previousStreak   number – the streak length before the break
- *   shields          number – available restoration shields
+ *   shields          number – available restoration shields remaining this month (max 3)
  *   onRestore        () => void – called when user taps "Use Shield"
  *   onContinue       () => void – called when user taps "Log Anyway"
  *   onClose          () => void – called when user dismisses without action
@@ -96,6 +96,23 @@ export default function StreakRestorationPopup({
                 </div>
               )}
 
+              {/* Monthly shield dots */}
+              {shields > 0 && (
+                <div className="flex items-center justify-center gap-1.5 mb-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        i < shields ? 'bg-[#c44033]' : 'bg-[#e4e0db]'
+                      }`}
+                    />
+                  ))}
+                  <span className="ml-1.5 text-xs text-[#a39e95] font-outfit">
+                    {shields} of 3 shields left this month
+                  </span>
+                </div>
+              )}
+
               {/* Shield restore button (only if shields available) */}
               {shields > 0 && onRestore && (
                 <button
@@ -104,9 +121,6 @@ export default function StreakRestorationPopup({
                 >
                   <ShieldCheck className="w-4 h-4" />
                   Use Shield to Restore Streak
-                  <span className="ml-auto text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                    {shields} left
-                  </span>
                 </button>
               )}
 
