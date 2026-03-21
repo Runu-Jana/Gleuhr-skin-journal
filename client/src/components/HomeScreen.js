@@ -438,11 +438,15 @@ export default function HomeScreen() {
               <span className="text-xs text-[#a39e95] font-outfit">Done</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-[3px] bg-[#c5a84e]"></div>
+              <div className="w-2 h-2 rounded-[3px] bg-[#d4a017]"></div>
+              <span className="text-xs text-[#a39e95] font-outfit">Partial</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-[3px] bg-[#1a9688]"></div>
               <span className="text-xs text-[#a39e95] font-outfit">Shield</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-[3px] bg-[#e0ddd7]"></div>
+              <div className="w-2 h-2 rounded-[3px] bg-[#dc2626]"></div>
               <span className="text-xs text-[#a39e95] font-outfit">Missed</span>
             </div>
           </div>
@@ -460,7 +464,7 @@ export default function HomeScreen() {
                 !dayData ? '' :
                 dayData.status === 'before-start'    ? 'bg-transparent' :
                 dayData.status === 'done'             ? 'bg-[#1a8a4a] opacity-80' :
-                dayData.status === 'shield-restored'  ? 'bg-[#c5a84e] opacity-85' :
+                dayData.status === 'shield-restored'  ? 'bg-[#1a9688] opacity-85' :
                 dayData.status === 'partial'          ? 'bg-[#d4a017] opacity-60' :
                 dayData.status === 'current'          ? 'bg-[#c44033] opacity-90' :
                 dayData.isFuture                      ? 'bg-[#ede9e5] opacity-30' :
