@@ -300,13 +300,17 @@ function MainApp() {
             if (result.success) {
               // ── 1. Clear the "missed yesterday" flag so the popup never
               //       re-triggers until the streak breaks again.
+              //       Also record *which* date was restored so HomeScreen's
+              //       fetchData() cannot overwrite the flag back to '1' when
+              //       it re-runs (it checks gleuhrShieldRestoredDate first).
               localStorage.setItem('gleuhrMissedYesterday', '0');
-
-              // ── 2. Persist the shield-restored check-in to IndexedDB so
-              //       HomeScreen calendar picks it up without a full reload.
               const yesterday = new Date();
               yesterday.setDate(yesterday.getDate() - 1);
               const yesterdayStr = yesterday.toISOString().split('T')[0];
+              localStorage.setItem('gleuhrShieldRestoredDate', yesterdayStr);
+
+              // ── 2. Persist the shield-restored check-in to IndexedDB so
+              //       HomeScreen calendar picks it up without a full reload.
               const patientIdLocal = patient?.id || patient?._id;
               if (patientIdLocal) {
                 await saveCheckIn({
