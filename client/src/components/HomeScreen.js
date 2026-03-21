@@ -140,6 +140,7 @@ export default function HomeScreen() {
   const [consistency, setConsistency] = useState(0); // Default fallback
   const [checkIns, setCheckIns] = useState([]); // Store check-ins for calendar
   const [localStreak, setLocalStreak] = useState({ currentStreak: 0, longestStreak: 0 });
+  const [missedYesterday, setMissedYesterday] = useState(false);
   const [photosCount, setPhotosCount] = useState(0); // Store photos count
 
   // Fetch latest skin score and calculate consistency
@@ -174,7 +175,21 @@ export default function HomeScreen() {
           const calculatedConsistency = calculateConsistency(checkIns, patient.startDate);
           setConsistency(calculatedConsistency);
           setCheckIns(checkIns);
-          setLocalStreak(calculateStreakFromCheckIns(checkIns));
+          const computed = calculateStreakFromCheckIns(checkIns);
+          setLocalStreak(computed);
+
+          // Detect missed yesterday: no active check-in for yesterday but user has prior history
+          const today = new Date();
+          const yest = new Date(today); yest.setDate(today.getDate() - 1);
+          const yesterdayStr = yest.toISOString().split('T')[0];
+          const activeDates = new Set(
+            checkIns.filter(c => c.amRoutine || c.pmRoutine).map(c => c.date)
+          );
+          const brokeStreak = !activeDates.has(yesterdayStr) && activeDates.size > 0 && computed.longestStreak > 0;
+          setMissedYesterday(brokeStreak);
+          // Persist for BottomNavigation (which has no access to checkIns)
+          localStorage.setItem('gleuhrMissedYesterday', brokeStreak ? '1' : '0');
+          localStorage.setItem('gleuhrPrevStreak', String(computed.longestStreak));
 
           // Fetch weekly photos count
           const photos = await getWeeklyPhotos(patientId);
@@ -270,10 +285,11 @@ export default function HomeScreen() {
   const journeyMilestones = calculateJourneyMilestones(checkIns, day);
 
   const handleRoutineClick = () => {
-    if (isMorning) {
-      navigate('/amPage');
+    const path = isMorning ? '/amPage' : '/pmPage';
+    if (missedYesterday && window.__gleuhrStreakPopup) {
+      window.__gleuhrStreakPopup(path, localStreak.longestStreak);
     } else {
-      navigate('/pmPage');
+      navigate(path);
     }
   };
 

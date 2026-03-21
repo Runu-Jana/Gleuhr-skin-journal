@@ -28,6 +28,14 @@ export default function BottomNavigation() {
   ];
 
   const handleNavClick = (path) => {
+    // Intercept AM / PM navigation when the user missed yesterday
+    if ((path === '/amPage' || path === '/pmPage') &&
+        localStorage.getItem('gleuhrMissedYesterday') === '1' &&
+        window.__gleuhrStreakPopup) {
+      const prev = parseInt(localStorage.getItem('gleuhrPrevStreak') || '0', 10);
+      window.__gleuhrStreakPopup(path, prev);
+      return;
+    }
     navigate(path);
   };
 

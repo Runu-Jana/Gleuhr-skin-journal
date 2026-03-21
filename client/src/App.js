@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 
 import { useAuth } from './contexts/AuthContext';
@@ -21,6 +21,7 @@ import SkinScoreResults from './components/SkinScoreResults';
 import WeeklyPhotoScreen from './components/WeeklyPhotoScreen';
 import PhotoUploadPage from './components/PhotoUploadPage';
 import WeeklyPhotoPopup from './components/WeeklyPhotoPopup';
+import StreakRestorationPopup from './components/StreakRestorationPopup';
 import CheckInSuccessPage from './components/CheckInSuccessPage';
 import TransformationPage from './components/TransformationPage';
 import BottomNavigation from './components/BottomNavigation';
@@ -209,7 +210,28 @@ function AppRoutes() {
 
 function MainApp() {
   const { patient, streak: streakData, weeklyPhotos } = useAuth();
+  const navigate = useNavigate();
   const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
+
+  // ── Streak restoration popup ────────────────────────────────────────────────
+  const [showStreakPopup, setShowStreakPopup] = useState(false);
+  const [streakPopupPath, setStreakPopupPath] = useState('/amPage');
+  const [streakPopupPrev, setStreakPopupPrev] = useState(0);
+
+  // Expose globals so HomeScreen & BottomNavigation can fire the popup
+  // without prop-drilling.
+  useEffect(() => {
+    window.__gleuhrNavigate = navigate;
+    window.__gleuhrStreakPopup = (path, previousStreak) => {
+      setStreakPopupPath(path);
+      setStreakPopupPrev(previousStreak || 0);
+      setShowStreakPopup(true);
+    };
+    return () => {
+      delete window.__gleuhrNavigate;
+      delete window.__gleuhrStreakPopup;
+    };
+  }, [navigate]);
 
   // Show weekly photo popup only if today is a photo day AND no photo uploaded yet this week
   useEffect(() => {
@@ -247,10 +269,23 @@ function MainApp() {
       <GleuhrInsider />
       
       {/* Weekly Photo Popup */}
-      <WeeklyPhotoPopup 
+      <WeeklyPhotoPopup
         isVisible={showWeeklyPhotoPopup}
         onClose={handleCloseWeeklyPhotoPopup}
         patient={patient}
+      />
+
+      {/* Streak Restoration Popup */}
+      <StreakRestorationPopup
+        isVisible={showStreakPopup}
+        previousStreak={streakPopupPrev}
+        shields={streakData?.restorationShields?.available || 0}
+        onContinue={() => {
+          setShowStreakPopup(false);
+          // Navigate after a short delay so exit animation plays
+          setTimeout(() => window.__gleuhrNavigate?.(streakPopupPath), 100);
+        }}
+        onClose={() => setShowStreakPopup(false)}
       />
     </>
   );
