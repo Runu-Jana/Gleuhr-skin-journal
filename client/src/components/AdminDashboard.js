@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Phone as PhoneIcon, ArrowLeft, RefreshCw, ChevronDown } from 'lucide-react';
+import { Search, Phone as PhoneIcon, ArrowLeft, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import './AdminDashboard.css';
 
@@ -79,10 +79,15 @@ export default function AdminDashboard() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState('overview');
 
-  // Load dietician list
+  // Load dietician list and auto-select the first one
   useEffect(() => {
     adminApi.get('/admin/dietician').then(({ data }) => {
-      setDieticians(data.data || []);
+      const list = data.data || [];
+      setDieticians(list);
+      if (list.length > 0) {
+        const first = typeof list[0] === 'string' ? list[0] : (list[0]?.name || list[0]?.email || '');
+        setDietician(prev => prev === 'Dt.Muskan' ? first : prev);
+      }
     }).catch(() => {});
   }, []);
 
@@ -157,15 +162,25 @@ export default function AdminDashboard() {
         <aside className="admin-sidebar">
           <div className="admin-sidebar-logo"><h2>GLEUHR</h2><p>Skin Journal</p></div>
           <nav className="admin-sidebar-nav">
-            <button className="admin-sidebar-item active">
-              <div className="admin-sidebar-avatar" style={{ background: '#c44033' }}>
-                {getInitials(dietician)}
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>Dietician</div>
-                <div style={{ fontSize: 11, opacity: 0.6 }}>{dietician}</div>
-              </div>
-            </button>
+            <div style={{ padding: '12px 16px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1, opacity: 0.4, textTransform: 'uppercase' }}>Coaches</div>
+            {dieticians.map((d, i) => {
+              const name = typeof d === 'string' ? d : (d?.name || d?.email || String(i));
+              return (
+                <button
+                  key={name}
+                  className={`admin-sidebar-item ${name === dietician ? 'active' : ''}`}
+                  onClick={() => { setDietician(name); setSelectedCustomer(null); setDetails(null); }}
+                >
+                  <div className="admin-sidebar-avatar" style={{ background: avatarColor(name) }}>
+                    {getInitials(name)}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{name}</div>
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>Coach</div>
+                  </div>
+                </button>
+              );
+            })}
           </nav>
           <div className="admin-sidebar-footer">
             <div>Airtable Sync: Live</div>
@@ -202,16 +217,25 @@ export default function AdminDashboard() {
       <aside className="admin-sidebar">
         <div className="admin-sidebar-logo"><h2>GLEUHR</h2><p>Skin Journal</p></div>
         <nav className="admin-sidebar-nav">
-          <div style={{ padding: '12px 16px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1, opacity: 0.4, textTransform: 'uppercase' }}>Dietician</div>
-          <button className="admin-sidebar-item active">
-            <div className="admin-sidebar-avatar" style={{ background: '#c44033' }}>
-              {getInitials(dietician)}
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{dietician}</div>
-              <div style={{ fontSize: 11, opacity: 0.6 }}>{stats.inApp} in app · {stats.total} total</div>
-            </div>
-          </button>
+          <div style={{ padding: '12px 16px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1, opacity: 0.4, textTransform: 'uppercase' }}>Coaches</div>
+          {dieticians.map((d, i) => {
+            const name = typeof d === 'string' ? d : (d?.name || d?.email || String(i));
+            return (
+              <button
+                key={name}
+                className={`admin-sidebar-item ${name === dietician ? 'active' : ''}`}
+                onClick={() => setDietician(name)}
+              >
+                <div className="admin-sidebar-avatar" style={{ background: avatarColor(name) }}>
+                  {getInitials(name)}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{name}</div>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>Coach</div>
+                </div>
+              </button>
+            );
+          })}
         </nav>
         <div className="admin-sidebar-footer">
           <div>Airtable Sync: Live</div>
@@ -232,28 +256,9 @@ export default function AdminDashboard() {
               &nbsp;·&nbsp;{stats.total} total customers
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {/* Dietician picker */}
-            <div style={{ position: 'relative' }}>
-              <select
-                value={dietician}
-                onChange={e => setDietician(e.target.value)}
-                style={{ appearance: 'none', padding: '7px 30px 7px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 13, background: '#fff', cursor: 'pointer', fontWeight: 600 }}
-              >
-                {dieticians.length === 0
-                  ? <option value={dietician}>{dietician}</option>
-                  : dieticians.map((d, i) => {
-                      const name = typeof d === 'string' ? d : (d?.name || d?.email || String(i));
-                      return <option key={name} value={name}>{name}</option>;
-                    })
-                }
-              </select>
-              <ChevronDown size={14} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#888' }}/>
-            </div>
-            <button onClick={fetchCustomers} disabled={loading} style={{ display:'flex',alignItems:'center',gap:4,color:'#c44033',fontWeight:600,background:'none',border:'none',cursor:'pointer',fontSize:13,opacity:loading?0.5:1 }}>
-              <RefreshCw size={15} className={loading ? 'animate-spin' : ''}/> Refresh
-            </button>
-          </div>
+          <button onClick={fetchCustomers} disabled={loading} style={{ display:'flex',alignItems:'center',gap:4,color:'#c44033',fontWeight:600,background:'none',border:'none',cursor:'pointer',fontSize:13,opacity:loading?0.5:1 }}>
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''}/> Refresh
+          </button>
         </div>
 
         {/* Stats cards */}
