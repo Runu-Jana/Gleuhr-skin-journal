@@ -57,6 +57,7 @@ app.use('/api/reorder', require('./routes/reorder'));
 app.use('/api/admin/diet-plans', require('./routes/admin-diet-plans'));
 app.use('/api/admin/patients', require('./routes/admin-patients'));
 app.use('/api/admin/dietician', require('./routes/admin-dietician'));
+app.use('/api/admin/overview', require('./routes/admin-overview'));
 
 // Admin routes
 app.use('/api/admin', require('./admin'));
