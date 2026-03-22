@@ -275,16 +275,6 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
 
         {/* Controls */}
         <div className="bg-[#1a1a1a] p-4 space-y-3 flex-shrink-0">
-          <button 
-            onClick={() => setConsentGiven(!consentGiven)} 
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-          >
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${consentGiven ? 'bg-[#c44033]' : 'bg-white/20'}`}>
-              {consentGiven && <Check className="w-4 h-4 text-white" />}
-            </div>
-            <span className="text-white text-sm">I'd like to share my photos to help improve Gleuhr's analysis</span>
-          </button>
-
           <div className="flex gap-3">
             <button 
               onClick={handleRetake} 
