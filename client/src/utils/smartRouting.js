@@ -31,13 +31,12 @@ export async function getSmartRoute(patient, currentTime = new Date(), weeklyPho
   // Only redirect to weekly-photo if no photo has been uploaded for this week yet
   if (isPhotoDay && bothDone) {
     const currentWeek = getWeekNumber(patient.startDate);
-    // Prefer the already-loaded list (from AuthContext); fall back to IndexedDB
-    let photos = weeklyPhotos;
-    if (!Array.isArray(photos)) {
-      const phone = patient.phone || patient.phoneNumber;
-      photos = await getWeeklyPhotos(phone).catch(() => []);
-    }
-    const alreadyUploaded = photos.some(p => p.week === currentWeek);
+    const phone = patient.phone || patient.phoneNumber;
+    // Always check IndexedDB so locally-saved photos are detected immediately
+    const localPhotos = await getWeeklyPhotos(phone).catch(() => []);
+    const serverPhotos = Array.isArray(weeklyPhotos) ? weeklyPhotos : [];
+    const allPhotos = [...localPhotos, ...serverPhotos];
+    const alreadyUploaded = allPhotos.some(p => p.week === currentWeek);
     if (!alreadyUploaded) {
       return '/weekly-photo';
     }

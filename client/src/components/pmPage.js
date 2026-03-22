@@ -5,7 +5,7 @@ import { Shield, Frown, Meh, Smile } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
-import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
+import { saveCheckIn, getTodayCheckIn, getCheckIns, getWeeklyPhotos, getPatient } from '../utils/db';
 import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
 import BottomNavigation from './BottomNavigation';
@@ -132,20 +132,8 @@ export default function PMPage() {
     }
   };
 
-  useEffect(() => {
-    const checkMilestone = async () => {
-      // Only redirect to skin-score on milestone days if not already completed
-      const latestScore = await getLatestSkinScore(patient?.phoneNumber || patient?.phone);
-      const today = new Date().toISOString().split('T')[0];
-      const alreadyScoredToday = latestScore && latestScore.date === today;
-
-      if (isMilestoneDay(day) && !alreadyScoredToday) {
-        navigate('/skin-score');
-      }
-      // Weekly photo reminders are handled by WeeklyPhotoPopup in App.js
-    };
-    if (patient) checkMilestone();
-  }, [day, patient, navigate]);
+  // Skin-score redirect is intentionally removed from pmPage to prevent
+  // hijacking direct navigation. SmartRouter handles milestone routing.
 
   useEffect(() => {
     // Load today's PM check-in if already submitted
