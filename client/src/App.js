@@ -38,8 +38,7 @@ import DieticianLogin from './components/DieticianLogin';
 import DieticianDashboard from './components/DieticianDashboard';
 
 // Utils
-import { initDB } from './utils/db';
-import { saveCheckIn } from './utils/db';
+import { initDB, saveCheckIn, getWeeklyPhotos } from './utils/db';
 import { generateId } from './utils/helpers';
 import AMPage from './components/amPage';
 import PMPage from './components/pmPage';
@@ -94,25 +93,7 @@ function App() {
 }
 
 function AppRoutes() {
-  const { isAuthenticated, patient, isLoading, weeklyPhotos } = useAuth();
-  const [showWeeklyPhotoPopup, setShowWeeklyPhotoPopup] = useState(false);
-
-  // Show weekly photo popup only if today is a photo day AND no photo uploaded yet this week
-  useEffect(() => {
-    if (isAuthenticated && patient && isWeeklyPhotoDay(patient?.startDate)) {
-      const currentWeek = getWeekNumber(patient.startDate);
-      const alreadyUploaded = Array.isArray(weeklyPhotos) && weeklyPhotos.some(p => p.week === currentWeek);
-      if (!alreadyUploaded) setShowWeeklyPhotoPopup(true);
-    }
-  }, [isAuthenticated, patient, weeklyPhotos]);
-
-  const handleCloseWeeklyPhotoPopup = () => {
-    setShowWeeklyPhotoPopup(false);
-  };
-
-  console.log('AppRoutes - isAuthenticated:', isAuthenticated);
-  console.log('AppRoutes - patient:', patient);
-  console.log('AppRoutes - isLoading:', isLoading);
+  const { isAuthenticated, patient, isLoading } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#faf8f5] pb-20">
@@ -240,13 +221,22 @@ function MainApp() {
     };
   }, [navigate]);
 
-  // Show weekly photo popup only if today is a photo day AND no photo uploaded yet this week
+  // Show weekly photo popup only if today is a photo day AND no photo uploaded yet this week.
+  // Always check IndexedDB so a locally-saved photo is detected immediately (AuthContext
+  // weeklyPhotos only reflects server data and may be stale right after upload).
   useEffect(() => {
-    if (patient && isWeeklyPhotoDay(patient?.startDate)) {
-      const currentWeek = getWeekNumber(patient.startDate);
-      const alreadyUploaded = Array.isArray(weeklyPhotos) && weeklyPhotos.some(p => p.week === currentWeek);
-      if (!alreadyUploaded) setShowWeeklyPhotoPopup(true);
-    }
+    if (!patient || !isWeeklyPhotoDay(patient?.startDate)) return;
+    const currentWeek = getWeekNumber(patient.startDate);
+    const phone = patient.phone || patient.phoneNumber;
+
+    const check = async () => {
+      const serverUploaded = Array.isArray(weeklyPhotos) && weeklyPhotos.some(p => p.week === currentWeek);
+      if (serverUploaded) return;
+      const localPhotos = await getWeeklyPhotos(phone).catch(() => []);
+      const localUploaded = localPhotos.some(p => p.week === currentWeek);
+      if (!localUploaded) setShowWeeklyPhotoPopup(true);
+    };
+    check();
   }, [patient, weeklyPhotos]);
 
   const handleCloseWeeklyPhotoPopup = () => {
