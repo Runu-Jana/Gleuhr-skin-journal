@@ -382,31 +382,59 @@ export default function HomeScreen() {
       </div>
 
       {/* Main CTA Button */}
-      <div 
-        onClick={handleRoutineClick}
-        className="mx-5 my-3 p-5 rounded-[18px] bg-[#c44033] cursor-pointer relative overflow-hidden shadow-[rgba(196,64,51,0.208)_0px_8px_24px]"
-      >
-        <div className="absolute -top-0.15 -right-5 w-20 h-20 rounded-[40px] bg-[rgba(255,255,255,0.08)]"></div>
-        <div className="flex items-center justify-between relative">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-[14px] bg-[rgba(255,255,255,0.15)] flex items-center justify-center">
-              <span className="text-xl">{isMorning ? '☀️' : '🌙'}</span>
+      <div className="mx-5 my-3">
+        <div
+          onClick={handleRoutineClick}
+          className={`p-5 rounded-[18px] bg-[#c44033] cursor-pointer relative overflow-hidden shadow-[rgba(196,64,51,0.208)_0px_8px_24px] ${day === 1 && checkIns.length === 0 ? 'animate-[ctaPulse_2s_ease-in-out_infinite]' : ''}`}
+          style={day === 1 && checkIns.length === 0 ? { animation: 'ctaPulse 2s ease-in-out infinite' } : {}}
+        >
+          <style>{`
+            @keyframes ctaPulse {
+              0%,100% { box-shadow: rgba(196,64,51,0.25) 0px 8px 24px, rgba(196,64,51,0) 0px 0px 0px 0px; }
+              50%      { box-shadow: rgba(196,64,51,0.45) 0px 8px 32px, rgba(196,64,51,0.25) 0px 0px 0px 8px; }
+            }
+            @keyframes tapBounce {
+              0%,100% { transform: translateY(0); }
+              50%      { transform: translateY(5px); }
+            }
+          `}</style>
+          <div className="absolute -top-0.15 -right-5 w-20 h-20 rounded-[40px] bg-[rgba(255,255,255,0.08)]"></div>
+          <div className="flex items-center justify-between relative">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-[14px] bg-[rgba(255,255,255,0.15)] flex items-center justify-center">
+                <span className="text-xl">{isMorning ? '☀️' : '🌙'}</span>
+              </div>
+              <div>
+                <p className="text-base font-semibold text-white font-crimson">
+                  Log {isMorning ? 'AM' : 'PM'} routine
+                </p>
+                <p className="text-xs text-[rgba(255,255,255,0.65)] font-outfit mt-0.5">
+                  {isMorning ? 'Tap after your sunscreen absorbs' : 'Complete your evening routine'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-base font-semibold text-white font-crimson">
-                Log {isMorning ? 'AM' : 'PM'} routine
-              </p>
-              <p className="text-xs text-[rgba(255,255,255,0.65)] font-outfit mt-0.5">
-                {isMorning ? 'Tap after your sunscreen absorbs' : 'Complete your evening routine'}
-              </p>
+            <div className="w-5 h-5 text-white opacity-60">
+              <svg viewBox="0 0 20 20" fill="none" strokeWidth={2} strokeLinecap="round">
+                <path d="M7 4l6 6-6 6" />
+              </svg>
             </div>
-          </div>
-          <div className="w-5 h-5 text-white opacity-60">
-            <svg viewBox="0 0 20 20" fill="none" strokeWidth={2} strokeLinecap="round">
-              <path d="M7 4l6 6-6 6" />
-            </svg>
           </div>
         </div>
+
+        {/* First-time tap hint — only shown on day 1 with no logs */}
+        {day === 1 && checkIns.length === 0 && (
+          <div className="flex items-center justify-center gap-1.5 mt-2">
+            <span
+              className="text-base leading-none"
+              style={{ animation: 'tapBounce 1.2s ease-in-out infinite' }}
+            >
+              👆
+            </span>
+            <span className="text-xs text-[#c44033] font-semibold font-outfit">
+              Tap here to log your first routine
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Progress Section */}
@@ -446,6 +474,17 @@ export default function HomeScreen() {
 
       {/* Calendar Section */}
       <div className="px-5 py-4.5">
+        {/* Calendar heading */}
+        <div className="flex items-center gap-1.5 mb-3">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+            <path d="M10 18c-3.87 0-6.5-2.42-6.5-5.6 0-2 1.2-4 2.4-5.2.4-.4 1.2-.4 1.2.4 0 1.2.4 2.4 1.6 3.2.4.4.8.4 1.2 0 .4-.4.4-1.2 0-2.4-.4-1.2-.4-2.8.8-4.4.8-1.2 1.6-2 2.4-2.8.4-.4 1.2-.4 1.2.4 0 1.6.8 2.8 2 4 .8.8 1.6 2 1.6 3.6 0 3.2-2.42 5.6-6.5 5.6z" fill="#c44033" />
+          </svg>
+          <span className="text-xs font-bold text-[#c44033] uppercase tracking-[0.8px] font-outfit">
+            My Skin Journey Log
+          </span>
+          <span className="text-xs text-[#a39e95] font-outfit">· 90-day programme</span>
+        </div>
+
         <div className="flex justify-between items-center mb-2.5">
           <p className="text-sm font-semibold text-[#191716] font-outfit">{currentMonth}</p>
           <div className="flex gap-3">
