@@ -216,7 +216,6 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
                   id="popup-camera-input"
                   type="file"
                   accept="image/*"
-                  capture="user"
                   onChange={handleCameraCapture}
                   className="hidden"
                 />
