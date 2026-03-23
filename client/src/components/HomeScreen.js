@@ -475,14 +475,13 @@ export default function HomeScreen() {
       {/* Calendar Section */}
       <div className="px-5 py-4.5">
         {/* Calendar heading */}
-        <div className="flex items-center gap-1.5 mb-3">
+        <div className="inline-flex items-center gap-1.5 mb-3 px-3 py-1.5 rounded-lg border border-[#e8b4af] bg-[#fdf1f0]">
           <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
             <path d="M10 18c-3.87 0-6.5-2.42-6.5-5.6 0-2 1.2-4 2.4-5.2.4-.4 1.2-.4 1.2.4 0 1.2.4 2.4 1.6 3.2.4.4.8.4 1.2 0 .4-.4.4-1.2 0-2.4-.4-1.2-.4-2.8.8-4.4.8-1.2 1.6-2 2.4-2.8.4-.4 1.2-.4 1.2.4 0 1.6.8 2.8 2 4 .8.8 1.6 2 1.6 3.6 0 3.2-2.42 5.6-6.5 5.6z" fill="#c44033" />
           </svg>
           <span className="text-xs font-bold text-[#c44033] uppercase tracking-[0.8px] font-outfit">
-            My Skin Journey Log
+            Activity Log
           </span>
-          <span className="text-xs text-[#a39e95] font-outfit">· 90-day programme</span>
         </div>
 
         <div className="flex justify-between items-center mb-2.5">

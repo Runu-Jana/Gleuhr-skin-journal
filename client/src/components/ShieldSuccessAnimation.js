@@ -64,7 +64,7 @@ export default function ShieldSuccessAnimation({
         <div className="relative bg-[#1f2d20] border border-[#2e4430] rounded-2xl px-5 py-4 max-w-xs">
           <p className="text-white text-base font-semibold font-outfit text-center leading-snug">
             {phase === 'shield'
-              ? 'Your shield protected your streak! 🛡️'
+              ? `Shield activated. Your streak is safe. ${shieldsRemaining} shield${shieldsRemaining !== 1 ? 's' : ''} remaining.`
               : 'Keep going — your streak lives on! 🔥'}
           </p>
           {/* Bubble tail */}
