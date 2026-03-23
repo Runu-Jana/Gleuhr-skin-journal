@@ -71,20 +71,7 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
   };
 
   const handleUnlockProgress = () => {
-    // Try mobile camera first, fallback to PC file picker
-    const mobileInput = document.getElementById('popup-camera-input');
-    const pcInput = document.getElementById('popup-pc-camera-input');
-    
-    if (mobileInput) {
-      mobileInput.click();
-    }
-    
-    // Fallback for PC - if mobile doesn't work, try PC input after a delay
-    setTimeout(() => {
-      if (!capturedImage && pcInput) {
-        pcInput.click();
-      }
-    }, 1000);
+    document.getElementById('popup-camera-input').click();
   };
 
   const handleRetake = () => {
@@ -229,15 +216,7 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
                   id="popup-camera-input"
                   type="file"
                   accept="image/*"
-                  capture="environment"
-                  onChange={handleCameraCapture}
-                  className="hidden"
-                />
-                {/* PC fallback */}
-                <input
-                  id="popup-pc-camera-input"
-                  type="file"
-                  accept="image/*"
+                  capture="user"
                   onChange={handleCameraCapture}
                   className="hidden"
                 />
@@ -287,7 +266,7 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
               disabled={isSubmitting || !capturedImage}
               className="flex-1 py-3 px-4 rounded-xl bg-[#c44033] text-white font-medium flex items-center justify-center gap-2 hover:bg-[#a0352a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Check className="w-5 h-5" /> {isSubmitting ? 'Saving...' : 'Save'}
+              <Check className="w-5 h-5" /> {isSubmitting ? 'Earning Reward...' : 'Earn a Reward'}
             </button>
           </div>
         </div>
