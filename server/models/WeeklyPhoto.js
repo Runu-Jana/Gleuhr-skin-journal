@@ -45,6 +45,16 @@ const weeklyPhotoSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  coachRating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: null
+  },
+  coachNote: {
+    type: String,
+    default: ''
+  },
   createdAt: {
     type: Date,
     default: Date.now

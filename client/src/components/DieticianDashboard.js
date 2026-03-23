@@ -279,6 +279,170 @@ function SectionHeading({ label }) {
   );
 }
 
+// ── Photos & Ratings tab ─────────────────────────────────────────────────────
+const RATING_LABELS = { 1: 'No visible change', 2: 'Very slight', 3: 'Moderate', 4: 'Good improvement', 5: 'Dramatic' };
+
+function PhotoRatingsTab({ phone, card }) {
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [savingWeek, setSavingWeek] = useState(null);
+  const [ratings, setRatings] = useState({});    // { weekNumber: { rating, note } }
+  const [savedMsg, setSavedMsg] = useState({});  // { weekNumber: msg }
+
+  useEffect(() => {
+    setPhotos([]);
+    setLoading(true);
+    api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/photos`)
+      .then(res => {
+        const list = res.data.photos || [];
+        setPhotos(list);
+        // Pre-fill existing ratings
+        const existing = {};
+        list.forEach(p => {
+          if (p.weekNumber) {
+            existing[p.weekNumber] = { rating: p.coachRating || '', note: p.coachNote || '' };
+          }
+        });
+        setRatings(existing);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [phone]);
+
+  const handleSaveRating = async (weekNumber) => {
+    const { rating, note } = ratings[weekNumber] || {};
+    if (!rating) return;
+    setSavingWeek(weekNumber);
+    try {
+      await api.post(`/api/dietician/patient/${encodeURIComponent(phone)}/photo-rating`, { weekNumber, rating, note });
+      setSavedMsg(prev => ({ ...prev, [weekNumber]: 'Saved' }));
+      setTimeout(() => setSavedMsg(prev => ({ ...prev, [weekNumber]: '' })), 2500);
+    } catch (e) {
+      setSavedMsg(prev => ({ ...prev, [weekNumber]: e.response?.data?.error || 'Error saving' }));
+    } finally {
+      setSavingWeek(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#aaa' }}>
+        <div style={{ width: 24, height: 24, border: '3px solid #c44033', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      </div>
+    );
+  }
+
+  if (photos.length === 0) {
+    return (
+      <div style={{ ...card, textAlign: 'center', padding: '40px', color: '#bbb' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>📸</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#ccc' }}>No weekly photos yet</div>
+        <div style={{ fontSize: 13, marginTop: 6 }}>Photos will appear here as the patient takes their weekly check-ins.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+      {photos.map((photo) => {
+        const wk = photo.weekNumber;
+        const current = ratings[wk] || { rating: '', note: '' };
+        const isSaving = savingWeek === wk;
+        return (
+          <div key={wk} style={card}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>Week {wk}</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
+                  Day {photo.day} · {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                </div>
+              </div>
+              {photo.coachRating && (
+                <div style={{
+                  background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0',
+                  borderRadius: 99, fontSize: 12, fontWeight: 700, padding: '3px 12px',
+                }}>
+                  Rated {photo.coachRating}/5
+                </div>
+              )}
+            </div>
+
+            {/* Photo placeholder (base64 photos not rendered to save memory in dashboard) */}
+            <div style={{
+              background: '#f9f9f9', borderRadius: 10, height: 80,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#ccc', fontSize: 28, marginBottom: 14,
+            }}>
+              {photo.hasPhoto ? '🖼️' : '📷'}
+            </div>
+
+            {/* Rating selector */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#aaa', letterSpacing: '0.08em', marginBottom: 8 }}>
+                IMPROVEMENT RATING (1–5)
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setRatings(prev => ({ ...prev, [wk]: { ...current, rating: n } }))}
+                    style={{
+                      flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
+                      fontWeight: 700, fontSize: 14, transition: 'all 0.15s',
+                      background: current.rating === n ? '#c44033' : '#f3f4f6',
+                      color: current.rating === n ? '#fff' : '#555',
+                    }}
+                    title={RATING_LABELS[n]}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              {current.rating && (
+                <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>{RATING_LABELS[current.rating]}</div>
+              )}
+            </div>
+
+            {/* Optional note */}
+            <textarea
+              rows={2}
+              value={current.note}
+              onChange={e => setRatings(prev => ({ ...prev, [wk]: { ...current, note: e.target.value } }))}
+              placeholder="Optional coach note for this photo…"
+              style={{
+                width: '100%', border: '1px solid #e5e7eb', borderRadius: 8,
+                padding: '8px 10px', fontSize: 12, color: '#444', resize: 'none',
+                fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: 10,
+              }}
+            />
+
+            <button
+              onClick={() => handleSaveRating(wk)}
+              disabled={isSaving || !current.rating}
+              style={{
+                width: '100%', background: current.rating ? '#c44033' : '#e5e7eb',
+                color: current.rating ? '#fff' : '#aaa', border: 'none', borderRadius: 8,
+                padding: '8px', fontSize: 13, fontWeight: 600, cursor: current.rating ? 'pointer' : 'default',
+              }}
+            >
+              {isSaving ? 'Saving…' : 'Save Rating'}
+            </button>
+            {savedMsg[wk] && (
+              <div style={{
+                marginTop: 8, fontSize: 12, fontWeight: 500, textAlign: 'center',
+                color: savedMsg[wk] === 'Saved' ? '#16a34a' : '#dc2626',
+              }}>
+                {savedMsg[wk] === 'Saved' ? '✓ Saved' : savedMsg[wk]}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Diet & Compliance tab ────────────────────────────────────────────────────
 const WATER_LABELS = { 1: '< 1L', 2: '1–2L', 3: '2–3L', 4: '3L+' };
 
@@ -473,6 +637,8 @@ function PatientDetailPanel({ phone, onBack }) {
   const [notes, setNotes]         = useState([]);
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [restoringShield, setRestoringShield] = useState(false);
+  const [shieldMsg, setShieldMsg] = useState('');
 
   const fetchNotes = () => {
     setNotesLoading(true);
@@ -495,6 +661,23 @@ function PatientDetailPanel({ phone, onBack }) {
       .finally(() => setLoading(false));
     fetchNotes();
   }, [phone]); // eslint-disable-line
+
+  const handleRestoreShield = async () => {
+    setRestoringShield(true);
+    setShieldMsg('');
+    try {
+      const res = await api.post(`/api/dietician/patient/${encodeURIComponent(phone)}/restore-shield`);
+      const remaining = res.data.coachRestorations?.remaining ?? '?';
+      setShieldMsg(`Shield restored. ${remaining} coach restoration${remaining === 1 ? '' : 's'} remaining this month.`);
+      // Refresh patient data to update shield count
+      const updated = await api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/details`);
+      setData(updated.data.data);
+    } catch (e) {
+      setShieldMsg(e.response?.data?.error || 'Failed to restore shield');
+    } finally {
+      setRestoringShield(false);
+    }
+  };
 
   const handleSaveNote = async () => {
     if (!noteText.trim()) return;
@@ -612,7 +795,7 @@ function PatientDetailPanel({ phone, onBack }) {
                 <SectionHeading label="STREAK & SHIELDS" />
                 <div style={{ display: 'flex', gap: 28, alignItems: 'center', marginBottom: 16 }}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 26 }}>🔥 <span style={{ fontSize: 22, fontWeight: 700 }}>{streak.currentStreak || 'O'}</span></div>
+                    <div style={{ fontSize: 26 }}>🔥 <span style={{ fontSize: 22, fontWeight: 700 }}>{streak.currentStreak || 0}</span></div>
                     <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Current</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
@@ -621,8 +804,34 @@ function PatientDetailPanel({ phone, onBack }) {
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: 22 }}>🛡️ <span style={{ fontWeight: 700 }}>{streak.shields}</span></div>
-                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Shields</div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Shields left</div>
                   </div>
+                </div>
+                {/* Coach shield restoration */}
+                <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 14 }}>
+                  <div style={{ fontSize: 12, color: '#888', marginBottom: 10, lineHeight: 1.4 }}>
+                    Restore a shield for this patient if they had a tough day. Max 2 coach restorations per patient per month.
+                  </div>
+                  <button
+                    onClick={handleRestoreShield}
+                    disabled={restoringShield}
+                    style={{
+                      background: restoringShield ? '#e5e7eb' : '#c44033',
+                      color: restoringShield ? '#aaa' : '#fff',
+                      border: 'none', borderRadius: 8, padding: '8px 18px',
+                      fontSize: 13, fontWeight: 600, cursor: restoringShield ? 'default' : 'pointer',
+                    }}
+                  >
+                    {restoringShield ? 'Restoring…' : '🛡️ Restore Shield'}
+                  </button>
+                  {shieldMsg && (
+                    <div style={{
+                      marginTop: 10, fontSize: 12, fontWeight: 500,
+                      color: shieldMsg.startsWith('Shield restored') ? '#16a34a' : '#dc2626',
+                    }}>
+                      {shieldMsg}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -831,8 +1040,13 @@ function PatientDetailPanel({ phone, onBack }) {
         <DietComplianceTab phone={phone} card={card} />
       )}
 
-      {/* ── Other tabs (placeholder) ── */}
-      {(activeTab === 'photos' || activeTab === 'calls') && (
+      {/* ── Photos & Ratings tab ── */}
+      {activeTab === 'photos' && (
+        <PhotoRatingsTab phone={phone} card={card} />
+      )}
+
+      {/* ── Call History tab placeholder ── */}
+      {activeTab === 'calls' && (
         <div style={{ background: '#fff', borderRadius: 14, padding: '40px', textAlign: 'center', color: '#bbb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#ccc' }}>Coming soon</div>

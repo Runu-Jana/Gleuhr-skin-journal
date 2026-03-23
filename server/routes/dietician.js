@@ -146,8 +146,8 @@ router.get('/dashboard', async (req, res) => {
         categorized = true;
       }
 
-      // Reorder: day 30-45
-      if (currentDay >= 30 && currentDay <= 45) {
+      // Reorder: day 25-35 (products last ~40 days, need 5-7 days shipping buffer)
+      if (currentDay >= 25 && currentDay <= 35) {
         reorder.push({ ...item, reason: 'Reorder Window', action: 'Reorder conversation' });
         categorized = true;
       }
@@ -506,6 +506,108 @@ router.post('/patient/:phone/notes', async (req, res) => {
   } catch (err) {
     console.error('Save note error:', err);
     res.status(500).json({ error: 'Failed to save note' });
+  }
+});
+
+/**
+ * POST /api/dietician/patient/:phone/restore-shield
+ * Coach restores one shield for a patient (max 2 coach-restorations per month).
+ */
+router.post('/patient/:phone/restore-shield', async (req, res) => {
+  try {
+    const phoneVariants = getPhoneVariants(req.params.phone);
+    const patientOr = phoneVariants.flatMap(v => [{ phoneNumber: v }, { phone: v }]);
+    const streakOr  = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
+
+    const [patient, streak] = await Promise.all([
+      Patient.findOne({ $or: patientOr }),
+      Streak.findOne({ $or: streakOr }),
+    ]);
+
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
+    if (!streak)  return res.status(404).json({ error: 'No streak data found' });
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    // Track coach restorations separately (max 2/month)
+    const coachShields = streak.coachShields || { used: 0, lastResetMonth: currentMonth };
+    if (coachShields.lastResetMonth !== currentMonth) {
+      coachShields.used = 0;
+      coachShields.lastResetMonth = currentMonth;
+    }
+    if (coachShields.used >= 2) {
+      return res.status(400).json({ error: 'Maximum 2 coach shield restorations used this month for this patient' });
+    }
+
+    // Add 1 to the player's available shields (cap at 3 total auto + 2 coach = 5 total possible)
+    const currentAvailable = streak.shields?.monthly != null
+      ? (streak.shields.monthly - (streak.shields.used || 0))
+      : 3;
+
+    await Streak.findByIdAndUpdate(streak._id, {
+      'shields.monthly': Math.min(5, (streak.shields?.monthly || 3) + 1),
+      coachShields: { used: coachShields.used + 1, lastResetMonth: currentMonth },
+    });
+
+    res.json({
+      success: true,
+      message: 'Shield restored for patient',
+      coachRestorations: { used: coachShields.used + 1, remaining: 2 - (coachShields.used + 1) },
+    });
+  } catch (err) {
+    console.error('Coach restore shield error:', err);
+    res.status(500).json({ error: 'Failed to restore shield' });
+  }
+});
+
+/**
+ * POST /api/dietician/patient/:phone/photo-rating
+ * Coach saves a 1-5 improvement rating for a patient's weekly photo.
+ */
+router.post('/patient/:phone/photo-rating', async (req, res) => {
+  try {
+    const { weekNumber, rating, note } = req.body;
+    if (!weekNumber || !rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'weekNumber and rating (1-5) are required' });
+    }
+    const phoneVariants = getPhoneVariants(req.params.phone);
+    const photoOr = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
+
+    const updated = await WeeklyPhoto.findOneAndUpdate(
+      { $or: photoOr, weekNumber: Number(weekNumber) },
+      { coachRating: Number(rating), coachNote: note || '' },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ error: 'Photo not found for that week' });
+
+    res.json({ success: true, photo: { weekNumber: updated.weekNumber, coachRating: updated.coachRating, coachNote: updated.coachNote } });
+  } catch (err) {
+    console.error('Coach photo rating error:', err);
+    res.status(500).json({ error: 'Failed to save rating' });
+  }
+});
+
+/**
+ * GET /api/dietician/patient/:phone/photos
+ * Return weekly photos with coach ratings for a patient.
+ */
+router.get('/patient/:phone/photos', async (req, res) => {
+  try {
+    const phoneVariants = getPhoneVariants(req.params.phone);
+    const photoOr = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
+    const photos = await WeeklyPhoto.find({ $or: photoOr }).sort({ weekNumber: 1 }).lean();
+    res.json({ success: true, photos: photos.map(p => ({
+      weekNumber: p.weekNumber,
+      day: p.day,
+      createdAt: p.createdAt,
+      coachRating: p.coachRating || null,
+      coachNote: p.coachNote || '',
+      hasPhoto: !!p.photoData,
+    })) });
+  } catch (err) {
+    console.error('Fetch photos error:', err);
+    res.status(500).json({ error: 'Failed to fetch photos' });
   }
 });
 
