@@ -94,6 +94,7 @@ export default function AdminDashboard() {
 
   // Team lead overview
   const [showTeamOverview, setShowTeamOverview] = useState(isTeamLead);
+  const [showDieticianOverview, setShowDieticianOverview] = useState(false);
   const [allCoachData, setAllCoachData] = useState({}); // { coachName: { customers, loading } }
 
   // Load dietician list
@@ -111,7 +112,7 @@ export default function AdminDashboard() {
 
   // Load customers for selected dietician (skip when team lead is on overview)
   const fetchCustomers = useCallback(async () => {
-    if (showTeamOverview) return;
+    if (showTeamOverview || showDieticianOverview) return;
     setLoading(true);
     setError(null);
     setSelectedCustomer(null);
@@ -124,13 +125,13 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [dietician, showTeamOverview]);
+  }, [dietician, showTeamOverview, showDieticianOverview]);
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
-  // Fetch all coaches' data for team overview
+  // Fetch all coaches' data for team overview or dietician overview
   useEffect(() => {
-    if (!showTeamOverview || dieticians.length === 0) return;
+    if ((!showTeamOverview && !showDieticianOverview) || dieticians.length === 0) return;
     dieticians.forEach(d => {
       const name = typeof d === 'string' ? d : (d?.name || d?.email || '');
       if (!name || allCoachData[name]) return;
@@ -139,7 +140,7 @@ export default function AdminDashboard() {
         .then(({ data }) => setAllCoachData(prev => ({ ...prev, [name]: { customers: data.data || [], loading: false } })))
         .catch(()         => setAllCoachData(prev => ({ ...prev, [name]: { customers: [],           loading: false } })));
     });
-  }, [showTeamOverview, dieticians]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showTeamOverview, showDieticianOverview, dieticians]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Open customer detail
   const openDetail = async (customer) => {
@@ -195,9 +196,15 @@ export default function AdminDashboard() {
           <div className="admin-sidebar-logo"><h2>GLEUHR</h2><p>Skin Journal</p></div>
           <nav className="admin-sidebar-nav">
             {isTeamLead && (
-              <button className="admin-sidebar-item" onClick={() => { setSelectedCustomer(null); setDetails(null); setShowTeamOverview(true); }}>
+              <button className="admin-sidebar-item" onClick={() => { setSelectedCustomer(null); setDetails(null); setShowTeamOverview(true); setShowDieticianOverview(false); }}>
                 <div className="admin-sidebar-avatar" style={{ background: avatarColor(teamLeadName) }}>{getInitials(teamLeadName)}</div>
                 <div><div style={{ fontWeight: 600, fontSize: 13 }}>{teamLeadName}</div><div style={{ fontSize: 11, opacity: 0.6 }}>Team Overview</div></div>
+              </button>
+            )}
+            {!isTeamLead && (
+              <button className="admin-sidebar-item" onClick={() => { setSelectedCustomer(null); setDetails(null); setShowDieticianOverview(true); setShowTeamOverview(false); }}>
+                <div className="admin-sidebar-avatar" style={{ background: '#374151', fontSize: 11 }}>OV</div>
+                <div><div style={{ fontWeight: 600, fontSize: 13 }}>All Coaches</div><div style={{ fontSize: 11, opacity: 0.6 }}>Overview</div></div>
               </button>
             )}
             <div style={{ padding: '12px 16px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1, opacity: 0.4, textTransform: 'uppercase' }}>Coaches</div>
@@ -207,7 +214,7 @@ export default function AdminDashboard() {
                 <button
                   key={name}
                   className={`admin-sidebar-item ${name === dietician ? 'active' : ''}`}
-                  onClick={() => { setDietician(name); setSelectedCustomer(null); setDetails(null); setShowTeamOverview(false); }}
+                  onClick={() => { setDietician(name); setSelectedCustomer(null); setDetails(null); setShowTeamOverview(false); setShowDieticianOverview(false); }}
                 >
                   <div className="admin-sidebar-avatar" style={{ background: avatarColor(name) }}>
                     {getInitials(name)}
@@ -258,10 +265,19 @@ export default function AdminDashboard() {
           {isTeamLead && (
             <button
               className={`admin-sidebar-item ${showTeamOverview ? 'active' : ''}`}
-              onClick={() => setShowTeamOverview(true)}
+              onClick={() => { setShowTeamOverview(true); setShowDieticianOverview(false); }}
             >
               <div className="admin-sidebar-avatar" style={{ background: avatarColor(teamLeadName) }}>{getInitials(teamLeadName)}</div>
               <div><div style={{ fontWeight: 600, fontSize: 13 }}>{teamLeadName}</div><div style={{ fontSize: 11, opacity: 0.6 }}>Team Overview</div></div>
+            </button>
+          )}
+          {!isTeamLead && (
+            <button
+              className={`admin-sidebar-item ${showDieticianOverview ? 'active' : ''}`}
+              onClick={() => { setShowDieticianOverview(true); setShowTeamOverview(false); }}
+            >
+              <div className="admin-sidebar-avatar" style={{ background: '#374151', fontSize: 11 }}>OV</div>
+              <div><div style={{ fontWeight: 600, fontSize: 13 }}>All Coaches</div><div style={{ fontSize: 11, opacity: 0.6 }}>Overview</div></div>
             </button>
           )}
           <div style={{ padding: '12px 16px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1, opacity: 0.4, textTransform: 'uppercase' }}>Coaches</div>
@@ -270,8 +286,8 @@ export default function AdminDashboard() {
             return (
               <button
                 key={name}
-                className={`admin-sidebar-item ${!showTeamOverview && name === dietician ? 'active' : ''}`}
-                onClick={() => { setDietician(name); setShowTeamOverview(false); }}
+                className={`admin-sidebar-item ${!showTeamOverview && !showDieticianOverview && name === dietician ? 'active' : ''}`}
+                onClick={() => { setDietician(name); setShowTeamOverview(false); setShowDieticianOverview(false); }}
               >
                 <div className="admin-sidebar-avatar" style={{ background: avatarColor(name) }}>
                   {getInitials(name)}
@@ -297,7 +313,13 @@ export default function AdminDashboard() {
               teamLeadName={teamLeadName}
               dieticians={dieticians}
               allCoachData={allCoachData}
-              onSelectCoach={name => { setDietician(name); setShowTeamOverview(false); }}
+              onSelectCoach={name => { setDietician(name); setShowTeamOverview(false); setShowDieticianOverview(false); }}
+            />
+          : showDieticianOverview
+          ? <AllCoachesOverviewPanel
+              dieticians={dieticians}
+              allCoachData={allCoachData}
+              onSelectCoach={name => { setDietician(name); setShowDieticianOverview(false); }}
             />
           : <>
               {/* Top bar */}
@@ -956,6 +978,101 @@ function TeamOverviewPanel({ teamLeadName, dieticians, allCoachData, onSelectCoa
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {allPatients.map((c, i) => <CustomerCard key={i} customer={c} onView={() => {}} />)}
         </div>
+      )}
+    </>
+  );
+}
+
+// ── All Coaches Overview Panel (admin view with per-dietician analytics cards) ──
+
+function AllCoachesOverviewPanel({ dieticians, allCoachData, onSelectCoach }) {
+  const coaches = dieticians.map(d => typeof d === 'string' ? d : (d?.name || d?.email || ''));
+
+  const coachStats = useMemo(() => {
+    const out = {};
+    coaches.forEach(c => { out[c] = computeCoachStats(allCoachData[c]?.customers || []); });
+    return out;
+  }, [coaches, allCoachData]);
+
+  const totals = useMemo(() => {
+    const vals = Object.values(coachStats);
+    const activeCons = vals.filter(v => v.total > 0).map(v => v.avgConsistency);
+    return {
+      totalPatients:   vals.reduce((s, v) => s + v.calls, 0),
+      totalUrgent:     vals.reduce((s, v) => s + v.urgent, 0),
+      avgConsistency:  activeCons.length > 0 ? Math.round(activeCons.reduce((a, b) => a + b, 0) / activeCons.length) : 0,
+      totalReorderDue: vals.reduce((s, v) => s + v.reorderDue, 0),
+      totalRetained:   vals.reduce((s, v) => s + v.retained, 0),
+    };
+  }, [coachStats]);
+
+  const anyLoading = coaches.some(c => allCoachData[c]?.loading);
+
+  return (
+    <>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Coaches Overview</h1>
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>
+          {coaches.length} coaches · {totals.totalPatients} total patients
+        </p>
+      </div>
+
+      {/* Summary stats row */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        {[
+          { value: totals.totalPatients,          label: 'Total Patients',        color: '#374151' },
+          { value: totals.totalUrgent,             label: 'Total Urgent',          color: '#c44033' },
+          { value: `${totals.avgConsistency}%`,    label: 'Avg Consistency',       color: '#16a34a' },
+          { value: totals.totalReorderDue,         label: 'Reorders Due',          color: '#2563eb' },
+          { value: totals.totalRetained,           label: 'Retained (Day 28+)',    color: '#7c3aed' },
+        ].map(({ value, label, color }) => (
+          <div key={label} style={{ flex: 1, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: '20px', textAlign: 'center', borderTop: `3px solid ${color}` }}>
+            <div style={{ fontSize: 32, fontWeight: 700, color }}>{value}</div>
+            <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Loading spinner */}
+      {anyLoading && coaches.length === 0 ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <div style={{ width: 28, height: 28, border: '3px solid #c44033', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        </div>
+      ) : (
+        <>
+          {/* Coach cards grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 20 }}>
+            {coaches.map(coach => (
+              <CoachCard
+                key={coach}
+                name={coach}
+                stats={coachStats[coach] || {}}
+                loading={allCoachData[coach]?.loading ?? true}
+                onDrillDown={() => onSelectCoach(coach)}
+              />
+            ))}
+          </div>
+
+          {/* Consistency comparison bar chart */}
+          <div className="admin-card">
+            <h4 style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#888' }}>Coach Consistency Comparison</h4>
+            {[...coaches]
+              .sort((a, b) => (coachStats[b]?.avgConsistency ?? 0) - (coachStats[a]?.avgConsistency ?? 0))
+              .map(coach => {
+                const pct   = coachStats[coach]?.avgConsistency ?? 0;
+                const color = pct >= 50 ? '#f59e0b' : '#e5e5e5';
+                return (
+                  <div key={coach} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <div style={{ width: 90, fontSize: 13, fontWeight: 600, flexShrink: 0 }}>{coach.split(' ')[0]}</div>
+                    <div style={{ flex: 1, height: 10, background: '#f0ebe6', borderRadius: 5, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 5, transition: 'width 0.6s' }} />
+                    </div>
+                    <div style={{ width: 36, fontSize: 13, fontWeight: 700, color: pct >= 50 ? '#f59e0b' : '#999', textAlign: 'right' }}>{pct}%</div>
+                  </div>
+                );
+              })}
+          </div>
+        </>
       )}
     </>
   );
