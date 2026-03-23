@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Phone as PhoneIcon, ArrowLeft, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import './AdminDashboard.css';
@@ -64,7 +64,20 @@ function Badge({ label, styleMap }) {
 
 // ────────────────────────────────────────────────────────────────────────────
 
+// ── JWT helper (no-verify decode for role detection) ────────────────────────
+function decodeToken(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64));
+  } catch { return null; }
+}
+
 export default function AdminDashboard() {
+  const rawToken = localStorage.getItem('adminToken');
+  const decoded  = decodeToken(rawToken);
+  if (decoded?.role === 'team_lead') {
+    return <TeamLeadDashboard teamLeadName={decoded.name || decoded.email || 'Team Lead'} />;
+  }
   const [dietician, setDietician] = useState('Dt.Muskan');
   const [dieticians, setDieticians] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -725,6 +738,279 @@ function CallsTab() {
     <div className="admin-card" style={{ textAlign:'center',padding:40,color:'#999' }}>
       <h4>Call History</h4>
       <p>Call logs will appear here once logged.</p>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TEAM LEAD DASHBOARD
+// ════════════════════════════════════════════════════════════════════════════
+
+function computeCoachStats(customers) {
+  const appPatients = customers.filter(c => c.mongodb);
+  const total = customers.length;
+
+  const consistencies = appPatients.map(c => {
+    const ci = c.mongodb?.last7Days?.checkInsCompleted ?? 0;
+    return Math.round((ci / 7) * 100);
+  });
+  const avgConsistency = consistencies.length > 0
+    ? Math.round(consistencies.reduce((a, b) => a + b, 0) / consistencies.length) : 0;
+
+  const skinScores = appPatients.map(c => c.mongodb?.latestSkinScore?.totalScore).filter(v => v != null);
+  const avgSkinScore = skinScores.length > 0
+    ? parseFloat((skinScores.reduce((a, b) => a + b, 0) / skinScores.length).toFixed(1)) : 0;
+
+  const urgent  = appPatients.filter(c => (c.mongodb?.streak?.daysAbsent ?? 0) >= 3).length;
+  const flagged = appPatients.filter(c => {
+    const ci = c.mongodb?.last7Days?.checkInsCompleted ?? 0;
+    const absent = c.mongodb?.streak?.daysAbsent ?? 0;
+    return absent >= 1 || ci < 4;
+  }).length;
+  const reorderDue = appPatients.filter(c => (c.mongodb?.currentDay ?? 0) >= 78).length;
+  const retained   = appPatients.filter(c => (c.mongodb?.currentDay ?? 0) >= 28).length;
+
+  return { total: appPatients.length, calls: total, avgConsistency, avgSkinScore, urgent, flagged, reorderDue, retained };
+}
+
+function TeamStatCard({ value, label, color }) {
+  return (
+    <div style={{
+      flex: 1, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12,
+      padding: '20px', textAlign: 'center', borderTop: `3px solid ${color}`,
+    }}>
+      <div style={{ fontSize: 32, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>{label}</div>
+    </div>
+  );
+}
+
+function CoachCard({ name, stats, loading }) {
+  if (loading) {
+    return (
+      <div className="admin-card" style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight: 180 }}>
+        <div style={{ width:20, height:20, border:'2px solid #c44033', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+      </div>
+    );
+  }
+  const metrics = [
+    { label: 'Avg Consistency', value: `${stats.avgConsistency}%`, color: stats.avgConsistency >= 70 ? '#f59e0b' : stats.avgConsistency >= 50 ? '#f59e0b' : '#c44033' },
+    { label: 'Avg Skin Score',  value: stats.avgSkinScore,         color: '#1a1a1a' },
+    { label: 'Flagged',         value: stats.flagged,              color: stats.flagged > 0 ? '#f59e0b' : '#16a34a' },
+    { label: 'Reorder Due',     value: stats.reorderDue,           color: '#1a1a1a' },
+    { label: 'Retained',        value: stats.retained,             color: stats.retained > 0 ? '#16a34a' : '#1a1a1a' },
+    { label: 'Calls (Total)',   value: stats.calls,                color: '#1a1a1a', bold: true },
+  ];
+  return (
+    <div className="admin-card">
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:avatarColor(name), color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:13, flexShrink:0 }}>
+          {getInitials(name)}
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:700, fontSize:14 }}>{name}</div>
+          <div style={{ fontSize:12, color:'#888' }}>{stats.total} patients</div>
+        </div>
+        {stats.urgent > 0 && (
+          <span style={{ fontSize:11, fontWeight:700, background:'#FEE2E2', color:'#B91C1C', padding:'2px 8px', borderRadius:99 }}>
+            {stats.urgent} urgent
+          </span>
+        )}
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px 16px' }}>
+        {metrics.map(({ label, value, color, bold }) => (
+          <div key={label}>
+            <div style={{ fontSize:11, color:'#aaa', marginBottom:2 }}>{label}</div>
+            <div style={{ fontSize:18, fontWeight: bold ? 700 : 600, color }}>{value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TeamLeadDashboard({ teamLeadName }) {
+  const [coaches, setCoaches]     = useState([]);
+  const [coachData, setCoachData] = useState({});
+  const [loadingList, setLoadingList] = useState(true);
+  const [activeTab, setActiveTab] = useState('performance');
+
+  useEffect(() => {
+    adminApi.get('/admin/dietician').then(({ data }) => {
+      const list = (data.data || []).map(d => typeof d === 'string' ? d : (d?.name || d?.email || ''));
+      setCoaches(list);
+      setLoadingList(false);
+      list.forEach(coach => {
+        setCoachData(prev => ({ ...prev, [coach]: { customers: [], loading: true } }));
+        adminApi.get(`/admin/dietician/${encodeURIComponent(coach)}/customers`)
+          .then(({ data: d }) => setCoachData(prev => ({ ...prev, [coach]: { customers: d.data || [], loading: false } })))
+          .catch(()          => setCoachData(prev => ({ ...prev, [coach]: { customers: [],    loading: false } })));
+      });
+    }).catch(() => setLoadingList(false));
+  }, []);
+
+  const coachStats = useMemo(() => {
+    const out = {};
+    coaches.forEach(coach => {
+      out[coach] = computeCoachStats(coachData[coach]?.customers || []);
+    });
+    return out;
+  }, [coaches, coachData]);
+
+  const teamTotals = useMemo(() => {
+    const vals = Object.values(coachStats);
+    const totalUrgent         = vals.reduce((s, v) => s + v.urgent, 0);
+    const totalReorderDue     = vals.reduce((s, v) => s + v.reorderDue, 0);
+    const totalRetained       = vals.reduce((s, v) => s + v.retained, 0);
+    const totalPatients       = vals.reduce((s, v) => s + v.calls, 0);
+    const activeCons = vals.filter(v => v.total > 0).map(v => v.avgConsistency);
+    const teamAvgConsistency  = activeCons.length > 0
+      ? Math.round(activeCons.reduce((a, b) => a + b, 0) / activeCons.length) : 0;
+    return { totalUrgent, teamAvgConsistency, totalReorderDue, totalRetained, totalPatients };
+  }, [coachStats]);
+
+  const escalations = useMemo(() =>
+    coaches.flatMap(coach =>
+      (coachData[coach]?.customers || [])
+        .filter(c => c.mongodb && (c.mongodb?.streak?.daysAbsent ?? 0) >= 3)
+        .map(c => ({ ...c, coachName: coach }))
+    ), [coaches, coachData]);
+
+  const allPatients = useMemo(() =>
+    coaches.flatMap(coach =>
+      (coachData[coach]?.customers || []).map(c => ({ ...c, coachName: coach }))
+    ), [coaches, coachData]);
+
+  const anyLoading = loadingList || Object.values(coachData).some(d => d.loading);
+
+  return (
+    <div className="admin-layout">
+      {/* Sidebar */}
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar-logo"><h2>GLEUHR</h2><p>Skin Journal</p></div>
+        <nav className="admin-sidebar-nav">
+          <div style={{ padding:'12px 16px 4px', fontSize:10, fontWeight:700, letterSpacing:1, opacity:0.4, textTransform:'uppercase' }}>Team</div>
+          <div className="admin-sidebar-item active">
+            <div className="admin-sidebar-avatar" style={{ background: avatarColor(teamLeadName) }}>
+              {getInitials(teamLeadName)}
+            </div>
+            <div>
+              <div style={{ fontWeight:600, fontSize:13 }}>{teamLeadName}</div>
+              <div style={{ fontSize:11, opacity:0.6 }}>Team Lead</div>
+            </div>
+          </div>
+          {coaches.length > 0 && (
+            <>
+              <div style={{ padding:'12px 16px 4px', fontSize:10, fontWeight:700, letterSpacing:1, opacity:0.4, textTransform:'uppercase' }}>Coaches</div>
+              {coaches.map(coach => (
+                <div key={coach} className="admin-sidebar-item" style={{ cursor:'default' }}>
+                  <div className="admin-sidebar-avatar" style={{ background: avatarColor(coach) }}>
+                    {getInitials(coach)}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight:500, fontSize:13 }}>{coach}</div>
+                    <div style={{ fontSize:11, opacity:0.6 }}>Coach · {coachStats[coach]?.calls ?? 0} patients</div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </nav>
+        <div className="admin-sidebar-footer">
+          <div>Airtable Sync: Live</div>
+          <div>Last updated: {new Date().toISOString().split('T')[0]}</div>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="admin-main">
+        {/* Header */}
+        <div style={{ marginBottom:20 }}>
+          <h1 style={{ margin:0, fontSize:24, fontWeight:700 }}>Team Overview — {teamLeadName}</h1>
+          <p style={{ margin:'4px 0 0', fontSize:13, color:'#888' }}>
+            {coaches.length} coaches · {teamTotals.totalPatients} total patients
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display:'flex', gap:4, marginBottom:20, background:'#fff', border:'1px solid #e5e5e5', borderRadius:12, padding:6 }}>
+          {[
+            { key:'performance',  label:'🔥 Team Performance' },
+            { key:'escalations',  label:'📋 Escalations',  count: escalations.length },
+            { key:'all',          label:'All Patients',     count: allPatients.length },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding:'7px 16px', border:'none', borderRadius:8, cursor:'pointer',
+                fontSize:13, fontWeight:600,
+                background: activeTab === tab.key ? '#fff' : 'transparent',
+                boxShadow: activeTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                color: activeTab === tab.key ? '#1a1a1a' : '#888',
+              }}
+            >
+              {tab.label}{tab.count !== undefined ? ` ${tab.count}` : ''}
+            </button>
+          ))}
+        </div>
+
+        {anyLoading && coaches.length === 0 ? (
+          <div style={{ display:'flex', justifyContent:'center', padding:60 }}>
+            <div style={{ width:28, height:28, border:'3px solid #c44033', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+          </div>
+        ) : activeTab === 'performance' ? (
+          <>
+            {/* Stats row */}
+            <div style={{ display:'flex', gap:12, marginBottom:20 }}>
+              <TeamStatCard value={teamTotals.totalUrgent}        label="Total Urgent"          color="#c44033" />
+              <TeamStatCard value={`${teamTotals.teamAvgConsistency}%`} label="Team Avg Consistency" color="#16a34a" />
+              <TeamStatCard value={teamTotals.totalReorderDue}    label="Reorders Due"           color="#2563eb" />
+              <TeamStatCard value={teamTotals.totalRetained}      label="Retained"               color="#7c3aed" />
+            </div>
+
+            {/* Coach cards */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:20 }}>
+              {coaches.map(coach => (
+                <CoachCard
+                  key={coach}
+                  name={coach}
+                  stats={coachStats[coach] || {}}
+                  loading={coachData[coach]?.loading ?? true}
+                />
+              ))}
+            </div>
+
+            {/* Consistency comparison */}
+            <div className="admin-card">
+              <h4>COACH CONSISTENCY COMPARISON</h4>
+              {coaches.map(coach => {
+                const pct   = coachStats[coach]?.avgConsistency ?? 0;
+                const color = pct >= 50 ? '#f59e0b' : '#e5e5e5';
+                return (
+                  <div key={coach} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                    <div style={{ width:80, fontSize:13, fontWeight:600, flexShrink:0 }}>{coach.split(' ')[0]}</div>
+                    <div style={{ flex:1, height:10, background:'#f0ebe6', borderRadius:5, overflow:'hidden' }}>
+                      <div style={{ width:`${pct}%`, height:'100%', background:color, borderRadius:5, transition:'width 0.6s' }} />
+                    </div>
+                    <div style={{ width:36, fontSize:13, fontWeight:700, color: pct >= 50 ? '#f59e0b' : '#999', textAlign:'right' }}>{pct}%</div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : activeTab === 'escalations' ? (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {escalations.length === 0
+              ? <div style={{ textAlign:'center', padding:60, color:'#999' }}>No escalations right now</div>
+              : escalations.map((c, i) => <CustomerCard key={i} customer={c} onView={() => {}} />)}
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {allPatients.map((c, i) => <CustomerCard key={i} customer={c} onView={() => {}} />)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
