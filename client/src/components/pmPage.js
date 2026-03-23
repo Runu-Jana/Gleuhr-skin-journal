@@ -410,24 +410,6 @@ export default function PMPage() {
                   </label>
                 </div>
 
-                {/* Sunscreen sub-checkbox when AM ticked */}
-                {amRoutine && (
-                  <div style={{ padding: '10px 12px', background: 'rgba(16,185,129,0.06)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <div
-                        onClick={() => setSunscreen(!sunscreen)}
-                        style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid rgb(204,200,192)', background: 'rgb(255,255,255)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: '0' }}
-                      >
-                        {sunscreen && (
-                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                            <path d="M13.5 4.5L6 12l-3.5-3.5" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '12px', color: 'rgb(61,57,53)', fontFamily: 'Outfit, sans-serif', lineHeight: '1.4' }}>Applied sunscreen this morning?</span>
-                    </label>
-                  </div>
-                )}
               </>
             )}
 
@@ -567,32 +549,89 @@ export default function PMPage() {
         </motion.div>
       )}
 
-      {/* Shield Restore Modal */}
-      {showShieldRestore && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-white rounded-2xl p-6 text-center max-w-sm mx-4">
-            <div className="text-4xl mb-4">🛡️</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Restore Your Streak?</h3>
-            <p className="text-gray-600 mb-4">
-              Use a shield to restore your streak. You have {streakData?.restorationShields?.available || 0} shields available this month.
-            </p>
-            <div className="flex gap-3 justify-center">
+      {/* Shield Restore Reminder — bottom sheet */}
+      <AnimatePresence>
+        {showShieldRestore && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowShieldRestore(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 40 }}
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              style={{
+                position: 'fixed', bottom: 0, left: 0, right: 0,
+                background: '#fff', borderRadius: '24px 24px 0 0',
+                padding: '12px 24px 48px', zIndex: 50,
+                boxShadow: '0 -8px 40px rgba(0,0,0,0.14)',
+              }}
+            >
+              {/* drag handle */}
+              <div style={{ width: 40, height: 4, background: '#e0ddd8', borderRadius: 99, margin: '0 auto 24px' }} />
+
+              {/* Shield icon */}
+              <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(196,64,51,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <span style={{ fontSize: 32 }}>🛡️</span>
+              </div>
+
+              <h3 style={{ fontSize: 22, fontWeight: 700, textAlign: 'center', color: '#191716', fontFamily: 'Crimson Pro, serif', marginBottom: 8 }}>
+                Don't lose your streak!
+              </h3>
+
+              <p style={{ fontSize: 14, color: '#7a756d', fontFamily: 'Outfit, sans-serif', textAlign: 'center', lineHeight: 1.6, marginBottom: 10 }}>
+                You missed today's routine. Activate a shield to keep your streak alive.
+              </p>
+
+              {/* Shield count pill */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(196,64,51,0.07)', borderRadius: 99, padding: '6px 16px' }}>
+                  <Shield size={14} style={{ color: '#c44033' }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#c44033', fontFamily: 'Outfit, sans-serif' }}>
+                    {availableShields} shield{availableShields !== 1 ? 's' : ''} available
+                  </span>
+                </div>
+              </div>
+
+              {availableShields > 0 ? (
+                <button
+                  onClick={restoreStreakWithShield}
+                  style={{
+                    width: '100%', padding: '16px', borderRadius: 14, border: 'none',
+                    background: '#c44033', color: '#fff',
+                    fontSize: 15, fontWeight: 700, fontFamily: 'Outfit, sans-serif',
+                    cursor: 'pointer', marginBottom: 12,
+                    boxShadow: 'rgba(196,64,51,0.25) 0px 6px 20px',
+                  }}
+                >
+                  🛡️ Restore Streak
+                </button>
+              ) : (
+                <div style={{ textAlign: 'center', marginBottom: 12, padding: '14px', background: '#fef2f2', borderRadius: 14 }}>
+                  <p style={{ fontSize: 13, color: '#c44033', fontFamily: 'Outfit, sans-serif', margin: 0, fontWeight: 600 }}>
+                    No shields available this month
+                  </p>
+                  <p style={{ fontSize: 12, color: '#9ca3af', fontFamily: 'Outfit, sans-serif', margin: '4px 0 0' }}>
+                    Your streak will reset. New shields arrive next month.
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={() => setShowShieldRestore(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#9ca3af', padding: '8px 0', fontFamily: 'Outfit, sans-serif' }}
               >
-                Cancel
+                Maybe later
               </button>
-              <button
-                onClick={restoreStreakWithShield}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-              >
-                Use Shield
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
       
       {/* Shield Success Animation */}
       <AnimatePresence>
