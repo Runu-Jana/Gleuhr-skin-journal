@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient, savePatient } from '../utils/db';
+import { saveCheckIn, getTodayCheckIn, getCheckIns, getWeeklyPhotos, getPatient, savePatient } from '../utils/db';
 import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
@@ -77,18 +77,6 @@ export default function AMPage() {
       alert('Failed to restore streak');
     }
   };
-
-  useEffect(() => {
-    const checkMilestone = async () => {
-      const latestScore = await getLatestSkinScore(patient?.phoneNumber || patient?.phone);
-      const today = new Date().toISOString().split('T')[0];
-      const alreadyScoredToday = latestScore && latestScore.date === today;
-      if (isMilestoneDay(day) && !alreadyScoredToday) {
-        navigate('/skin-score');
-      }
-    };
-    if (patient) checkMilestone();
-  }, [day, patient, navigate]);
 
   useEffect(() => {
     const loadToday = async () => {
