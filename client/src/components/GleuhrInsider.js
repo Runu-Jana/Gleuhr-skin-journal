@@ -27,8 +27,8 @@ export default function GleuhrInsider() {
       const uniqueDays = new Set(checkIns.map(c => c.date)).size;
       setStreak(uniqueDays);
 
-      // Show if eligible (Day 42+ and >75% consistency)
-      if (day >= 42 && cons > 75) {
+      // Show if eligible (Day 84+ and >86% consistency — Week 12 milestone threshold)
+      if (day >= 84 && cons > 86) {
         setShowModal(true);
         localStorage.setItem('gleuhrInsiderShown', 'true');
       }
@@ -42,10 +42,10 @@ export default function GleuhrInsider() {
   if (!showModal) return null;
 
   const benefits = [
-    { icon: Crown, title: 'Community Badge', description: 'Exclusive high-consistency achiever badge', unlocked: true },
-    { icon: Gift, title: 'Early Access', description: 'Be the first to try new products', unlocked: consistency >= 80 },
-    { icon: Users, title: 'Insider Community', description: 'Join our exclusive WhatsApp group', unlocked: streak >= 30 },
-    { icon: Sparkles, title: 'Expert Tips', description: 'Weekly advanced skincare tips', unlocked: true },
+    { icon: Crown, title: 'Gleuhr Insider Badge', description: 'Permanent badge on your journal profile', unlocked: true },
+    { icon: Gift, title: '10% Off Forever', description: '10% off all future product purchases — ongoing, not a one-time code', unlocked: true },
+    { icon: Sparkles, title: 'Early Product Access', description: 'First to try new launches before anyone else', unlocked: true },
+    { icon: Users, title: 'Free Skin Assessment', description: 'One complimentary skin assessment for a friend or family member', unlocked: true },
   ];
 
   return (
@@ -60,7 +60,7 @@ export default function GleuhrInsider() {
             <Crown className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-1">Gleuhr Insider</h2>
-          <p className="text-white/80">Welcome to the inner circle</p>
+          <p className="text-white/80">You kept your promise. 84 days of commitment.</p>
         </div>
 
         <div className="flex justify-center gap-6 mb-6">

@@ -3,20 +3,16 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { useGamification } from '../contexts/GamificationContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
 import { calculateDay, calculateStreak, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
-import { Flame, Shield, Sun, Moon, Droplets, Utensils, Frown, Meh, Smile, Home, Map, User, Camera, Edit3 } from 'lucide-react';
+import { Flame, Shield, Lock } from 'lucide-react';
 import ReorderBanner from './ReorderBanner';
-import GamificationPanel from './GamificationPanel';
-import AchievementPopup from './AchievementPopup';
 
 export default function HomeScreen() {
   const { patient, streak: streakData, refreshStreak } = useAuth();
   const { isOnline, queueForSync } = useOffline();
-  const { awardPoints, checkAchievements } = useGamification();
   const { showStreakWarning } = useNotifications();
   const navigate = useNavigate();
   
@@ -136,8 +132,6 @@ export default function HomeScreen() {
     return calendar;
   };
 
-  const [showGamification, setShowGamification] = useState(false);
-  const [newAchievement, setNewAchievement] = useState(null);
   const [currentSkinScore, setCurrentSkinScore] = useState(0); // Default fallback
   const [consistency, setConsistency] = useState(0); // Default fallback
   const [checkIns, setCheckIns] = useState([]); // Store check-ins for calendar
@@ -346,17 +340,37 @@ export default function HomeScreen() {
             <Flame className="w-5.5 h-5.5 text-[#dc2626]" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-[#191716] font-crimson tracking-[-0.2px]">
-              Current streak <span className="text-[#c44033] font-crimson text-xl font-bold ml-1">{localStreak.currentStreak || streakData?.streak || 0}</span> <span className="text-xs text-[#7a756d] font-crimson">days</span>
-            </div>
-            {(localStreak.currentStreak || streakData?.streak || 0) === 0 && (localStreak.longestStreak || streakData?.longestStreak || 0) > 0 && (
-              <div className="text-xs text-[#a39e95] font-crimson mt-0.5 mb-0.5">
-                Best: <span className="font-semibold text-[#191716]">{localStreak.longestStreak || streakData?.longestStreak || 0}</span> days
-              </div>
-            )}
+            {(() => {
+              const current = localStreak.currentStreak || streakData?.streak || 0;
+              const best = localStreak.longestStreak || streakData?.longestStreak || 0;
+              const atBest = current > 0 && current >= best;
+              return (
+                <>
+                  {atBest ? (
+                    <div className="text-sm font-semibold text-[#191716] font-crimson tracking-[-0.2px]">
+                      Your best streak: <span className="text-[#c44033] font-crimson text-xl font-bold ml-1">{current}</span> <span className="text-xs text-[#7a756d] font-crimson">days</span>
+                    </div>
+                  ) : current > 0 ? (
+                    <div className="text-sm font-semibold text-[#191716] font-crimson tracking-[-0.2px]">
+                      <span className="text-[#c44033] font-crimson text-xl font-bold">{current}</span>
+                      <span className="text-xs text-[#7a756d] font-crimson ml-1">current</span>
+                      <span className="text-[#ccc8c0] mx-1.5">·</span>
+                      <span className="text-[#a39e95] text-sm">{best}</span>
+                      <span className="text-xs text-[#a39e95] ml-1">best</span>
+                    </div>
+                  ) : (
+                    <div className="text-sm font-semibold text-[#191716] font-crimson tracking-[-0.2px]">
+                      {best > 0 ? (
+                        <>Best: <span className="text-[#c44033] font-crimson text-xl font-bold ml-1">{best}</span> <span className="text-xs text-[#7a756d] font-crimson">days</span></>
+                      ) : (
+                        <>Start your streak today</>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
             <div className="text-xs text-[#a39e95] font-outfit mt-0.5 flex items-center gap-1.5">
-              <span>Red Hot flame</span>
-              <span className="w-0.5 h-0.5 rounded-[2px] bg-[#ccc8c0]"></span>
               <span>{consistency}% consistent</span>
             </div>
           </div>
@@ -429,16 +443,6 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* Reorder Banner */}
-      <div className="mx-5 my-4 px-5 py-4 bg-gradient-to-br from-[rgba(196,64,51,0.03)] to-[rgba(196,64,51,0.016)] rounded-[16px] border border-[rgba(196,64,51,0.094)] flex justify-between items-center">
-        <div className="flex-1 mr-3">
-          <p className="text-sm font-semibold text-[#c44033] font-outfit">Products running low</p>
-          <p className="text-xs text-[#5c574f] font-outfit mt-0.5 leading-[1.4]">A gap resets your melanin suppression.</p>
-        </div>
-        <button className="px-5 py-2.5 bg-[#c44033] text-white border-0 rounded-[12px] text-sm font-semibold cursor-pointer font-outfit shadow-[rgba(196,64,51,0.25)_0px_4px_12px]">
-          Reorder →
-        </button>
-      </div>
 
       {/* Calendar Section */}
       <div className="px-5 py-4.5">
@@ -458,7 +462,7 @@ export default function HomeScreen() {
               <span className="text-xs text-[#a39e95] font-outfit">Shield</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-[3px] bg-[#dc2626]"></div>
+              <div className="w-2 h-2 rounded-[3px] bg-[#d4cfc9]"></div>
               <span className="text-xs text-[#a39e95] font-outfit">Missed</span>
             </div>
           </div>
@@ -480,7 +484,7 @@ export default function HomeScreen() {
                 dayData.status === 'partial'          ? 'bg-[#d4a017] opacity-60' :
                 dayData.status === 'current'          ? 'bg-[#c44033] opacity-90' :
                 dayData.isFuture                      ? 'bg-[#ede9e5] opacity-30' :
-                'bg-[#dc2626] opacity-40'
+                'bg-[#d4cfc9] opacity-60'
               }`}
             >
               <span className={`text-xs font-medium ${
@@ -596,37 +600,111 @@ export default function HomeScreen() {
       {/* Reorder Banner for Day 25+ */}
       {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
 
-      {/* Gamification Button */}
-      <button
-        onClick={() => setShowGamification(true)}
-        className="fixed bottom-24 right-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded-full shadow-lg z-40"
-        aria-label="View progress and achievements"
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0" />
-        </svg>
-      </button>
+      {/* Milestone Rewards Ladder */}
+      <MilestoneRewards day={day} consistency={consistency} checkIns={checkIns} />
 
-      {/* Gamification Panel */}
-      {showGamification && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <GamificationPanel onClose={() => setShowGamification(false)} />
-          </div>
-        </div>
-      )}
+      {/* Bottom padding for nav */}
+      <div className="h-24" />
+    </div>
+  );
+}
 
-      {/* Achievement Popup */}
-      {newAchievement && (
-        <AchievementPopup 
-          achievement={newAchievement}
-          onClose={() => setNewAchievement(null)}
-          onShare={(achievement) => {
-            // Share achievement logic (can be implemented later)
-            console.log('Sharing achievement:', achievement);
-          }}
-        />
-      )}
+// ── Milestone reward ladder ────────────────────────────────────────────────
+const MILESTONES = [
+  {
+    week: 'Week 2', day: 14, threshold: 10, thresholdOf: 14,
+    icon: '✨', title: 'Your Skin is Responding',
+    desc: 'Personalised insight from your first 14 days of data',
+    color: '#16a34a',
+  },
+  {
+    week: 'Week 4', day: 28, threshold: 22, thresholdOf: 28,
+    icon: '📊', title: 'Month 1 Progress Report',
+    desc: 'Full consistency report + earned complimentary product with Month 2',
+    color: '#2563eb',
+  },
+  {
+    week: 'Week 6', day: 42, threshold: 35, thresholdOf: 42,
+    icon: '📸', title: 'Transformation Card',
+    desc: 'Shareable Week 1 vs Week 6 before-after card',
+    color: '#7c3aed',
+  },
+  {
+    week: 'Week 8', day: 56, threshold: 48, thresholdOf: 56,
+    icon: '🎁', title: 'Surprise Gift',
+    desc: 'A branded skincare accessory in your Month 3 box',
+    color: '#d97706',
+  },
+  {
+    week: 'Week 12', day: 84, threshold: 72, thresholdOf: 84,
+    icon: '👑', title: 'Gleuhr Insider',
+    desc: '10% off all future orders + early product access + Insider badge',
+    color: '#c44033',
+  },
+];
+
+function MilestoneRewards({ day, consistency, checkIns }) {
+  const completedCheckIns = checkIns ? checkIns.filter(c => c.amRoutine || c.pmRoutine).length : 0;
+
+  return (
+    <div className="mx-5 mb-4">
+      <p className="text-xs font-bold text-[#a39e95] font-outfit uppercase tracking-[0.8px] mb-3">Your Rewards</p>
+      <div className="flex flex-col gap-2.5">
+        {MILESTONES.map((m) => {
+          const isUnlocked = day >= m.day && completedCheckIns >= m.threshold;
+          const isActive = day < m.day && day >= (m.day - 14);
+          const isPast = day >= m.day && !isUnlocked;
+          const isFuture = day < m.day - 14;
+
+          return (
+            <div
+              key={m.week}
+              className={`flex items-center gap-3.5 p-3.5 rounded-[14px] border ${
+                isUnlocked
+                  ? 'bg-[rgba(26,138,74,0.04)] border-[rgba(26,138,74,0.15)]'
+                  : isActive
+                  ? 'bg-[rgba(196,64,51,0.03)] border-[rgba(196,64,51,0.1)]'
+                  : 'bg-[#faf9f7] border-[#ede9e4]'
+              }`}
+            >
+              {/* Icon */}
+              <div
+                className="w-10 h-10 rounded-[12px] flex items-center justify-center flex-shrink-0 text-lg"
+                style={{ background: isUnlocked ? `${m.color}18` : isFuture || isPast ? '#f0ede8' : `${m.color}10` }}
+              >
+                {isUnlocked ? (
+                  <span>{m.icon}</span>
+                ) : (
+                  <Lock className="w-4 h-4 text-[#c4bfb8]" strokeWidth={1.5} />
+                )}
+              </div>
+
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs font-semibold font-outfit ${isUnlocked ? 'text-[#16a34a]' : isActive ? 'text-[#c44033]' : 'text-[#a39e95]'}`}>
+                    {m.week}
+                  </span>
+                  {isUnlocked && (
+                    <span className="text-[10px] bg-[rgba(26,138,74,0.1)] text-[#16a34a] font-semibold font-outfit px-2 py-0.5 rounded-full">
+                      Earned
+                    </span>
+                  )}
+                  {isActive && !isUnlocked && (
+                    <span className="text-[10px] bg-[rgba(196,64,51,0.08)] text-[#c44033] font-semibold font-outfit px-2 py-0.5 rounded-full">
+                      {m.threshold - completedCheckIns > 0 ? `${m.threshold - completedCheckIns} check-ins away` : 'Almost there'}
+                    </span>
+                  )}
+                </div>
+                <p className={`text-sm font-semibold font-crimson mt-0.5 ${isUnlocked ? 'text-[#191716]' : 'text-[#7a756d]'}`}>
+                  {m.title}
+                </p>
+                <p className="text-xs text-[#a39e95] font-outfit mt-0.5 leading-[1.4]">{m.desc}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

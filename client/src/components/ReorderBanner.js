@@ -22,8 +22,8 @@ export default function ReorderBanner({ coachName, coachWhatsApp, day }) {
             <ShoppingBag className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-white mb-1">Running Low on Products?</h4>
-            <p className="text-white/90 text-sm mb-3">Your products are running low! Reorder now to continue your transformation without interruption.</p>
+            <h4 className="font-semibold text-white mb-1">Time to Reorder</h4>
+            <p className="text-white/90 text-sm mb-3">Your products are actively suppressing excess melanin. A gap doesn't pause progress — it resets it.</p>
             <button onClick={handleReorder} className="w-full bg-white text-[#c44033] font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-white/90 transition-colors">
               Reorder Now
               <ArrowRight className="w-4 h-4" />

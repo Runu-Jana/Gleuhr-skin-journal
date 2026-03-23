@@ -50,6 +50,11 @@ const streakSchema = new mongoose.Schema({
       default: () => new Date().toISOString().slice(0, 7) // YYYY-MM format
     }
   },
+  // Tracks coach-initiated restorations separately (max 2/month per patient)
+  coachShields: {
+    used: { type: Number, default: 0, min: 0 },
+    lastResetMonth: { type: String, default: () => new Date().toISOString().slice(0, 7) }
+  },
   createdAt: {
     type: Date,
     default: Date.now
