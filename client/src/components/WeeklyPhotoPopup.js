@@ -239,6 +239,7 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
                   onChange={handleCameraCapture}
                   className="hidden"
                 />
+                {/* PC fallback */}
                 <input
                   id="popup-pc-camera-input"
                   type="file"
