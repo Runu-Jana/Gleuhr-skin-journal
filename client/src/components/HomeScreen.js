@@ -525,9 +525,9 @@ export default function HomeScreen() {
               <div className="w-7 h-7 rounded-[8px] bg-[rgba(196,64,51,0.15)] flex items-center justify-center">
                 <span className="text-xs">🤝</span>
               </div>
-              <span className="text-xs font-bold text-[rgba(255,255,255,0.45)] font-outfit uppercase tracking-[1.2px]">Your Journey · Day {day}</span>
+              <span className="text-xs font-bold text-[rgba(255,255,255,0.45)] font-outfit uppercase tracking-[1.2px]">Your Promise</span>
             </div>
-            <span className="text-xs text-[rgba(255,255,255,0.3)] font-outfit">of 90</span>
+            
           </div>
 
           {/* Quote */}
