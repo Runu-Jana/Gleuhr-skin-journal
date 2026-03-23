@@ -332,15 +332,28 @@ export default function PMPage() {
                   </svg>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-gray-900 tracking-tight">
-                    Your best streak <span className="text-red-600" style={{ fontFamily: 'Playfair Display, serif', fontSize: '16px sm:20px', fontWeight: '700', marginLeft: '2px' }}>{streakData?.longestStreak || 0}</span> <span className="text-xs text-gray-600 font-normal">days</span>
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1 flex items-center gap-1.5">
-                    <span className="xs:inline">Red Hot flame</span>
-                    <span className="xs:inline">⚆</span>
-                    <span className="w-1 h-1 rounded-full bg-gray-300 hidden xs:inline"></span>
-                    <span>{consistency}% consistent</span>
-                  </div>
+                  {(streakData?.longestStreak || 0) === 0 ? (
+                    <>
+                      <div className="text-sm font-semibold text-gray-900 tracking-tight">
+                        Your streak starts tonight!
+                      </div>
+                      <div className="text-xs text-red-500 mt-1 font-medium">
+                        Log today & ignite your first flame 🔥
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-sm font-semibold text-gray-900 tracking-tight">
+                        Your best streak <span className="text-red-600" style={{ fontFamily: 'Playfair Display, serif', fontSize: '16px sm:20px', fontWeight: '700', marginLeft: '2px' }}>{streakData?.longestStreak}</span> <span className="text-xs text-gray-600 font-normal">days</span>
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1 flex items-center gap-1.5">
+                        <span className="xs:inline">Red Hot flame</span>
+                        <span className="xs:inline">⚆</span>
+                        <span className="w-1 h-1 rounded-full bg-gray-300 hidden xs:inline"></span>
+                        <span>{consistency}% consistent</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 px-5 py-2.5 sm:px-2 sm:py-1 rounded-lg flex-shrink-0 mb-3 sm:mb-0 border border-red-100" style={{ background: 'rgba(196, 64, 51, 0.05)' }}>
