@@ -7,7 +7,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
 import { calculateDay, calculateStreak, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
-import { Flame, Shield, Lock } from 'lucide-react';
+import { Flame, Shield } from 'lucide-react';
 import ReorderBanner from './ReorderBanner';
 
 export default function HomeScreen() {
@@ -600,111 +600,10 @@ export default function HomeScreen() {
       {/* Reorder Banner for Day 25+ */}
       {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
 
-      {/* Milestone Rewards Ladder */}
-      <MilestoneRewards day={day} consistency={consistency} checkIns={checkIns} />
-
       {/* Bottom padding for nav */}
       <div className="h-24" />
     </div>
   );
 }
 
-// ── Milestone reward ladder ────────────────────────────────────────────────
-const MILESTONES = [
-  {
-    week: 'Week 2', day: 14, threshold: 10, thresholdOf: 14,
-    icon: '✨', title: 'Your Skin is Responding',
-    desc: 'Personalised insight from your first 14 days of data',
-    color: '#16a34a',
-  },
-  {
-    week: 'Week 4', day: 28, threshold: 22, thresholdOf: 28,
-    icon: '📊', title: 'Month 1 Progress Report',
-    desc: 'Full consistency report + earned complimentary product with Month 2',
-    color: '#2563eb',
-  },
-  {
-    week: 'Week 6', day: 42, threshold: 35, thresholdOf: 42,
-    icon: '📸', title: 'Transformation Card',
-    desc: 'Shareable Week 1 vs Week 6 before-after card',
-    color: '#7c3aed',
-  },
-  {
-    week: 'Week 8', day: 56, threshold: 48, thresholdOf: 56,
-    icon: '🎁', title: 'Surprise Gift',
-    desc: 'A branded skincare accessory in your Month 3 box',
-    color: '#d97706',
-  },
-  {
-    week: 'Week 12', day: 84, threshold: 72, thresholdOf: 84,
-    icon: '👑', title: 'Gleuhr Insider',
-    desc: '10% off all future orders + early product access + Insider badge',
-    color: '#c44033',
-  },
-];
 
-function MilestoneRewards({ day, consistency, checkIns }) {
-  const completedCheckIns = checkIns ? checkIns.filter(c => c.amRoutine || c.pmRoutine).length : 0;
-
-  return (
-    <div className="mx-5 mb-4">
-      <p className="text-xs font-bold text-[#a39e95] font-outfit uppercase tracking-[0.8px] mb-3">Your Rewards</p>
-      <div className="flex flex-col gap-2.5">
-        {MILESTONES.map((m) => {
-          const isUnlocked = day >= m.day && completedCheckIns >= m.threshold;
-          const isActive = day < m.day && day >= (m.day - 14);
-          const isPast = day >= m.day && !isUnlocked;
-          const isFuture = day < m.day - 14;
-
-          return (
-            <div
-              key={m.week}
-              className={`flex items-center gap-3.5 p-3.5 rounded-[14px] border ${
-                isUnlocked
-                  ? 'bg-[rgba(26,138,74,0.04)] border-[rgba(26,138,74,0.15)]'
-                  : isActive
-                  ? 'bg-[rgba(196,64,51,0.03)] border-[rgba(196,64,51,0.1)]'
-                  : 'bg-[#faf9f7] border-[#ede9e4]'
-              }`}
-            >
-              {/* Icon */}
-              <div
-                className="w-10 h-10 rounded-[12px] flex items-center justify-center flex-shrink-0 text-lg"
-                style={{ background: isUnlocked ? `${m.color}18` : isFuture || isPast ? '#f0ede8' : `${m.color}10` }}
-              >
-                {isUnlocked ? (
-                  <span>{m.icon}</span>
-                ) : (
-                  <Lock className="w-4 h-4 text-[#c4bfb8]" strokeWidth={1.5} />
-                )}
-              </div>
-
-              {/* Text */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-semibold font-outfit ${isUnlocked ? 'text-[#16a34a]' : isActive ? 'text-[#c44033]' : 'text-[#a39e95]'}`}>
-                    {m.week}
-                  </span>
-                  {isUnlocked && (
-                    <span className="text-[10px] bg-[rgba(26,138,74,0.1)] text-[#16a34a] font-semibold font-outfit px-2 py-0.5 rounded-full">
-                      Earned
-                    </span>
-                  )}
-                  {isActive && !isUnlocked && (
-                    <span className="text-[10px] bg-[rgba(196,64,51,0.08)] text-[#c44033] font-semibold font-outfit px-2 py-0.5 rounded-full">
-                      {m.threshold - completedCheckIns > 0 ? `${m.threshold - completedCheckIns} check-ins away` : 'Almost there'}
-                    </span>
-                  )}
-                </div>
-                <p className={`text-sm font-semibold font-crimson mt-0.5 ${isUnlocked ? 'text-[#191716]' : 'text-[#7a756d]'}`}>
-                  {m.title}
-                </p>
-                <p className="text-xs text-[#a39e95] font-outfit mt-0.5 leading-[1.4]">{m.desc}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}

@@ -10,7 +10,7 @@ const adminAuth = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== 'admin') {
+    if (decoded.role !== 'admin' && decoded.role !== 'team_lead') {
       return res.status(403).json({ error: 'Admin access required' });
     }
     req.admin = decoded;

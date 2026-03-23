@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Phone as PhoneIcon, ArrowLeft, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import './AdminDashboard.css';
@@ -64,14 +64,27 @@ function Badge({ label, styleMap }) {
 
 // ────────────────────────────────────────────────────────────────────────────
 
+// ── JWT helper (no-verify decode for role detection) ────────────────────────
+function decodeToken(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64));
+  } catch { return null; }
+}
+
 export default function AdminDashboard() {
+  const rawToken     = localStorage.getItem('adminToken');
+  const decoded      = decodeToken(rawToken);
+  const isTeamLead   = decoded?.role === 'team_lead';
+  const teamLeadName = decoded?.name || decoded?.email || 'Team Lead';
+
   const [dietician, setDietician] = useState('Dt.Muskan');
   const [dieticians, setDieticians] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('all');  // 'all' | 'inapp' | 'pending'
+  const [activeTab, setActiveTab] = useState('all');
 
   // Detail view
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -79,20 +92,27 @@ export default function AdminDashboard() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState('overview');
 
-  // Load dietician list and auto-select the first one
+  // Team lead overview
+  const [showTeamOverview, setShowTeamOverview] = useState(isTeamLead);
+  const [showDieticianOverview, setShowDieticianOverview] = useState(false);
+  const [allCoachData, setAllCoachData] = useState({}); // { coachName: { customers, loading } }
+
+  // Load dietician list
   useEffect(() => {
     adminApi.get('/admin/dietician').then(({ data }) => {
       const list = data.data || [];
       setDieticians(list);
-      if (list.length > 0) {
+      // For admins auto-select first coach; team leads start on overview
+      if (!isTeamLead && list.length > 0) {
         const first = typeof list[0] === 'string' ? list[0] : (list[0]?.name || list[0]?.email || '');
         setDietician(prev => prev === 'Dt.Muskan' ? first : prev);
       }
     }).catch(() => {});
-  }, []);
+  }, [isTeamLead]);
 
-  // Load customers for selected dietician
+  // Load customers for selected dietician (skip when team lead is on overview)
   const fetchCustomers = useCallback(async () => {
+    if (showTeamOverview || showDieticianOverview) return;
     setLoading(true);
     setError(null);
     setSelectedCustomer(null);
@@ -105,9 +125,22 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [dietician]);
+  }, [dietician, showTeamOverview, showDieticianOverview]);
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
+
+  // Fetch all coaches' data for team overview or dietician overview
+  useEffect(() => {
+    if ((!showTeamOverview && !showDieticianOverview) || dieticians.length === 0) return;
+    dieticians.forEach(d => {
+      const name = typeof d === 'string' ? d : (d?.name || d?.email || '');
+      if (!name || allCoachData[name]) return;
+      setAllCoachData(prev => ({ ...prev, [name]: { customers: [], loading: true } }));
+      adminApi.get(`/admin/dietician/${encodeURIComponent(name)}/customers`)
+        .then(({ data }) => setAllCoachData(prev => ({ ...prev, [name]: { customers: data.data || [], loading: false } })))
+        .catch(()         => setAllCoachData(prev => ({ ...prev, [name]: { customers: [],           loading: false } })));
+    });
+  }, [showTeamOverview, showDieticianOverview, dieticians]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Open customer detail
   const openDetail = async (customer) => {
@@ -162,6 +195,18 @@ export default function AdminDashboard() {
         <aside className="admin-sidebar">
           <div className="admin-sidebar-logo"><h2>GLEUHR</h2><p>Skin Journal</p></div>
           <nav className="admin-sidebar-nav">
+            {isTeamLead && (
+              <button className="admin-sidebar-item" onClick={() => { setSelectedCustomer(null); setDetails(null); setShowTeamOverview(true); setShowDieticianOverview(false); }}>
+                <div className="admin-sidebar-avatar" style={{ background: avatarColor(teamLeadName) }}>{getInitials(teamLeadName)}</div>
+                <div><div style={{ fontWeight: 600, fontSize: 13 }}>{teamLeadName}</div><div style={{ fontSize: 11, opacity: 0.6 }}>Team Overview</div></div>
+              </button>
+            )}
+            {!isTeamLead && (
+              <button className="admin-sidebar-item" onClick={() => { setSelectedCustomer(null); setDetails(null); setShowDieticianOverview(true); setShowTeamOverview(false); }}>
+                <div className="admin-sidebar-avatar" style={{ background: '#374151', fontSize: 11 }}>OV</div>
+                <div><div style={{ fontWeight: 600, fontSize: 13 }}>All Coaches</div><div style={{ fontSize: 11, opacity: 0.6 }}>Overview</div></div>
+              </button>
+            )}
             <div style={{ padding: '12px 16px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1, opacity: 0.4, textTransform: 'uppercase' }}>Coaches</div>
             {dieticians.map((d, i) => {
               const name = typeof d === 'string' ? d : (d?.name || d?.email || String(i));
@@ -169,7 +214,7 @@ export default function AdminDashboard() {
                 <button
                   key={name}
                   className={`admin-sidebar-item ${name === dietician ? 'active' : ''}`}
-                  onClick={() => { setDietician(name); setSelectedCustomer(null); setDetails(null); }}
+                  onClick={() => { setDietician(name); setSelectedCustomer(null); setDetails(null); setShowTeamOverview(false); setShowDieticianOverview(false); }}
                 >
                   <div className="admin-sidebar-avatar" style={{ background: avatarColor(name) }}>
                     {getInitials(name)}
@@ -210,21 +255,39 @@ export default function AdminDashboard() {
     );
   }
 
-  // ── LIST VIEW ─────────────────────────────────────────────────────────────
+  // ── LIST / TEAM OVERVIEW ─────────────────────────────────────────────────
   return (
     <div className="admin-layout">
       {/* Sidebar */}
       <aside className="admin-sidebar">
         <div className="admin-sidebar-logo"><h2>GLEUHR</h2><p>Skin Journal</p></div>
         <nav className="admin-sidebar-nav">
+          {isTeamLead && (
+            <button
+              className={`admin-sidebar-item ${showTeamOverview ? 'active' : ''}`}
+              onClick={() => { setShowTeamOverview(true); setShowDieticianOverview(false); }}
+            >
+              <div className="admin-sidebar-avatar" style={{ background: avatarColor(teamLeadName) }}>{getInitials(teamLeadName)}</div>
+              <div><div style={{ fontWeight: 600, fontSize: 13 }}>{teamLeadName}</div><div style={{ fontSize: 11, opacity: 0.6 }}>Team Overview</div></div>
+            </button>
+          )}
+          {!isTeamLead && (
+            <button
+              className={`admin-sidebar-item ${showDieticianOverview ? 'active' : ''}`}
+              onClick={() => { setShowDieticianOverview(true); setShowTeamOverview(false); }}
+            >
+              <div className="admin-sidebar-avatar" style={{ background: '#374151', fontSize: 11 }}>OV</div>
+              <div><div style={{ fontWeight: 600, fontSize: 13 }}>All Coaches</div><div style={{ fontSize: 11, opacity: 0.6 }}>Overview</div></div>
+            </button>
+          )}
           <div style={{ padding: '12px 16px 4px', fontSize: 10, fontWeight: 700, letterSpacing: 1, opacity: 0.4, textTransform: 'uppercase' }}>Coaches</div>
           {dieticians.map((d, i) => {
             const name = typeof d === 'string' ? d : (d?.name || d?.email || String(i));
             return (
               <button
                 key={name}
-                className={`admin-sidebar-item ${name === dietician ? 'active' : ''}`}
-                onClick={() => setDietician(name)}
+                className={`admin-sidebar-item ${!showTeamOverview && !showDieticianOverview && name === dietician ? 'active' : ''}`}
+                onClick={() => { setDietician(name); setShowTeamOverview(false); setShowDieticianOverview(false); }}
               >
                 <div className="admin-sidebar-avatar" style={{ background: avatarColor(name) }}>
                   {getInitials(name)}
@@ -245,79 +308,86 @@ export default function AdminDashboard() {
 
       {/* Main */}
       <div className="admin-main">
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
-              {dietician}'s Patients
-            </h1>
-            <p style={{ margin: 0, fontSize: 13, color: '#888' }}>
-              {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              &nbsp;·&nbsp;{stats.total} total customers
-            </p>
-          </div>
-          <button onClick={fetchCustomers} disabled={loading} style={{ display:'flex',alignItems:'center',gap:4,color:'#c44033',fontWeight:600,background:'none',border:'none',cursor:'pointer',fontSize:13,opacity:loading?0.5:1 }}>
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''}/> Refresh
-          </button>
-        </div>
-
-        {/* Stats cards */}
-        <div className="admin-stats-row">
-          <StatCard label="Total Customers" value={stats.total} color="#374151" />
-          <StatCard label="Using the App" value={stats.inApp} color="#7C3AED" />
-          <StatCard label="Call Pending" value={stats.callPending} color="#92400E" />
-          <StatCard label="Not Responding" value={stats.notResponding} color="#B91C1C" />
-          <StatCard label="Diet Plan Shared" value={stats.dietShared} color="#166534" />
-        </div>
-
-        {/* Tabs + search */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
-          {[
-            { key: 'all', label: `All Patients ${stats.total}` },
-            { key: 'inapp', label: `In App ${stats.inApp}` },
-            { key: 'pending', label: `Call Pending ${stats.callPending}` },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              style={{ padding: '5px 14px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                background: activeTab === t.key ? '#c44033' : '#F3F4F6',
-                color: activeTab === t.key ? '#fff' : '#374151' }}
-            >
-              {t.label}
-            </button>
-          ))}
-          <div style={{ flex: 1, position: 'relative', minWidth: 200 }}>
-            <Search size={14} style={{ position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#999' }}/>
-            <input
-              type="text"
-              placeholder="Search name or phone..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{ width:'100%',padding:'6px 10px 6px 30px',border:'1px solid #ddd',borderRadius:8,fontSize:12,outline:'none' }}
+        {showTeamOverview
+          ? <TeamOverviewPanel
+              teamLeadName={teamLeadName}
+              dieticians={dieticians}
+              allCoachData={allCoachData}
+              onSelectCoach={name => { setDietician(name); setShowTeamOverview(false); setShowDieticianOverview(false); }}
             />
-          </div>
-        </div>
+          : showDieticianOverview
+          ? <AllCoachesOverviewPanel
+              dieticians={dieticians}
+              allCoachData={allCoachData}
+              onSelectCoach={name => { setDietician(name); setShowDieticianOverview(false); }}
+            />
+          : <>
+              {/* Top bar */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div>
+                  <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{dietician}'s Patients</h1>
+                  <p style={{ margin: 0, fontSize: 13, color: '#888' }}>
+                    {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    &nbsp;·&nbsp;{stats.total} total customers
+                  </p>
+                </div>
+                <button onClick={fetchCustomers} disabled={loading} style={{ display:'flex',alignItems:'center',gap:4,color:'#c44033',fontWeight:600,background:'none',border:'none',cursor:'pointer',fontSize:13,opacity:loading?0.5:1 }}>
+                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''}/> Refresh
+                </button>
+              </div>
 
-        {error && (
-          <div style={{ background:'#FEF2F2',color:'#c44033',padding:12,borderRadius:8,fontSize:13,marginBottom:12 }}>{error}</div>
-        )}
+              {/* Stats cards */}
+              <div className="admin-stats-row">
+                <StatCard label="Total Customers" value={stats.total} color="#374151" />
+                <StatCard label="Using the App" value={stats.inApp} color="#7C3AED" />
+                <StatCard label="Call Pending" value={stats.callPending} color="#92400E" />
+                <StatCard label="Not Responding" value={stats.notResponding} color="#B91C1C" />
+                <StatCard label="Diet Plan Shared" value={stats.dietShared} color="#166534" />
+              </div>
 
-        {loading ? (
-          <div style={{ display:'flex',justifyContent:'center',padding:60 }}>
-            <div style={{ width:28,height:28,border:'3px solid #c44033',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite' }}/>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign:'center',padding:60,color:'#999' }}>
-            {activeTab === 'inapp' ? 'No customers using the app yet' : 'No customers found'}
-          </div>
-        ) : (
-          <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
-            {filtered.map((c, i) => (
-              <CustomerCard key={c.airtable.id || i} customer={c} onView={() => openDetail(c)} />
-            ))}
-          </div>
-        )}
+              {/* Tabs + search */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+                {[
+                  { key: 'all',     label: `All Patients ${stats.total}` },
+                  { key: 'inapp',   label: `In App ${stats.inApp}` },
+                  { key: 'pending', label: `Call Pending ${stats.callPending}` },
+                ].map(t => (
+                  <button key={t.key} onClick={() => setActiveTab(t.key)}
+                    style={{ padding: '5px 14px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                      background: activeTab === t.key ? '#c44033' : '#F3F4F6',
+                      color:      activeTab === t.key ? '#fff'    : '#374151' }}>
+                    {t.label}
+                  </button>
+                ))}
+                <div style={{ flex: 1, position: 'relative', minWidth: 200 }}>
+                  <Search size={14} style={{ position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#999' }}/>
+                  <input type="text" placeholder="Search name or phone..." value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    style={{ width:'100%',padding:'6px 10px 6px 30px',border:'1px solid #ddd',borderRadius:8,fontSize:12,outline:'none' }} />
+                </div>
+              </div>
+
+              {error && (
+                <div style={{ background:'#FEF2F2',color:'#c44033',padding:12,borderRadius:8,fontSize:13,marginBottom:12 }}>{error}</div>
+              )}
+
+              {loading ? (
+                <div style={{ display:'flex',justifyContent:'center',padding:60 }}>
+                  <div style={{ width:28,height:28,border:'3px solid #c44033',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite' }}/>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div style={{ textAlign:'center',padding:60,color:'#999' }}>
+                  {activeTab === 'inapp' ? 'No customers using the app yet' : 'No customers found'}
+                </div>
+              ) : (
+                <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+                  {filtered.map((c, i) => (
+                    <CustomerCard key={c.airtable.id || i} customer={c} onView={() => openDetail(c)} />
+                  ))}
+                </div>
+              )}
+            </>
+        }
       </div>
     </div>
   );
@@ -726,5 +796,284 @@ function CallsTab() {
       <h4>Call History</h4>
       <p>Call logs will appear here once logged.</p>
     </div>
+  );
+}
+
+// ── Team overview panel (renders inside the existing admin layout main area) ──
+
+function computeCoachStats(customers) {
+  const appPatients = customers.filter(c => c.mongodb);
+  const consistencies = appPatients.map(c => Math.round(((c.mongodb?.last7Days?.checkInsCompleted ?? 0) / 7) * 100));
+  const avgConsistency = consistencies.length > 0 ? Math.round(consistencies.reduce((a, b) => a + b, 0) / consistencies.length) : 0;
+  const skinScores = appPatients.map(c => c.mongodb?.latestSkinScore?.totalScore).filter(v => v != null);
+  const avgSkinScore = skinScores.length > 0 ? parseFloat((skinScores.reduce((a, b) => a + b, 0) / skinScores.length).toFixed(1)) : 0;
+  const urgent     = appPatients.filter(c => (c.mongodb?.streak?.daysAbsent ?? 0) >= 3).length;
+  const flagged    = appPatients.filter(c => (c.mongodb?.streak?.daysAbsent ?? 0) >= 1 || (c.mongodb?.last7Days?.checkInsCompleted ?? 0) < 4).length;
+  const reorderDue = appPatients.filter(c => (c.mongodb?.currentDay ?? 0) >= 78).length;
+  const retained   = appPatients.filter(c => (c.mongodb?.currentDay ?? 0) >= 28).length;
+  return { total: appPatients.length, calls: customers.length, avgConsistency, avgSkinScore, urgent, flagged, reorderDue, retained };
+}
+
+function CoachCard({ name, stats, loading, onDrillDown }) {
+  if (loading) {
+    return (
+      <div className="admin-card" style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:180 }}>
+        <div style={{ width:20, height:20, border:'2px solid #c44033', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+      </div>
+    );
+  }
+  const metrics = [
+    { label:'Avg Consistency', value:`${stats.avgConsistency}%`, color: stats.avgConsistency >= 50 ? '#f59e0b' : '#c44033' },
+    { label:'Avg Skin Score',  value: stats.avgSkinScore,        color:'#1a1a1a' },
+    { label:'Flagged',         value: stats.flagged,             color: stats.flagged > 0 ? '#f59e0b' : '#16a34a' },
+    { label:'Reorder Due',     value: stats.reorderDue,          color:'#1a1a1a' },
+    { label:'Retained',        value: stats.retained,            color: stats.retained > 0 ? '#16a34a' : '#1a1a1a' },
+    { label:'Calls (Total)',   value: stats.calls,               color:'#1a1a1a', bold:true },
+  ];
+  return (
+    <div className="admin-card" style={{ cursor: onDrillDown ? 'pointer' : 'default' }} onClick={onDrillDown}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:avatarColor(name), color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:13, flexShrink:0 }}>
+          {getInitials(name)}
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:700, fontSize:14 }}>{name}</div>
+          <div style={{ fontSize:12, color:'#888' }}>{stats.total} patients</div>
+        </div>
+        {stats.urgent > 0 && (
+          <span style={{ fontSize:11, fontWeight:700, background:'#FEE2E2', color:'#B91C1C', padding:'2px 8px', borderRadius:99 }}>
+            {stats.urgent} urgent
+          </span>
+        )}
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px 16px' }}>
+        {metrics.map(({ label, value, color, bold }) => (
+          <div key={label}>
+            <div style={{ fontSize:11, color:'#aaa', marginBottom:2 }}>{label}</div>
+            <div style={{ fontSize:18, fontWeight: bold ? 700 : 600, color }}>{value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TeamOverviewPanel({ teamLeadName, dieticians, allCoachData, onSelectCoach }) {
+  const [activeTab, setActiveTab] = useState('performance');
+
+  const coaches = dieticians.map(d => typeof d === 'string' ? d : (d?.name || d?.email || ''));
+
+  const coachStats = useMemo(() => {
+    const out = {};
+    coaches.forEach(c => { out[c] = computeCoachStats(allCoachData[c]?.customers || []); });
+    return out;
+  }, [coaches, allCoachData]);
+
+  const teamTotals = useMemo(() => {
+    const vals = Object.values(coachStats);
+    const activeCons = vals.filter(v => v.total > 0).map(v => v.avgConsistency);
+    return {
+      totalUrgent:        vals.reduce((s, v) => s + v.urgent, 0),
+      teamAvgConsistency: activeCons.length > 0 ? Math.round(activeCons.reduce((a, b) => a + b, 0) / activeCons.length) : 0,
+      totalReorderDue:    vals.reduce((s, v) => s + v.reorderDue, 0),
+      totalRetained:      vals.reduce((s, v) => s + v.retained, 0),
+      totalPatients:      vals.reduce((s, v) => s + v.calls, 0),
+    };
+  }, [coachStats]);
+
+  const escalations = useMemo(() =>
+    coaches.flatMap(coach =>
+      (allCoachData[coach]?.customers || [])
+        .filter(c => c.mongodb && (c.mongodb?.streak?.daysAbsent ?? 0) >= 3)
+        .map(c => ({ ...c, coachName: coach }))
+    ), [coaches, allCoachData]);
+
+  const allPatients = useMemo(() =>
+    coaches.flatMap(coach =>
+      (allCoachData[coach]?.customers || []).map(c => ({ ...c, coachName: coach }))
+    ), [coaches, allCoachData]);
+
+  const anyLoading = coaches.some(c => allCoachData[c]?.loading);
+
+  return (
+    <>
+      <div style={{ marginBottom:20 }}>
+        <h1 style={{ margin:0, fontSize:24, fontWeight:700 }}>Team Overview — {teamLeadName}</h1>
+        <p style={{ margin:'4px 0 0', fontSize:13, color:'#888' }}>
+          {coaches.length} coaches · {teamTotals.totalPatients} total patients
+        </p>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display:'flex', gap:4, marginBottom:20, background:'#fff', border:'1px solid #e5e5e5', borderRadius:12, padding:6 }}>
+        {[
+          { key:'performance', label:'🔥 Team Performance' },
+          { key:'escalations', label:'📋 Escalations', count: escalations.length },
+          { key:'all',         label:'All Patients',   count: allPatients.length },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            style={{ padding:'7px 16px', border:'none', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600,
+              background: activeTab === tab.key ? '#fff' : 'transparent',
+              boxShadow:  activeTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+              color:      activeTab === tab.key ? '#1a1a1a' : '#888' }}>
+            {tab.label}{tab.count !== undefined ? ` ${tab.count}` : ''}
+          </button>
+        ))}
+      </div>
+
+      {anyLoading && coaches.length === 0 ? (
+        <div style={{ display:'flex', justifyContent:'center', padding:60 }}>
+          <div style={{ width:28, height:28, border:'3px solid #c44033', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+        </div>
+      ) : activeTab === 'performance' ? (
+        <>
+          <div style={{ display:'flex', gap:12, marginBottom:20 }}>
+            {[
+              { value: teamTotals.totalUrgent,                    label:'Total Urgent',          color:'#c44033' },
+              { value: `${teamTotals.teamAvgConsistency}%`,       label:'Team Avg Consistency',  color:'#16a34a' },
+              { value: teamTotals.totalReorderDue,                label:'Reorders Due',           color:'#2563eb' },
+              { value: teamTotals.totalRetained,                  label:'Retained',               color:'#7c3aed' },
+            ].map(({ value, label, color }) => (
+              <div key={label} style={{ flex:1, background:'#fff', border:'1px solid #e5e5e5', borderRadius:12, padding:'20px', textAlign:'center', borderTop:`3px solid ${color}` }}>
+                <div style={{ fontSize:32, fontWeight:700, color }}>{value}</div>
+                <div style={{ fontSize:12, color:'#888', marginTop:4 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:20 }}>
+            {coaches.map(coach => (
+              <CoachCard key={coach} name={coach}
+                stats={coachStats[coach] || {}}
+                loading={allCoachData[coach]?.loading ?? true}
+                onDrillDown={() => onSelectCoach(coach)}
+              />
+            ))}
+          </div>
+
+          <div className="admin-card">
+            <h4>COACH CONSISTENCY COMPARISON</h4>
+            {coaches.map(coach => {
+              const pct   = coachStats[coach]?.avgConsistency ?? 0;
+              const color = pct >= 50 ? '#f59e0b' : '#e5e5e5';
+              return (
+                <div key={coach} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                  <div style={{ width:80, fontSize:13, fontWeight:600, flexShrink:0 }}>{coach.split(' ')[0]}</div>
+                  <div style={{ flex:1, height:10, background:'#f0ebe6', borderRadius:5, overflow:'hidden' }}>
+                    <div style={{ width:`${pct}%`, height:'100%', background:color, borderRadius:5, transition:'width 0.6s' }} />
+                  </div>
+                  <div style={{ width:36, fontSize:13, fontWeight:700, color: pct >= 50 ? '#f59e0b' : '#999', textAlign:'right' }}>{pct}%</div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : activeTab === 'escalations' ? (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {escalations.length === 0
+            ? <div style={{ textAlign:'center', padding:60, color:'#999' }}>No escalations right now</div>
+            : escalations.map((c, i) => <CustomerCard key={i} customer={c} onView={() => {}} />)}
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {allPatients.map((c, i) => <CustomerCard key={i} customer={c} onView={() => {}} />)}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── All Coaches Overview Panel (admin view with per-dietician analytics cards) ──
+
+function AllCoachesOverviewPanel({ dieticians, allCoachData, onSelectCoach }) {
+  const coaches = dieticians.map(d => typeof d === 'string' ? d : (d?.name || d?.email || ''));
+
+  const coachStats = useMemo(() => {
+    const out = {};
+    coaches.forEach(c => { out[c] = computeCoachStats(allCoachData[c]?.customers || []); });
+    return out;
+  }, [coaches, allCoachData]);
+
+  const totals = useMemo(() => {
+    const vals = Object.values(coachStats);
+    const activeCons = vals.filter(v => v.total > 0).map(v => v.avgConsistency);
+    return {
+      totalPatients:   vals.reduce((s, v) => s + v.calls, 0),
+      totalUrgent:     vals.reduce((s, v) => s + v.urgent, 0),
+      avgConsistency:  activeCons.length > 0 ? Math.round(activeCons.reduce((a, b) => a + b, 0) / activeCons.length) : 0,
+      totalReorderDue: vals.reduce((s, v) => s + v.reorderDue, 0),
+      totalRetained:   vals.reduce((s, v) => s + v.retained, 0),
+    };
+  }, [coachStats]);
+
+  const anyLoading = coaches.some(c => allCoachData[c]?.loading);
+
+  return (
+    <>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Coaches Overview</h1>
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>
+          {coaches.length} coaches · {totals.totalPatients} total patients
+        </p>
+      </div>
+
+      {/* Summary stats row */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        {[
+          { value: totals.totalPatients,          label: 'Total Patients',        color: '#374151' },
+          { value: totals.totalUrgent,             label: 'Total Urgent',          color: '#c44033' },
+          { value: `${totals.avgConsistency}%`,    label: 'Avg Consistency',       color: '#16a34a' },
+          { value: totals.totalReorderDue,         label: 'Reorders Due',          color: '#2563eb' },
+          { value: totals.totalRetained,           label: 'Retained (Day 28+)',    color: '#7c3aed' },
+        ].map(({ value, label, color }) => (
+          <div key={label} style={{ flex: 1, background: '#fff', border: '1px solid #e5e5e5', borderRadius: 12, padding: '20px', textAlign: 'center', borderTop: `3px solid ${color}` }}>
+            <div style={{ fontSize: 32, fontWeight: 700, color }}>{value}</div>
+            <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Loading spinner */}
+      {anyLoading && coaches.length === 0 ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <div style={{ width: 28, height: 28, border: '3px solid #c44033', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        </div>
+      ) : (
+        <>
+          {/* Coach cards grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 20 }}>
+            {coaches.map(coach => (
+              <CoachCard
+                key={coach}
+                name={coach}
+                stats={coachStats[coach] || {}}
+                loading={allCoachData[coach]?.loading ?? true}
+                onDrillDown={() => onSelectCoach(coach)}
+              />
+            ))}
+          </div>
+
+          {/* Consistency comparison bar chart */}
+          <div className="admin-card">
+            <h4 style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#888' }}>Coach Consistency Comparison</h4>
+            {[...coaches]
+              .sort((a, b) => (coachStats[b]?.avgConsistency ?? 0) - (coachStats[a]?.avgConsistency ?? 0))
+              .map(coach => {
+                const pct   = coachStats[coach]?.avgConsistency ?? 0;
+                const color = pct >= 50 ? '#f59e0b' : '#e5e5e5';
+                return (
+                  <div key={coach} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <div style={{ width: 90, fontSize: 13, fontWeight: 600, flexShrink: 0 }}>{coach.split(' ')[0]}</div>
+                    <div style={{ flex: 1, height: 10, background: '#f0ebe6', borderRadius: 5, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 5, transition: 'width 0.6s' }} />
+                    </div>
+                    <div style={{ width: 36, fontSize: 13, fontWeight: 700, color: pct >= 50 ? '#f59e0b' : '#999', textAlign: 'right' }}>{pct}%</div>
+                  </div>
+                );
+              })}
+          </div>
+        </>
+      )}
+    </>
   );
 }
