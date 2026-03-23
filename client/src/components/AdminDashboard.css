@@ -40,6 +40,22 @@
   flex: 1;
   padding: 12px 0;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+.admin-sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.admin-sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 4px;
+}
+.admin-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.28);
 }
 
 .admin-sidebar-item {

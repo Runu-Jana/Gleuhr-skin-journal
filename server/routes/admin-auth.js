@@ -1,33 +1,45 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const { fetchTeamMembers } = require('../services/airtableService');
 
 // POST /api/admin/auth/login
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.JWT_SECRET) {
-    console.error('Missing required env vars: ADMIN_EMAIL, ADMIN_PASSWORD, JWT_SECRET');
+  if (!process.env.JWT_SECRET) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
-  console.log('[admin-auth] login attempt:', { email, expectedEmail: process.env.ADMIN_EMAIL, passwordMatch: password === process.env.ADMIN_PASSWORD });
-
-  if (email !== process.env.ADMIN_EMAIL || password !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+  // ── 1. Check admin credentials ───────────────────────────────────────────
+  if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+    if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
+      const token = jwt.sign({ role: 'admin', email }, process.env.JWT_SECRET, { expiresIn: '8h' });
+      return res.json({ token, role: 'admin', expiresIn: 28800 });
+    }
   }
 
-  const token = jwt.sign(
-    { role: 'admin', email },
-    process.env.JWT_SECRET,
-    { expiresIn: '8h' }
-  );
+  // ── 2. Check team lead credentials ──────────────────────────────────────
+  const teamLeadPassword = process.env.TEAM_LEAD_PASSWORD || process.env.DIETICIAN_PASSWORD;
+  const teamLeadEmails   = (process.env.TEAM_LEAD_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 
-  res.json({ token, expiresIn: 28800 });
+  if (teamLeadPassword && password === teamLeadPassword && teamLeadEmails.includes(email.toLowerCase())) {
+    try {
+      const members = await fetchTeamMembers();
+      const member = members.find(m => m.email && m.email.toLowerCase() === email.toLowerCase());
+      const name = member?.name || email;
+      const token = jwt.sign({ role: 'team_lead', email, name }, process.env.JWT_SECRET, { expiresIn: '8h' });
+      return res.json({ token, role: 'team_lead', name, expiresIn: 28800 });
+    } catch {
+      return res.status(500).json({ error: 'Failed to validate credentials' });
+    }
+  }
+
+  return res.status(401).json({ error: 'Invalid credentials' });
 });
 
 // POST /api/admin/auth/verify
