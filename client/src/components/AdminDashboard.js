@@ -113,7 +113,6 @@ export default function AdminDashboard() {
   // Load customers for selected dietician (skip when team lead is on overview)
   const fetchCustomers = useCallback(async () => {
     if (showTeamOverview || showDieticianOverview) return;
-    if (showTeamOverview) return;
     setLoading(true);
     setError(null);
     setSelectedCustomer(null);
@@ -130,13 +129,6 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
-  // Fetch all coaches' data for team overview or dietician overview
-  useEffect(() => {
-    if ((!showTeamOverview && !showDieticianOverview) || dieticians.length === 0) return;
-  }, [dietician, showTeamOverview]);
-
-  useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
-
   // Fetch all coaches' data for team overview
   useEffect(() => {
     if (!showTeamOverview || dieticians.length === 0) return;
@@ -149,7 +141,6 @@ export default function AdminDashboard() {
         .catch(()         => setAllCoachData(prev => ({ ...prev, [name]: { customers: [],           loading: false } })));
     });
   }, [showTeamOverview, showDieticianOverview, dieticians]); // eslint-disable-line react-hooks/exhaustive-deps
-  }, [showTeamOverview, dieticians]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Open customer detail
   const openDetail = async (customer) => {
@@ -206,7 +197,6 @@ export default function AdminDashboard() {
           <nav className="admin-sidebar-nav">
             {isTeamLead && (
               <button className="admin-sidebar-item" onClick={() => { setSelectedCustomer(null); setDetails(null); setShowTeamOverview(true); setShowDieticianOverview(false); }}>
-              <button className="admin-sidebar-item" onClick={() => { setSelectedCustomer(null); setDetails(null); setShowTeamOverview(true); }}>
                 <div className="admin-sidebar-avatar" style={{ background: avatarColor(teamLeadName) }}>{getInitials(teamLeadName)}</div>
                 <div><div style={{ fontWeight: 600, fontSize: 13 }}>{teamLeadName}</div><div style={{ fontSize: 11, opacity: 0.6 }}>Team Overview</div></div>
               </button>
@@ -225,7 +215,6 @@ export default function AdminDashboard() {
                   key={name}
                   className={`admin-sidebar-item ${name === dietician ? 'active' : ''}`}
                   onClick={() => { setDietician(name); setSelectedCustomer(null); setDetails(null); setShowTeamOverview(false); setShowDieticianOverview(false); }}
-                  onClick={() => { setDietician(name); setSelectedCustomer(null); setDetails(null); setShowTeamOverview(false); }}
                 >
                   <div className="admin-sidebar-avatar" style={{ background: avatarColor(name) }}>
                     {getInitials(name)}
@@ -277,7 +266,6 @@ export default function AdminDashboard() {
             <button
               className={`admin-sidebar-item ${showTeamOverview ? 'active' : ''}`}
               onClick={() => { setShowTeamOverview(true); setShowDieticianOverview(false); }}
-              onClick={() => setShowTeamOverview(true)}
             >
               <div className="admin-sidebar-avatar" style={{ background: avatarColor(teamLeadName) }}>{getInitials(teamLeadName)}</div>
               <div><div style={{ fontWeight: 600, fontSize: 13 }}>{teamLeadName}</div><div style={{ fontSize: 11, opacity: 0.6 }}>Team Overview</div></div>
@@ -300,8 +288,6 @@ export default function AdminDashboard() {
                 key={name}
                 className={`admin-sidebar-item ${!showTeamOverview && !showDieticianOverview && name === dietician ? 'active' : ''}`}
                 onClick={() => { setDietician(name); setShowTeamOverview(false); setShowDieticianOverview(false); }}
-                className={`admin-sidebar-item ${!showTeamOverview && name === dietician ? 'active' : ''}`}
-                onClick={() => { setDietician(name); setShowTeamOverview(false); }}
               >
                 <div className="admin-sidebar-avatar" style={{ background: avatarColor(name) }}>
                   {getInitials(name)}
