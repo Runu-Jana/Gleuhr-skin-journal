@@ -71,15 +71,34 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
   };
 
   const handleUnlockProgress = () => {
-    document.getElementById('popup-camera-input').click();
+    // Try mobile camera first, fallback to PC file picker
+    const mobileInput = document.getElementById('popup-camera-input');
+    const pcInput = document.getElementById('popup-pc-camera-input');
+    if (mobileInput) {
+      mobileInput.click();
+    }
+    // Fallback for PC - if mobile doesn't work, try PC input after a delay
+    setTimeout(() => {
+      if (!capturedImage && pcInput) {
+        pcInput.click();
+      }
+    }, 1000);
   };
 
   const handleRetake = () => {
     setCapturedImage(null);
     setShowSuccess(false);
-    // Trigger camera again
     setTimeout(() => {
-      document.getElementById('popup-camera-input').click();
+      const mobileInput = document.getElementById('popup-camera-input');
+      const pcInput = document.getElementById('popup-pc-camera-input');
+      if (mobileInput) {
+        mobileInput.click();
+      }
+      setTimeout(() => {
+        if (!capturedImage && pcInput) {
+          pcInput.click();
+        }
+      }, 1000);
     }, 100);
   };
 
@@ -214,6 +233,14 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
                 </button>
                 <input
                   id="popup-camera-input"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleCameraCapture}
+                  className="hidden"
+                />
+                <input
+                  id="popup-pc-camera-input"
                   type="file"
                   accept="image/*"
                   onChange={handleCameraCapture}
