@@ -596,15 +596,22 @@ router.get('/patient/:phone/photos', async (req, res) => {
   try {
     const phoneVariants = getPhoneVariants(req.params.phone);
     const photoOr = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
-    const photos = await WeeklyPhoto.find({ $or: photoOr }).sort({ weekNumber: 1 }).lean();
-    res.json({ success: true, photos: photos.map(p => ({
-      weekNumber: p.weekNumber,
-      day: p.day,
-      createdAt: p.createdAt,
-      coachRating: p.coachRating || null,
-      coachNote: p.coachNote || '',
-      hasPhoto: !!p.photoData,
-    })) });
+    const photos = await WeeklyPhoto.find({ $or: photoOr })
+      .sort({ weekNumber: 1 })
+      .select('weekNumber dayOfJourney uploadDate photoUrl photoData coachRating coachNote')
+      .lean();
+    res.json({
+      success: true,
+      photos: photos.map(p => ({
+        weekNumber: p.weekNumber,
+        dayOfJourney: p.dayOfJourney,
+        uploadDate: p.uploadDate,
+        // Prefer Airtable URL (stable); fall back to base64 data-URI
+        photoUrl: p.photoUrl || p.photoData || '',
+        coachRating: p.coachRating ?? null,
+        coachNote: p.coachNote || '',
+      })),
+    });
   } catch (err) {
     console.error('Fetch photos error:', err);
     res.status(500).json({ error: 'Failed to fetch photos' });
