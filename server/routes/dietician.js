@@ -451,16 +451,28 @@ router.get('/patient/:phone/diet', async (req, res) => {
     }, 0);
     const dietCompliance = daysWithData > 0 ? Math.round((dietScore / daysWithData) * 100) : 0;
 
-    // Diet plan history from Patient.dietPlan
-    const dietPlanHistory = patient?.dietPlan ? [{
-      version: patient.dietPlan.version || 'v1',
-      category: patient.dietPlan.category || 'Standard',
-      restrictions: patient.dietPlan.restrictions || [],
-      recommendations: patient.dietPlan.recommendations || [],
-      isActive: patient.dietPlan.isActive !== false,
-      createdAt: patient.dietPlan.createdAt,
-      notes: patient.dietPlan.notes || '',
-    }] : [];
+    // Diet plan history: past versions (oldest → newest) + current active plan
+    let dietPlanHistory = [];
+    if (patient?.dietPlan) {
+      const dp = patient.dietPlan;
+      const pastVersions = (dp.versions || []).map((v, i) => ({
+        version: `v${i + 1}`,
+        category: v.category || '',
+        restrictions: v.restrictions || [],
+        notes: v.notes || '',
+        isActive: false,
+        createdAt: v.createdAt,
+      }));
+      const currentVersion = {
+        version: `v${pastVersions.length + 1}`,
+        category: dp.category || 'Standard',
+        restrictions: dp.restrictions || [],
+        notes: dp.notes || '',
+        isActive: dp.isActive !== false,
+        createdAt: dp.updatedAt || dp.createdAt,
+      };
+      dietPlanHistory = [...pastVersions, currentVersion];
+    }
 
     res.json({
       success: true,
@@ -469,6 +481,58 @@ router.get('/patient/:phone/diet', async (req, res) => {
   } catch (error) {
     console.error('Dietician patient diet error:', error);
     res.status(500).json({ error: 'Failed to fetch diet data' });
+  }
+});
+
+/**
+ * POST /api/dietician/patient/:phone/diet-plan
+ * Add a new diet plan version for a patient.
+ * Body: { category, restrictions, notes }
+ */
+const DietPlan = require('../models/DietPlan');
+router.post('/patient/:phone/diet-plan', async (req, res) => {
+  try {
+    const { phone } = req.params;
+    const { category, restrictions, notes } = req.body;
+    const phoneVariants = getPhoneVariants(phone);
+    const patientOr = phoneVariants.flatMap(v => [{ phoneNumber: v }, { phone: v }]);
+
+    const patient = await Patient.findOne({ $or: patientOr }).populate('dietPlan');
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
+
+    if (patient.dietPlan) {
+      // Archive the current plan into the versions history, then update with new values
+      const dp = patient.dietPlan;
+      await DietPlan.findByIdAndUpdate(dp._id, {
+        $push: {
+          versions: {
+            category: dp.category,
+            restrictions: dp.restrictions || [],
+            notes: dp.notes || '',
+            createdAt: dp.updatedAt || dp.createdAt || new Date(),
+          }
+        },
+        category: category || dp.category,
+        restrictions: restrictions || [],
+        notes: notes || '',
+        updatedAt: new Date(),
+      });
+    } else {
+      // First-time diet plan for this patient
+      const newPlan = new DietPlan({
+        version: 'v1',
+        category: category || 'General',
+        restrictions: restrictions || [],
+        notes: notes || '',
+      });
+      await newPlan.save();
+      await Patient.findByIdAndUpdate(patient._id, { dietPlan: newPlan._id });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Save diet plan error:', error);
+    res.status(500).json({ error: 'Failed to save diet plan' });
   }
 });
 

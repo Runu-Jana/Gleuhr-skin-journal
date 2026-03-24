@@ -510,7 +510,7 @@ function CustomerDetailView({ customer, details, detailsLoading, activeTab, setA
         {activeTab === 'overview' && (
           <OverviewTab customer={customer} rich={rich} detailsLoading={detailsLoading} />
         )}
-        {activeTab === 'diet' && <DietTab airtable={airtable} />}
+        {activeTab === 'diet' && <DietTab airtable={airtable} phone={airtable.customerPhone} />}
         {activeTab === 'calls' && <CallsTab />}
       </div>
     </>
@@ -731,17 +731,297 @@ function OverviewTab({ customer, rich, detailsLoading }) {
 }
 
 // ── Diet tab ─────────────────────────────────────────────────────────────────
-function DietTab({ airtable }) {
+const DIET_CATEGORIES = [
+  'Strict Elimination', 'Moderate Restriction', 'Maintenance',
+  'Anti-Inflammatory', 'Gut Health Focus',
+];
+const DIET_RESTRICTIONS = [
+  'Dairy-free', 'Sugar-free', 'Gluten-free', 'Low-spice', 'No caffeine',
+  'No processed food', 'High antioxidant', 'Probiotic-rich',
+];
+const WATER_LABELS_ADMIN = { 1: '<1L', 2: '1–2L', 3: '2–3L', 4: '3L+' };
+
+function DietTab({ airtable, phone }) {
+  const [dietData, setDietData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formCategory, setFormCategory] = useState('');
+  const [formRestrictions, setFormRestrictions] = useState([]);
+  const [formNotes, setFormNotes] = useState('');
+
+  const fetchDiet = useCallback(() => {
+    if (!phone) return;
+    setLoading(true);
+    adminApi.get(`/dietician/patient/${encodeURIComponent(phone)}/diet`)
+      .then(r => setDietData(r.data.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [phone]);
+
+  useEffect(() => { fetchDiet(); }, [fetchDiet]);
+
+  const openForm = () => {
+    setFormCategory('');
+    setFormRestrictions([]);
+    setFormNotes('');
+    setShowForm(true);
+  };
+
+  const toggleRestriction = (r) =>
+    setFormRestrictions(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+
+  const handleSave = async () => {
+    if (!formCategory) { alert('Please select a category'); return; }
+    setSaving(true);
+    try {
+      await adminApi.post(`/dietician/patient/${encodeURIComponent(phone)}/diet-plan`, {
+        category: formCategory,
+        restrictions: formRestrictions,
+        notes: formNotes,
+      });
+      setShowForm(false);
+      fetchDiet();
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Failed to save diet plan');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const { dietPlanHistory = [], triggerFoodFrequency = [], waterIntake = {}, dietCompliance = 0 } = dietData || {};
+  const maxTriggerDays = triggerFoodFrequency[0]?.days || 1;
+  const totalWaterLogs = Object.values(waterIntake.buckets || {}).reduce((a, b) => a + b, 0) || 1;
+  const avgBucket = waterIntake.average || 0;
+  const triggerColor = (days) => days >= 7 ? '#dc2626' : days >= 4 ? '#d97706' : '#ca8a04';
+  const nextVersion = dietPlanHistory.length + 1;
+
+  const card = { background:'#fff', border:'1px solid #f0ede8', borderRadius:12, padding:'20px 20px' };
+
+  if (loading) {
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:200, color:'#aaa' }}>
+        <div style={{ width:24, height:24, border:'3px solid #c44033', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      </div>
+    );
+  }
+
   return (
-    <div className="admin-card">
-      <h3 style={{ marginBottom:16 }}>Diet Plan (Airtable)</h3>
-      <div style={{ display:'grid',gap:12,fontSize:13 }}>
-        <div><strong>Customer:</strong> {safeStr(airtable.customerName) || '—'}</div>
-        <div><strong>Phone:</strong> {airtable.customerPhone ? `+${safeStr(airtable.dialCode)} ${safeStr(airtable.customerPhone)}` : '—'}</div>
-        <div><strong>Treatment Plan:</strong> {safeStr(airtable.treatmentPlan) || '—'}</div>
-        <div><strong>Call Status:</strong> <Badge label={airtable.dieticianCallStatus} styleMap={CALL_STATUS_STYLE}/></div>
-        <div><strong>Diet Plan Status:</strong> <Badge label={airtable.dietPlanStatus} styleMap={DIET_STATUS_STYLE}/></div>
-        {airtable.dietPlanDate && <div><strong>Diet Plan Due Date:</strong> {new Date(airtable.dietPlanDate).toLocaleDateString()}</div>}
+    <div style={{ display:'grid', gridTemplateColumns:'55% 1fr', gap:16 }}>
+
+      {/* ── Left: Diet Plan History ── */}
+      <div style={card}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+          <span style={{ fontSize:11, fontWeight:700, letterSpacing:'0.08em', color:'#a39e95' }}>DIET PLAN HISTORY</span>
+          {!showForm && (
+            <button
+              onClick={openForm}
+              style={{ background:'#c44033', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600, cursor:'pointer' }}
+            >
+              + Log Diet Change
+            </button>
+          )}
+        </div>
+
+        {/* ── Inline form for new diet version ── */}
+        {showForm && (
+          <div style={{ border:'1.5px solid #c44033', borderRadius:14, padding:'18px 16px', marginBottom:16, background:'#fff' }}>
+            <div style={{ fontSize:14, fontWeight:700, color:'#191716', marginBottom:14 }}>
+              New Diet Plan — v{nextVersion}
+            </div>
+
+            {/* Category */}
+            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', color:'#a39e95', marginBottom:8 }}>CATEGORY</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:14 }}>
+              {DIET_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setFormCategory(cat)}
+                  style={{
+                    fontSize:12, padding:'5px 13px', borderRadius:99, cursor:'pointer',
+                    border: formCategory === cat ? '1.5px solid #c44033' : '1px solid #e0ddd7',
+                    background: formCategory === cat ? 'rgba(196,64,51,0.07)' : '#fafafa',
+                    color: formCategory === cat ? '#c44033' : '#555',
+                    fontWeight: formCategory === cat ? 600 : 400,
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Restrictions */}
+            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', color:'#a39e95', marginBottom:8 }}>RESTRICTIONS</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:14 }}>
+              {DIET_RESTRICTIONS.map(r => {
+                const on = formRestrictions.includes(r);
+                return (
+                  <button
+                    key={r}
+                    onClick={() => toggleRestriction(r)}
+                    style={{
+                      fontSize:12, padding:'5px 13px', borderRadius:99, cursor:'pointer',
+                      border: on ? '1.5px solid #7c3aed' : '1px solid #e0ddd7',
+                      background: on ? 'rgba(124,58,237,0.07)' : '#fafafa',
+                      color: on ? '#6d28d9' : '#555',
+                      fontWeight: on ? 600 : 400,
+                    }}
+                  >
+                    {on ? '✓ ' : ''}{r}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* What changed & why */}
+            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', color:'#a39e95', marginBottom:8 }}>WHAT CHANGED &amp; WHY</div>
+            <textarea
+              value={formNotes}
+              onChange={e => setFormNotes(e.target.value)}
+              placeholder="e.g. Relaxed dairy restriction — patient was struggling with family meals"
+              rows={3}
+              style={{
+                width:'100%', boxSizing:'border-box', borderRadius:10, border:'1px solid #e0ddd7',
+                padding:'10px 12px', fontSize:13, color:'#333', resize:'vertical',
+                fontFamily:'inherit', outline:'none',
+              }}
+            />
+
+            {/* Actions */}
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:14 }}>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{ padding:'8px 18px', borderRadius:10, border:'1px solid #e0ddd7', background:'#fafafa', fontSize:13, cursor:'pointer', color:'#555' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{ padding:'8px 18px', borderRadius:10, border:'none', background:'#c44033', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}
+              >
+                {saving ? 'Saving…' : `Save v${nextVersion}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Version history cards ── */}
+        {dietPlanHistory.length === 0 && !showForm ? (
+          <div style={{ textAlign:'center', color:'#bbb', padding:'30px 0', fontSize:13 }}>
+            No diet plan recorded yet.
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {[...dietPlanHistory].reverse().map((plan, i) => (
+              <div
+                key={i}
+                style={{
+                  border:`1.5px solid ${plan.isActive ? '#c4b5fd' : '#e5e7eb'}`,
+                  borderRadius:12, padding:'14px 16px',
+                  background: plan.isActive ? 'rgba(196,181,253,0.07)' : '#fafafa',
+                }}
+              >
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:'#555' }}>
+                    {plan.version}
+                  </span>
+                  {plan.isActive && (
+                    <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99, background:'#ede9fe', color:'#7c3aed', letterSpacing:'0.05em' }}>
+                      ACTIVE
+                    </span>
+                  )}
+                  {plan.createdAt && (
+                    <span style={{ marginLeft:'auto', fontSize:12, color:'#aaa' }}>
+                      {new Date(plan.createdAt).toISOString().split('T')[0]}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize:13, fontWeight:600, color:'#333', marginBottom:8 }}>
+                  {plan.category}
+                </div>
+                {plan.restrictions.length > 0 && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+                    {plan.restrictions.map((r, j) => (
+                      <span key={j} style={{ fontSize:11, padding:'3px 10px', borderRadius:99, background:'#ede9fe', color:'#6d28d9', border:'1px solid #ddd6fe' }}>
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {plan.notes && (
+                  <div style={{ fontSize:12, color:'#888', fontStyle:'italic' }}>
+                    "{plan.notes}"
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Right: Trigger Foods + Water + Compliance ── */}
+      <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+        {/* Trigger Food Frequency */}
+        <div style={card}>
+          <span style={{ fontSize:11, fontWeight:700, letterSpacing:'0.08em', color:'#a39e95', display:'block', marginBottom:12 }}>
+            TRIGGER FOOD FREQUENCY (14 DAYS)
+          </span>
+          {triggerFoodFrequency.length === 0 ? (
+            <div style={{ color:'#bbb', fontSize:13 }}>No trigger foods reported.</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {triggerFoodFrequency.map(({ food, days }) => (
+                <div key={food}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:4 }}>
+                    <span style={{ color:'#444', fontWeight:500 }}>{food}</span>
+                    <span style={{ fontWeight:700, color:triggerColor(days) }}>{days} days</span>
+                  </div>
+                  <div style={{ background:'#f0f0f0', borderRadius:99, height:7, overflow:'hidden' }}>
+                    <div style={{ width:`${(days / 14) * 100}%`, background:triggerColor(days), height:'100%', borderRadius:99, transition:'width 0.4s' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Water Intake (Avg) */}
+        <div style={card}>
+          <span style={{ fontSize:11, fontWeight:700, letterSpacing:'0.08em', color:'#a39e95', display:'block', marginBottom:12 }}>
+            WATER INTAKE (AVG)
+          </span>
+          <div style={{ display:'flex', gap:8 }}>
+            {[1,2,3,4].map(bucket => {
+              const isActive = bucket === avgBucket;
+              return (
+                <div key={bucket} style={{ flex:1, textAlign:'center', padding:'10px 6px', borderRadius:10, border:`1.5px solid ${isActive ? '#3b82f6' : '#e5e7eb'}`, background: isActive ? '#eff6ff' : '#fafafa' }}>
+                  <div style={{ fontSize:13, fontWeight: isActive ? 700 : 400, color: isActive ? '#2563eb' : '#aaa' }}>
+                    {WATER_LABELS_ADMIN[bucket]}
+                  </div>
+                  {totalWaterLogs > 1 && (
+                    <div style={{ fontSize:10, color:'#bbb', marginTop:3 }}>{waterIntake.buckets?.[bucket] || 0}d</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Diet Compliance */}
+        <div style={card}>
+          <span style={{ fontSize:11, fontWeight:700, letterSpacing:'0.08em', color:'#a39e95', display:'block', marginBottom:12 }}>
+            DIET COMPLIANCE
+          </span>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'#444', marginBottom:5 }}>
+            <span>Overall</span>
+            <span style={{ fontWeight:700, color: dietCompliance >= 70 ? '#16a34a' : '#c44033' }}>{dietCompliance}%</span>
+          </div>
+          <div style={{ background:'#f0f0f0', borderRadius:99, height:7, overflow:'hidden' }}>
+            <div style={{ width:`${dietCompliance}%`, background:'#c44033', height:'100%', borderRadius:99, transition:'width 0.4s' }} />
+          </div>
+        </div>
       </div>
     </div>
   );
