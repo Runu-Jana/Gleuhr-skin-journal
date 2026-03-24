@@ -84,7 +84,7 @@ export default function ProfileScreen() {
             <p className="text-xs text-[rgba(255,255,255,0.4)] font-outfit uppercase tracking-[0.6px] flex items-center gap-1">
               <Shield className="w-3 h-3 text-[#c44033]" /> Shields
             </p>
-            <p className="text-xl font-bold text-white font-crimson mt-0.5">{streakData?.shields || 0}</p>
+            <p className="text-xl font-bold text-white font-crimson mt-0.5">{streakData?.restorationShields?.available ?? streakData?.shields ?? 0}</p>
           </div>
         </div>
       </div>

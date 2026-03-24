@@ -8,75 +8,90 @@ const DailyCheckIn = require('../models/DailyCheckIn');
 router.get('/:phone', async (req, res) => {
   try {
     const { phone } = req.params;
-    
+
     // Find patient by phone (support both field names)
     const patient = await Patient.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone }
-      ]
+      $or: [{ phoneNumber: phone }, { phone: phone }]
     });
 
     if (!patient) {
-      return res.json({
-        streak: 0,
-        longestStreak: 0,
-        shields: 0,
-        lastCheckin: null,
-        day: 1
-      });
+      return res.json({ streak: 0, longestStreak: 0, shields: 0, lastCheckin: null, day: 1 });
     }
 
-    // Find streak for this patient
-    const streak = await Streak.findOne({
-      $or: [
-        { phoneNumber: phone },
-        { phone: phone },
-        { patientPhone: phone }
-      ]
+    // ── Recalculate streak live from DailyCheckIn records ──────────────────
+    // This is the source of truth; avoids stale cached values in the Streak collection.
+    const patientIdStr = patient._id.toString();
+    const allCheckIns = await DailyCheckIn.find({
+      $or: [{ patientId: patientIdStr }, { patientPhone: phone }]
+    }).sort({ date: 1 });
+
+    const activeDates = new Set(
+      allCheckIns.filter(c => c.completed === true || c.shieldRestored === true).map(c => c.date)
+    );
+    const sorted = [...activeDates].sort();
+
+    // Longest streak
+    let longestStreak = activeDates.size > 0 ? 1 : 0;
+    let run = 1;
+    for (let i = 1; i < sorted.length; i++) {
+      const diff = Math.round((new Date(sorted[i]) - new Date(sorted[i - 1])) / 86400000);
+      if (diff === 1) { run++; if (run > longestStreak) longestStreak = run; }
+      else { run = 1; }
+    }
+
+    // Current streak (consecutive active days ending at today or yesterday)
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    let currentStreak = 0;
+    const startOffset = activeDates.has(todayStr) ? 0 : activeDates.has(yesterdayStr) ? 1 : -1;
+    if (startOffset >= 0) {
+      for (let i = startOffset; i <= sorted.length; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        if (activeDates.has(d.toISOString().split('T')[0])) { currentStreak++; }
+        else { break; }
+      }
+    }
+    if (currentStreak > longestStreak) longestStreak = currentStreak;
+
+    // ── Find (or create) the Streak record for shield data ─────────────────
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    let streak = await Streak.findOne({
+      $or: [{ patientId: patientIdStr }, { patientPhone: phone }]
     });
 
-    if (!streak) {
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      return res.json({
-        streak: 0,
-        longestStreak: 0,
-        shields: 0,
-        restorationShields: {
-          available: 3,
-          monthly: 3,
-          used: 0,
-          lastResetMonth: currentMonth
-        },
-        lastCheckin: null,
-        day: patient.currentDay || 1
-      });
+    // Sync the recalculated streak back to DB so it stays up to date
+    if (streak) {
+      await Streak.findByIdAndUpdate(streak._id, { currentStreak, longestStreak });
+    } else if (currentStreak > 0) {
+      streak = await Streak.findOneAndUpdate(
+        { $or: [{ patientId: patientIdStr }, { patientPhone: phone }] },
+        { currentStreak, longestStreak, patientPhone: phone, patientId: patientIdStr },
+        { upsert: true, new: true }
+      );
     }
 
-    const currentStreak = streak.currentStreak || 0;
-    const longestStreak = streak.longestStreak || 0;
-    
-    // Check and reset monthly shields if needed
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const availableShields = (streak.shields?.lastResetMonth === currentMonth) 
+    const availableShields = streak && streak.shields?.lastResetMonth === currentMonth
       ? (streak.shields?.monthly || 3) - (streak.shields?.used || 0)
-      : 3; // New month, reset to 3
-    
-    // Calculate shields (1 per 7 days, max 3)
+      : 3;
     const earnedShields = Math.min(3, Math.floor(currentStreak / 7));
 
     res.json({
       streak: currentStreak,
-      longestStreak: longestStreak,
+      longestStreak,
       shields: earnedShields,
       restorationShields: {
         available: availableShields,
         monthly: 3,
-        used: streak.shields?.used || 0,
+        used: streak?.shields?.used || 0,
         lastResetMonth: currentMonth
       },
-      lastCheckin: streak.lastCheckIn,
-      day: streak.day || patient.currentDay || 1
+      lastCheckin: streak?.lastCheckIn || null,
+      day: streak?.day || patient.currentDay || 1
     });
   } catch (error) {
     console.error('Fetch streak error:', error);
