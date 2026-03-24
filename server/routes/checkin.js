@@ -195,9 +195,10 @@ async function updateStreak(phoneNumber, currentDay, patientId = null) {
     if (patientId) orClauses.push({ patientId });
     const allCheckIns = await DailyCheckIn.find({ $or: orClauses }).sort({ date: 1 });
 
-    // Fully-complete days AND shield-restored days count toward streak
+    // Any day where at least one routine was logged (AM or PM) or shield was used.
+    // Matches the client-side streak logic to prevent discrepancies.
     const activeDates = new Set(
-      allCheckIns.filter(c => c.completed === true || c.shieldRestored === true).map(c => c.date)
+      allCheckIns.filter(c => c.amRoutine === true || c.pmRoutine === true || c.shieldRestored === true).map(c => c.date)
     );
 
     if (activeDates.size === 0) return;

@@ -163,6 +163,21 @@ export default function PMPage() {
         setSkinMood(today.skinMood);
         setHasSubmitted(true);
       }
+
+      // Auto-trigger shield popup if yesterday was missed and user has prior history
+      const allCheckIns = await getCheckIns(patient?.id);
+      const yest = new Date(); yest.setDate(yest.getDate() - 1);
+      const yesterdayStr = yest.toISOString().split('T')[0];
+      const shieldRestoredDate = localStorage.getItem('gleuhrShieldRestoredDate');
+      const hadHistory = allCheckIns && allCheckIns.some(
+        c => c.amRoutine || c.pmRoutine || c.shieldRestored
+      );
+      const yesterdayActive = allCheckIns && allCheckIns.some(
+        c => c.date === yesterdayStr && (c.amRoutine || c.pmRoutine || c.shieldRestored)
+      );
+      if (hadHistory && !yesterdayActive && shieldRestoredDate !== yesterdayStr) {
+        setShowShieldRestore(true);
+      }
     };
     loadToday();
   }, [patient]);

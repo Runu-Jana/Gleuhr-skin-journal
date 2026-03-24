@@ -341,8 +341,16 @@ export default function HomeScreen() {
           </div>
           <div>
             {(() => {
-              const current = localStreak.currentStreak || streakData?.streak || 0;
-              const best = localStreak.longestStreak || streakData?.longestStreak || 0;
+              // Cap streak values by the current programme day to prevent stale server
+              // data from showing an impossible streak (e.g. "3 days" on day 2).
+              const current = Math.min(
+                localStreak.currentStreak || streakData?.streak || 0,
+                day
+              );
+              const best = Math.min(
+                localStreak.longestStreak || streakData?.longestStreak || 0,
+                day
+              );
               const atBest = current > 0 && current >= best;
               return (
                 <>

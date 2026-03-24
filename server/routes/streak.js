@@ -25,8 +25,11 @@ router.get('/:phone', async (req, res) => {
       $or: [{ patientId: patientIdStr }, { patientPhone: phone }]
     }).sort({ date: 1 });
 
+    // Count any day where at least one routine was logged (AM or PM) or shield was used.
+    // This matches the client-side logic and prevents discrepancies where a day with
+    // only AM logged would not be counted by the server but would be by the client.
     const activeDates = new Set(
-      allCheckIns.filter(c => c.completed === true || c.shieldRestored === true).map(c => c.date)
+      allCheckIns.filter(c => c.amRoutine === true || c.pmRoutine === true || c.shieldRestored === true).map(c => c.date)
     );
     const sorted = [...activeDates].sort();
 

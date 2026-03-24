@@ -106,6 +106,20 @@ export default function AMPage() {
         // Load all check-ins for consistency calculation
         const allCheckIns = await getCheckIns(patient?.id);
         setCheckIns(allCheckIns || []);
+
+        // Auto-trigger shield popup if yesterday was missed and user has prior history
+        const yest = new Date(); yest.setDate(yest.getDate() - 1);
+        const yesterdayStr = yest.toISOString().split('T')[0];
+        const shieldRestoredDate = localStorage.getItem('gleuhrShieldRestoredDate');
+        const hadHistory = allCheckIns && allCheckIns.some(
+          c => c.amRoutine || c.pmRoutine || c.shieldRestored
+        );
+        const yesterdayActive = allCheckIns && allCheckIns.some(
+          c => c.date === yesterdayStr && (c.amRoutine || c.pmRoutine || c.shieldRestored)
+        );
+        if (hadHistory && !yesterdayActive && shieldRestoredDate !== yesterdayStr) {
+          setShowShieldRestore(true);
+        }
       } catch (error) {
         console.error('Error loading today check-in:', error);
       }
@@ -224,7 +238,10 @@ export default function AMPage() {
                 })()}
               </p>
               <p className="text-xs text-[#a39e95] font-outfit mt-0.5">
-                Current streak: <span className="font-semibold text-[#191716]">{streakData?.streak || 0}</span> days · {consistency}% consistent
+                {(streakData?.streak || 0) > 0
+                  ? <><span>Streak: </span><span className="font-semibold text-[#191716]">{streakData.streak}</span><span> days · {consistency}% consistent</span></>
+                  : <span>{consistency}% consistent</span>
+                }
               </p>
             </div>
             <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.06)] flex-shrink-0">
