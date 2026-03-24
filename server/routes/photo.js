@@ -84,11 +84,21 @@ router.post('/', async (req, res) => {
 
     console.log(`Photo saved for patient ${pPhone}, week ${weekNum}, id: ${weeklyPhoto._id}`);
 
-    // Mirror the photo to Airtable "Patient Photos" field — non-blocking, failure is safe
+    // Mirror the photo to Airtable "Patient Photos" field — non-blocking, failure is safe.
+    // On success, persist the returned Airtable URL to mongoDb so the admin dashboard
+    // can display photos without re-sending large base64 payloads.
     if (photoData) {
-      uploadPhotoToAirtable(pPhone, photoData, weekNum).catch(err =>
-        console.error('Airtable photo mirror failed (non-fatal):', err.message)
-      );
+      uploadPhotoToAirtable(pPhone, photoData, weekNum)
+        .then(result => {
+          // Airtable Content API returns either a single attachment object or an array.
+          const attachment = Array.isArray(result) ? result[0] : result;
+          const airtableUrl = attachment?.url;
+          if (airtableUrl) {
+            WeeklyPhoto.findByIdAndUpdate(weeklyPhoto._id, { photoUrl: airtableUrl })
+              .catch(e => console.error('Failed to save Airtable URL to MongoDB:', e.message));
+          }
+        })
+        .catch(err => console.error('Airtable photo mirror failed (non-fatal):', err.message));
     }
 
     res.json({

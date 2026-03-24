@@ -111,7 +111,7 @@ router.get('/:name/customers', async (req, res) => {
           weeklyPhotos = await WeeklyPhoto.find({ $or: photoOr })
             .sort({ weekNumber: -1 })
             .limit(12)
-            .select('weekNumber photoUrl uploadDate skinScore dayOfJourney notes')
+            .select('weekNumber photoUrl photoData uploadDate skinScore dayOfJourney notes coachRating coachNote')
             .lean();
         }
 
@@ -197,11 +197,15 @@ router.get('/:name/customers', async (req, res) => {
             // Weekly photos
             weeklyPhotos: weeklyPhotos.map(p => ({
               weekNumber: p.weekNumber,
-              photoUrl: p.photoUrl,
+              // Use the stored Airtable URL when available; fall back to the
+              // base64 data-URI so the admin dashboard always has something to display.
+              photoUrl: p.photoUrl || p.photoData || '',
               uploadDate: p.uploadDate,
               skinScore: p.skinScore,
               dayOfJourney: p.dayOfJourney,
               notes: p.notes,
+              coachRating: p.coachRating ?? null,
+              coachNote: p.coachNote || '',
             })),
           } : null,
         };

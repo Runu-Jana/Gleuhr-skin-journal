@@ -91,7 +91,7 @@ router.get('/', async (req, res) => {
       const daysAbsent = Math.floor(
         (new Date() - new Date(s.lastCheckIn)) / (1000 * 60 * 60 * 24)
       );
-      return daysAbsent >= 3;
+      return daysAbsent >= 5;
     }).length;
 
     // ── Drop-off funnel ──────────────────────────────────────────────────────
