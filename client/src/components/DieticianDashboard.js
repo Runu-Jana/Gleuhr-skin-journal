@@ -458,19 +458,64 @@ function PhotoRatingsTab({ phone, currentDay }) {
 
 // ── Diet & Compliance tab ────────────────────────────────────────────────────
 const WATER_LABELS = { 1: '< 1L', 2: '1–2L', 3: '2–3L', 4: '3L+' };
+const DC_CATEGORIES = [
+  'Strict Elimination', 'Moderate Restriction', 'Maintenance',
+  'Anti-Inflammatory', 'Gut Health Focus',
+];
+const DC_RESTRICTIONS = [
+  'Dairy-free', 'Sugar-free', 'Gluten-free', 'Low-spice', 'No caffeine',
+  'No processed food', 'High antioxidant', 'Probiotic-rich',
+];
 
 function DietComplianceTab({ phone, card }) {
   const [dietData, setDietData] = useState(null);
   const [loading, setLoading]   = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [formCategory, setFormCategory]       = useState('');
+  const [formRestrictions, setFormRestrictions] = useState([]);
+  const [formNotes, setFormNotes]             = useState('');
 
-  useEffect(() => {
-    setDietData(null);
+  const fetchDiet = () => {
     setLoading(true);
     api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/diet`)
       .then(res => setDietData(res.data.data))
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    setDietData(null);
+    fetchDiet();
   }, [phone]);
+
+  const openForm = () => {
+    setFormCategory('');
+    setFormRestrictions([]);
+    setFormNotes('');
+    setShowForm(true);
+  };
+
+  const toggleRestriction = (r) =>
+    setFormRestrictions(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+
+  const handleSave = async () => {
+    if (!formCategory) { alert('Please select a category'); return; }
+    setSaving(true);
+    try {
+      await api.post(`/api/dietician/patient/${encodeURIComponent(phone)}/diet-plan`, {
+        category: formCategory,
+        restrictions: formRestrictions,
+        notes: formNotes,
+      });
+      setShowForm(false);
+      fetchDiet();
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Failed to save diet plan');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -481,14 +526,10 @@ function DietComplianceTab({ phone, card }) {
   }
 
   const { dietPlanHistory = [], triggerFoodFrequency = [], waterIntake = {}, dietCompliance = 0 } = dietData || {};
-  const maxTriggerDays = triggerFoodFrequency[0]?.days || 1;
-
-  // Colour for trigger food bar based on frequency
   const triggerColor = (days) => days >= 7 ? '#dc2626' : days >= 4 ? '#d97706' : '#ca8a04';
-
-  // Water bucket widths (% of total days logged)
   const totalWaterLogs = Object.values(waterIntake.buckets || {}).reduce((a, b) => a + b, 0) || 1;
   const avgBucket = waterIntake.average || 0;
+  const nextVersion = dietPlanHistory.length + 1;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '55% 1fr', gap: 16 }}>
@@ -497,35 +538,104 @@ function DietComplianceTab({ phone, card }) {
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <SectionHeading label="DIET PLAN HISTORY" />
-          <button style={{
-            background: '#c44033', color: '#fff', border: 'none',
-            borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-          }}>
-            + Log Diet Change
-          </button>
+          {!showForm && (
+            <button
+              onClick={openForm}
+              style={{ background: '#c44033', color: '#fff', border: 'none', outline: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              + Log Diet Change
+            </button>
+          )}
         </div>
 
-        {dietPlanHistory.length === 0 ? (
+        {/* ── Inline form ── */}
+        {showForm && (
+          <div style={{ border: '1.5px solid #c44033', borderRadius: 14, padding: '18px 16px', marginBottom: 16, background: '#fff' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#191716', marginBottom: 14 }}>
+              New Diet Plan — v{nextVersion}
+            </div>
+
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#a39e95', marginBottom: 8 }}>CATEGORY</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 14 }}>
+              {DC_CATEGORIES.map(cat => (
+                <button key={cat} onClick={() => setFormCategory(cat)} style={{
+                  fontSize: 12, padding: '5px 13px', borderRadius: 99, cursor: 'pointer', outline: 'none',
+                  border: formCategory === cat ? '1.5px solid #c44033' : '1px solid #e0ddd7',
+                  background: formCategory === cat ? 'rgba(196,64,51,0.07)' : '#fafafa',
+                  color: formCategory === cat ? '#c44033' : '#555',
+                  fontWeight: formCategory === cat ? 600 : 400,
+                }}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#a39e95', marginBottom: 8 }}>RESTRICTIONS</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 14 }}>
+              {DC_RESTRICTIONS.map(r => {
+                const on = formRestrictions.includes(r);
+                return (
+                  <button key={r} onClick={() => toggleRestriction(r)} style={{
+                    fontSize: 12, padding: '5px 13px', borderRadius: 99, cursor: 'pointer', outline: 'none',
+                    border: on ? '1.5px solid #7c3aed' : '1px solid #e0ddd7',
+                    background: on ? 'rgba(124,58,237,0.07)' : '#fafafa',
+                    color: on ? '#6d28d9' : '#555',
+                    fontWeight: on ? 600 : 400,
+                  }}>
+                    {on ? '✓ ' : ''}{r}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#a39e95', marginBottom: 8 }}>WHAT CHANGED &amp; WHY</div>
+            <textarea
+              value={formNotes}
+              onChange={e => setFormNotes(e.target.value)}
+              placeholder="e.g. Relaxed dairy restriction — patient was struggling with family meals"
+              rows={3}
+              style={{
+                width: '100%', boxSizing: 'border-box', borderRadius: 10,
+                border: '1px solid #e0ddd7', padding: '10px 12px',
+                fontSize: 13, color: '#333', resize: 'vertical',
+                fontFamily: 'inherit', outline: 'none',
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{ padding: '8px 18px', borderRadius: 10, border: '1px solid #e0ddd7', background: '#fafafa', fontSize: 13, cursor: 'pointer', color: '#555', outline: 'none' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{ padding: '8px 18px', borderRadius: 10, border: 'none', outline: 'none', background: '#c44033', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                {saving ? 'Saving…' : `Save v${nextVersion}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {dietPlanHistory.length === 0 && !showForm ? (
           <div style={{ textAlign: 'center', color: '#bbb', padding: '30px 0', fontSize: 13 }}>
             No diet plan recorded yet.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {dietPlanHistory.map((plan, i) => (
+            {[...dietPlanHistory].reverse().map((plan, i) => (
               <div key={i} style={{
                 border: `1.5px solid ${plan.isActive ? '#c4b5fd' : '#e5e7eb'}`,
                 borderRadius: 12, padding: '14px 16px',
                 background: plan.isActive ? 'rgba(196,181,253,0.07)' : '#fafafa',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#555' }}>
-                    v{i + 1}
-                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#555' }}>{plan.version}</span>
                   {plan.isActive && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-                      background: '#ede9fe', color: '#7c3aed', letterSpacing: '0.05em',
-                    }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#ede9fe', color: '#7c3aed', letterSpacing: '0.05em' }}>
                       ACTIVE
                     </span>
                   )}
@@ -535,25 +645,18 @@ function DietComplianceTab({ phone, card }) {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 8 }}>
-                  {plan.category}
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 8 }}>{plan.category}</div>
                 {plan.restrictions.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                     {plan.restrictions.map((r, j) => (
-                      <span key={j} style={{
-                        fontSize: 11, padding: '3px 10px', borderRadius: 99,
-                        background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe',
-                      }}>
+                      <span key={j} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe' }}>
                         {r}
                       </span>
                     ))}
                   </div>
                 )}
                 {plan.notes && (
-                  <div style={{ fontSize: 12, color: '#888', fontStyle: 'italic' }}>
-                    "{plan.notes}"
-                  </div>
+                  <div style={{ fontSize: 12, color: '#888', fontStyle: 'italic' }}>"{plan.notes}"</div>
                 )}
               </div>
             ))}
