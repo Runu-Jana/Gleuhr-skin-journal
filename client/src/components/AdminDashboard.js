@@ -751,7 +751,7 @@ function DietTab({ airtable, phone }) {
   const [formNotes, setFormNotes] = useState('');
 
   const fetchDiet = useCallback(() => {
-    if (!phone) return;
+    if (!phone) { setLoading(false); return; }
     setLoading(true);
     adminApi.get(`/dietician/patient/${encodeURIComponent(phone)}/diet`)
       .then(r => setDietData(r.data.data))
@@ -816,7 +816,7 @@ function DietTab({ airtable, phone }) {
           {!showForm && (
             <button
               onClick={openForm}
-              style={{ background:'#c44033', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600, cursor:'pointer' }}
+              style={{ background:'#c44033', color:'#fff', border:'none', outline:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600, cursor:'pointer' }}
             >
               + Log Diet Change
             </button>
