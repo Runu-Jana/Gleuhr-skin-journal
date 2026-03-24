@@ -5,6 +5,7 @@ const Streak = require('../models/Streak');
 const DailyCheckIn = require('../models/DailyCheckIn');
 const SkinScore = require('../models/SkinScore');
 const ReorderEvent = require('../models/ReorderEvent');
+const WeeklyPhoto = require('../models/WeeklyPhoto');
 const { fetchDietPlans } = require('../services/airtableService');
 
 /**
@@ -257,6 +258,38 @@ router.get('/:phone/details', async (req, res) => {
   } catch (error) {
     console.error('Admin patient details error:', error);
     res.status(500).json({ error: 'Failed to fetch patient details' });
+  }
+});
+
+// PATCH /api/admin/patients/:phone/photos/:weekNumber/rating
+// Save or update the coach rating and note for a weekly photo.
+router.patch('/:phone/photos/:weekNumber/rating', async (req, res) => {
+  try {
+    const { phone, weekNumber } = req.params;
+    const { coachRating, coachNote } = req.body;
+    const week = parseInt(weekNumber, 10);
+
+    if (!coachRating || coachRating < 1 || coachRating > 5) {
+      return res.status(400).json({ error: 'coachRating must be 1–5' });
+    }
+
+    const phoneVariants = getPhoneVariants(phone);
+    const query = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
+
+    const photo = await WeeklyPhoto.findOneAndUpdate(
+      { $or: query, weekNumber: week },
+      { coachRating, coachNote: coachNote || '', updatedAt: new Date() },
+      { new: true }
+    );
+
+    if (!photo) {
+      return res.status(404).json({ error: 'Weekly photo not found for this patient/week' });
+    }
+
+    res.json({ success: true, data: { weekNumber: photo.weekNumber, coachRating: photo.coachRating, coachNote: photo.coachNote } });
+  } catch (error) {
+    console.error('Photo rating update error:', error);
+    res.status(500).json({ error: 'Failed to update photo rating' });
   }
 });
 

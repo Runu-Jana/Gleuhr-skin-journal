@@ -511,7 +511,7 @@ function CustomerDetailView({ customer, details, detailsLoading, activeTab, setA
           <OverviewTab customer={customer} rich={rich} detailsLoading={detailsLoading} />
         )}
         {activeTab === 'diet' && <DietTab airtable={airtable} />}
-        {activeTab === 'photos' && hasApp && <PhotosTab rich={rich} mongodb={mongodb} />}
+        {activeTab === 'photos' && hasApp && <PhotosTab rich={rich} mongodb={mongodb} phone={mongodb.phone} />}
         {activeTab === 'calls' && <CallsTab />}
       </div>
     </>
@@ -749,42 +749,162 @@ function DietTab({ airtable }) {
 }
 
 // ── Photos tab ───────────────────────────────────────────────────────────────
-function PhotosTab({ rich, mongodb }) {
-  const skinScores = rich?.skinScores || mongodb?.skinScoreHistory || [];
+const RATING_LABELS = {
+  1: 'No visible change',
+  2: 'Minimal change',
+  3: 'Moderate improvement',
+  4: 'Good improvement',
+  5: 'Significant improvement',
+};
+
+function PhotosTab({ mongodb, phone }) {
   const photos = mongodb?.weeklyPhotos || [];
+  const currentDay = mongodb?.currentDay || 1;
+  const maxWeek = Math.max(
+    Math.ceil(currentDay / 7),
+    photos.length > 0 ? Math.max(...photos.map(p => p.weekNumber)) : 1
+  );
+
+  const [ratings, setRatings] = useState(() => {
+    const r = {};
+    photos.forEach(p => {
+      if (p.coachRating != null) r[p.weekNumber] = { rating: p.coachRating, note: p.coachNote || '' };
+    });
+    return r;
+  });
+  const [saving, setSaving] = useState({});
+  const [editingNote, setEditingNote] = useState(null);
+  const [noteInput, setNoteInput] = useState('');
+
+  const handleRating = async (weekNumber, rating) => {
+    const existing = ratings[weekNumber];
+    const note = existing?.note || '';
+    setRatings(prev => ({ ...prev, [weekNumber]: { rating, note } }));
+    setSaving(prev => ({ ...prev, [weekNumber]: true }));
+    try {
+      await adminApi.patch(
+        `/admin/patients/${encodeURIComponent(phone)}/photos/${weekNumber}/rating`,
+        { coachRating: rating, coachNote: note }
+      );
+    } catch (_) { /* best-effort */ }
+    finally { setSaving(prev => ({ ...prev, [weekNumber]: false })); }
+  };
+
+  const handleNoteSave = async (weekNumber) => {
+    const existing = ratings[weekNumber];
+    const updatedNote = noteInput;
+    setRatings(prev => ({ ...prev, [weekNumber]: { ...prev[weekNumber], note: updatedNote } }));
+    setEditingNote(null);
+    if (existing?.rating) {
+      try {
+        await adminApi.patch(
+          `/admin/patients/${encodeURIComponent(phone)}/photos/${weekNumber}/rating`,
+          { coachRating: existing.rating, coachNote: updatedNote }
+        );
+      } catch (_) { /* best-effort */ }
+    }
+  };
+
+  const ratedWeeks = Array.from({ length: maxWeek }, (_, i) => i + 1)
+    .map(w => ratings[w]?.rating)
+    .filter(Boolean);
 
   return (
     <div className="admin-card">
-      <h4>Photos &amp; Skin Scores</h4>
-      {photos.length > 0 && (
-        <div style={{ display:'flex',gap:10,overflowX:'auto',paddingBottom:8,marginBottom:16 }}>
-          {photos.map(p => (
-            <div key={p.weekNumber} style={{ flexShrink:0,textAlign:'center' }}>
-              {p.photoUrl ? (
-                <img src={p.photoUrl} alt={`Week ${p.weekNumber}`} style={{ width:80,height:80,objectFit:'cover',borderRadius:8 }}/>
-              ) : (
-                <div style={{ width:80,height:80,background:'#F3F4F6',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#999' }}>No photo</div>
-              )}
-              <div style={{ fontSize:10,color:'#888',marginTop:4 }}>Week {p.weekNumber}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      <h4 style={{ fontSize:11, fontWeight:700, letterSpacing:1.5, textTransform:'uppercase', color:'#888', margin:'0 0 16px' }}>
+        Weekly Photo Ratings
+      </h4>
 
-      {skinScores.length > 0 ? (
-        <div>
-          <h4 style={{ fontSize:11,fontWeight:700,letterSpacing:1,textTransform:'uppercase',color:'#555',marginBottom:8 }}>Skin Score History</h4>
-          {skinScores.slice(0,12).map((s, i) => (
-            <div key={i} style={{ display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #f5f5f5',fontSize:13 }}>
-              <span style={{ color:'#888' }}>{s.date ? new Date(s.date).toLocaleDateString() : '—'} (Day {s.day})</span>
-              <span style={{ fontWeight:700,color: s.totalScore >= 14 ? '#16A34A' : s.totalScore >= 8 ? '#CA8A04' : '#c44033' }}>
-                {s.totalScore}/20
-              </span>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {Array.from({ length: maxWeek }, (_, i) => i + 1).map(week => {
+          const photo = photos.find(p => p.weekNumber === week);
+          const ratingData = ratings[week];
+          const currentRating = ratingData?.rating ?? null;
+          const currentNote = ratingData?.note || '';
+
+          if (!photo) {
+            return (
+              <div key={week} style={{ borderRadius:10, background:'repeating-linear-gradient(-45deg,#f5f5f5 0,#f5f5f5 8px,#ececec 8px,#ececec 16px)', padding:'14px 18px', display:'flex', alignItems:'center', gap:16 }}>
+                <div style={{ flexShrink:0, textAlign:'center' }}>
+                  <div style={{ width:52, height:52, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, color:'#bbb' }}>—</div>
+                  <div style={{ fontSize:11, color:'#aaa', marginTop:2 }}>Week {week}</div>
+                </div>
+                <div style={{ color:'#bbb', fontSize:13 }}>Photo not taken</div>
+              </div>
+            );
+          }
+
+          const autoLabel = currentRating ? RATING_LABELS[currentRating] : '';
+          const descText = autoLabel
+            ? (currentNote ? `${autoLabel} — '${currentNote}'` : autoLabel)
+            : (photo.notes || '');
+
+          return (
+            <div key={week} style={{ background:'#f9f7f5', borderRadius:10, padding:'14px 18px', display:'flex', alignItems:'center', gap:16 }}>
+              {/* Thumbnail */}
+              <div style={{ flexShrink:0, textAlign:'center' }}>
+                {photo.photoUrl ? (
+                  <img src={photo.photoUrl} alt={`Week ${week}`} style={{ width:52, height:52, objectFit:'cover', borderRadius:8 }} />
+                ) : (
+                  <div style={{ width:52, height:52, background:'#2b2b2b', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
+                    📷
+                  </div>
+                )}
+                <div style={{ fontSize:11, color:'#888', marginTop:4 }}>Week {week}</div>
+              </div>
+
+              {/* Rating + description */}
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:5 }}>
+                  {[1,2,3,4,5].map(n => (
+                    <button key={n} onClick={() => handleRating(week, n)}
+                      style={{ width:26, height:26, borderRadius:5,
+                        border: currentRating != null && n <= currentRating ? '1.5px solid #c44033' : '1.5px solid #ddd',
+                        background:'transparent',
+                        color: currentRating != null && n <= currentRating ? '#c44033' : '#bbb',
+                        fontSize:13, fontWeight:600, cursor:'pointer', lineHeight:1,
+                        display:'flex', alignItems:'center', justifyContent:'center', padding:0 }}>
+                      {n}
+                    </button>
+                  ))}
+                  {saving[week] && <span style={{ fontSize:11, color:'#aaa', marginLeft:4 }}>Saving...</span>}
+                </div>
+
+                {editingNote === week ? (
+                  <input
+                    autoFocus
+                    value={noteInput}
+                    onChange={e => setNoteInput(e.target.value)}
+                    onBlur={() => handleNoteSave(week)}
+                    onKeyDown={e => e.key === 'Enter' && handleNoteSave(week)}
+                    placeholder="Add coach note..."
+                    style={{ fontSize:12, color:'#555', border:'1px solid #ddd', borderRadius:6, padding:'3px 8px', width:'100%', outline:'none', background:'#fff' }}
+                  />
+                ) : (
+                  <div
+                    onClick={() => { setEditingNote(week); setNoteInput(currentNote); }}
+                    style={{ fontSize:12, color: descText ? '#888' : '#ccc', cursor:'text', minHeight:18 }}>
+                    {descText || (currentRating ? 'Click to add note...' : 'Select a rating above')}
+                  </div>
+                )}
+              </div>
+
+              {/* Score */}
+              <div style={{ fontSize:24, fontWeight:300, color:'#c0b8b0', flexShrink:0, minWidth:44, textAlign:'right', letterSpacing:-1 }}>
+                {currentRating != null ? `${currentRating}/5` : ''}
+              </div>
             </div>
-          ))}
+          );
+        })}
+      </div>
+
+      {ratedWeeks.length > 0 && (
+        <div style={{ marginTop:12, padding:'10px 14px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:8, display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontSize:13, fontWeight:700, color:'#16a34a' }}>Improvement Curve:</span>
+          <span style={{ fontSize:13, color:'#16a34a' }}>
+            {ratedWeeks.map(r => `${r}/5`).join(' → ')}
+          </span>
         </div>
-      ) : (
-        <p style={{ color:'#999',fontSize:13 }}>No skin scores recorded yet.</p>
       )}
     </div>
   );

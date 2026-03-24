@@ -202,6 +202,8 @@ router.get('/:name/customers', async (req, res) => {
               skinScore: p.skinScore,
               dayOfJourney: p.dayOfJourney,
               notes: p.notes,
+              coachRating: p.coachRating ?? null,
+              coachNote: p.coachNote || '',
             })),
           } : null,
         };
