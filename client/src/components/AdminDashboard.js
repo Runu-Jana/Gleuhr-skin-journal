@@ -808,7 +808,7 @@ function computeCoachStats(customers) {
   const avgConsistency = consistencies.length > 0 ? Math.round(consistencies.reduce((a, b) => a + b, 0) / consistencies.length) : 0;
   const skinScores = appPatients.map(c => c.mongodb?.latestSkinScore?.totalScore).filter(v => v != null);
   const avgSkinScore = skinScores.length > 0 ? parseFloat((skinScores.reduce((a, b) => a + b, 0) / skinScores.length).toFixed(1)) : 0;
-  const urgent     = appPatients.filter(c => (c.mongodb?.streak?.daysAbsent ?? 0) >= 3).length;
+  const urgent     = appPatients.filter(c => (c.mongodb?.streak?.daysAbsent ?? 0) >= 5).length;
   const flagged    = appPatients.filter(c => (c.mongodb?.streak?.daysAbsent ?? 0) >= 1 || (c.mongodb?.last7Days?.checkInsCompleted ?? 0) < 4).length;
   const reorderDue = appPatients.filter(c => (c.mongodb?.currentDay ?? 0) >= 78).length;
   const retained   = appPatients.filter(c => (c.mongodb?.currentDay ?? 0) >= 28).length;
@@ -859,6 +859,57 @@ function CoachCard({ name, stats, loading, onDrillDown }) {
   );
 }
 
+function EscalationCard({ customer }) {
+  const { airtable, mongodb, coachName } = customer;
+  const name = safeStr(airtable.customerName) || 'Unknown';
+  const daysAbsent = mongodb?.streak?.daysAbsent ?? 0;
+  const isOnHold = safeStr(airtable.dieticianCallStatus) === 'On Hold';
+  const currentDay = mongodb?.currentDay ?? null;
+  const consistency = mongodb?.last7Days?.checkInsCompleted != null
+    ? Math.round((mongodb.last7Days.checkInsCompleted / 7) * 100)
+    : null;
+  const tp = safeStr(airtable.treatmentPlan);
+  const coachFirst = coachName ? coachName.split(' ')[0] : '';
+
+  let badge, badgeBg, badgeColor, action;
+  if (isOnHold) {
+    badge = 'On Hold'; badgeBg = '#FEF3C7'; badgeColor = '#92400E';
+    action = 'Check in gently';
+  } else if (daysAbsent >= 7) {
+    badge = `${daysAbsent} Days Absent`; badgeBg = '#FEE2E2'; badgeColor = '#B91C1C';
+    action = 'Phone call required';
+  } else {
+    badge = `${daysAbsent} Days Absent`; badgeBg = '#FFEDD5'; badgeColor = '#C2410C';
+    action = 'Phone call required';
+  }
+
+  return (
+    <div style={{ background:'#fff', border:'1px solid #e5e5e5', borderRadius:12, padding:'14px 16px', display:'flex', alignItems:'center', gap:12 }}>
+      <div style={{ width:42, height:42, borderRadius:'50%', background:avatarColor(name), color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, flexShrink:0 }}>
+        {getInitials(name)}
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontWeight:600, fontSize:14 }}>{name}</div>
+        <div style={{ fontSize:12, color:'#888', marginTop:2 }}>
+          {tp && <span>{tp}</span>}
+          {currentDay != null && <span>{tp ? ' · ' : ''}Day {currentDay}</span>}
+          {consistency != null && <span style={{ color: consistency >= 50 ? '#f59e0b' : '#c44033', fontWeight:600 }}> · {consistency}%</span>}
+        </div>
+      </div>
+      <div style={{ fontSize:13, color:'#888', flexShrink:0, minWidth:60, textAlign:'right' }}>
+        {coachFirst}
+      </div>
+      <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:99, background:badgeBg, color:badgeColor, whiteSpace:'nowrap', flexShrink:0 }}>
+        {badge}
+      </span>
+      <div style={{ fontSize:12, color:'#666', flexShrink:0, minWidth:130 }}>
+        {action}
+      </div>
+      <span style={{ color:'#ccc', fontSize:16, flexShrink:0 }}>→</span>
+    </div>
+  );
+}
+
 function TeamOverviewPanel({ teamLeadName, dieticians, allCoachData, onSelectCoach }) {
   const [activeTab, setActiveTab] = useState('performance');
 
@@ -885,7 +936,11 @@ function TeamOverviewPanel({ teamLeadName, dieticians, allCoachData, onSelectCoa
   const escalations = useMemo(() =>
     coaches.flatMap(coach =>
       (allCoachData[coach]?.customers || [])
-        .filter(c => c.mongodb && (c.mongodb?.streak?.daysAbsent ?? 0) >= 3)
+        .filter(c => {
+          const daysAbsent = c.mongodb?.streak?.daysAbsent ?? 0;
+          const isOnHold = safeStr(c.airtable?.dieticianCallStatus) === 'On Hold';
+          return c.mongodb && (daysAbsent >= 5 || isOnHold);
+        })
         .map(c => ({ ...c, coachName: coach }))
     ), [coaches, allCoachData]);
 
@@ -971,9 +1026,14 @@ function TeamOverviewPanel({ teamLeadName, dieticians, allCoachData, onSelectCoa
         </>
       ) : activeTab === 'escalations' ? (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {escalations.length > 0 && (
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:1, textTransform:'uppercase', color:'#888', marginBottom:4 }}>
+              Patients Requiring TL Intervention (48H+ Unresolved Urgent Flags)
+            </div>
+          )}
           {escalations.length === 0
             ? <div style={{ textAlign:'center', padding:60, color:'#999' }}>No escalations right now</div>
-            : escalations.map((c, i) => <CustomerCard key={i} customer={c} onView={() => {}} />)}
+            : escalations.map((c, i) => <EscalationCard key={i} customer={c} />)}
         </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
