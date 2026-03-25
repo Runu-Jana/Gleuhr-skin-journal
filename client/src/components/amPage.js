@@ -100,7 +100,9 @@ export default function AMPage() {
 
         if (today?.date === todayDate) {
           setAmRoutine(today.amRoutine);
-          setSunscreen(today.sunscreen);
+          // If AM routine was completed, sunscreen must have been applied (both are required for submission).
+          // Guard against stale/overwritten DB values by defaulting to true when amRoutine is true.
+          setSunscreen(today.amRoutine ? true : (today.sunscreen || false));
           setHasSubmitted(true);
         }
         // Load all check-ins for consistency calculation
