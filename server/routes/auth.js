@@ -298,7 +298,7 @@ router.post('/verify-token', async (req, res) => {
   } catch (error) {
     console.error('Token verification error:', error);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ error: 'Authentication failed', details: error.message });
+    res.status(500).json({ error: 'Authentication failed' });
   }
 });
 
