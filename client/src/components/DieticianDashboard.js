@@ -87,7 +87,7 @@ function StatCard({ label, value, color }) {
 // ── Left panel patient card (dark theme) ────────────────────────────────────
 function PatientCardLeft({ item, isSelected, onClick }) {
   const { airtable, mongodb, reason } = item;
-  const name    = safeStr(mongodb?.name) || safeStr(airtable?.customerName) || '—';
+  const name    = safeStr(airtable?.customerName) || safeStr(mongodb?.name) || '—';
   const currentDay   = mongodb?.currentDay;
   const consistency  = mongodb?.consistency?.overall;
   const avatarColor  = getAvatarColor(name);
@@ -476,18 +476,20 @@ function DietComplianceTab({ phone, card }) {
   const [formRestrictions, setFormRestrictions] = useState([]);
   const [formNotes, setFormNotes]             = useState('');
 
-  const fetchDiet = () => {
+  const fetchDiet = useCallback(() => {
+    if (!phone) { setLoading(false); return; }
     setLoading(true);
     api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/diet`)
       .then(res => setDietData(res.data.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  };
+  }, [phone]);
 
   useEffect(() => {
     setDietData(null);
+    setShowForm(false);
     fetchDiet();
-  }, [phone]);
+  }, [fetchDiet]);
 
   const openForm = () => {
     setFormCategory('');
@@ -1300,8 +1302,8 @@ export default function DieticianDashboard() {
 
     if (activeTab === 'all') {
       const sorted = (allPatients || []).slice().sort((a, b) => {
-        const na = safeStr(a.mongodb?.name) || safeStr(a.airtable?.customerName);
-        const nb = safeStr(b.mongodb?.name) || safeStr(b.airtable?.customerName);
+        const na = safeStr(a.airtable?.customerName) || safeStr(a.mongodb?.name);
+        const nb = safeStr(b.airtable?.customerName) || safeStr(b.mongodb?.name);
         return na.localeCompare(nb);
       });
       return sorted.map((item, i) => {
