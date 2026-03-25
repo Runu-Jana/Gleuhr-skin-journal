@@ -226,7 +226,7 @@ export default function AMPage() {
                   const current = streakData?.streak || 0;
                   if (current === 0) {
                     if (hasSubmitted) return 'Amazing! Log your PM routine tonight to build your streak 🌙';
-                    return 'Log today to start your streak 🔥';
+                    return 'Log today to start your streak';
                   }
                   const milestones = [7, 14, 28, 56, 84, 90];
                   const next = milestones.find(m => m > current);
