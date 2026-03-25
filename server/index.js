@@ -30,7 +30,13 @@ const authLimiter = rateLimit({
 });
 
 app.use(limiter);
-app.use(cors());
+
+// CORS: restrict to CLIENT_URL in production, allow all in development
+const corsOrigin = (process.env.NODE_ENV === 'production' && process.env.CLIENT_URL)
+  ? process.env.CLIENT_URL.split(',').map(o => o.trim()).filter(Boolean)
+  : true;
+app.use(cors({ origin: corsOrigin, credentials: true }));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -79,27 +85,25 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Connect to MongoDB first, then start the server
-const startServer = async () => {
-  await connectDB();
+// Connect to MongoDB at module load — works for both traditional server and Vercel serverless
+const dbReady = connectDB();
 
-  // Seed test data in development (only if DB is connected)
-  const mongoose = require('mongoose');
-  if (process.env.NODE_ENV === 'development' && mongoose.connection.readyState === 1) {
-    const seedTestData = require('./config/seedTestData');
-    await seedTestData();
-  }
-
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Local: http://localhost:${PORT}`);
-  });
-};
-
-// Only auto-start when run directly (not when required by tests)
+// Only start the HTTP listener when run directly (not in serverless / tests)
 if (require.main === module) {
-  startServer();
+  dbReady.then(async () => {
+    // Seed test data in development (only if DB is connected)
+    const mongoose = require('mongoose');
+    if (process.env.NODE_ENV === 'development' && mongoose.connection.readyState === 1) {
+      const seedTestData = require('./config/seedTestData');
+      await seedTestData();
+    }
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Local: http://localhost:${PORT}`);
+    });
+  });
 }
 
 module.exports = app;
