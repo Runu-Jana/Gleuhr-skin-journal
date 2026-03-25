@@ -120,16 +120,17 @@ router.get('/:phone/details', async (req, res) => {
       daysAbsent = Math.floor((new Date() - new Date(streak.lastCheckIn)) / (1000 * 60 * 60 * 24));
     }
 
-    // Consistency
-    const completedCheckIns = checkIns.filter(c => c.completed).length;
+    // Consistency — count unique days (multiple docs can exist per day; deduplicate by date)
+    const toDateStr = d => new Date(d).toISOString().split('T')[0];
     const maxDay = patient.currentDay || 1;
-    const overallConsistency = maxDay > 0 ? Math.round((completedCheckIns / maxDay) * 100) : 0;
+    const completedDays = new Set(checkIns.filter(c => c.completed).map(c => toDateStr(c.date))).size;
+    const overallConsistency = maxDay > 0 ? Math.min(100, Math.round((completedDays / maxDay) * 100)) : 0;
 
     // Sunscreen & Diet consistency
-    const sunscreenCount = checkIns.filter(c => c.sunscreen).length;
-    const dietCount = checkIns.filter(c => c.dietFollowed === 'Yes' || c.dietFollowed === 'Partial').length;
-    const sunscreenConsistency = maxDay > 0 ? Math.round((sunscreenCount / maxDay) * 100) : 0;
-    const dietConsistency = maxDay > 0 ? Math.round((dietCount / maxDay) * 100) : 0;
+    const sunscreenDays = new Set(checkIns.filter(c => c.sunscreen).map(c => toDateStr(c.date))).size;
+    const dietDays = new Set(checkIns.filter(c => c.dietFollowed === 'Yes' || c.dietFollowed === 'Partial').map(c => toDateStr(c.date))).size;
+    const sunscreenConsistency = maxDay > 0 ? Math.min(100, Math.round((sunscreenDays / maxDay) * 100)) : 0;
+    const dietConsistency = maxDay > 0 ? Math.min(100, Math.round((dietDays / maxDay) * 100)) : 0;
 
     // Plan end date
     let planEndDate = null;

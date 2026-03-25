@@ -85,17 +85,18 @@ router.get('/dashboard', async (req, res) => {
 
         const currentDay = patient.currentDay || 1;
 
-        // Consistency from last 7 check-ins
+        // Consistency from last 7 days — use unique days to handle duplicate docs
+        const toDateStr7 = d => new Date(d).toISOString().split('T')[0];
         const last7 = last7CheckIns;
-        const overallCompleted = last7.filter(c => c.completed).length;
-        const sunscreenCount = last7.filter(c => c.sunscreen).length;
-        const dietCount = last7.filter(c => c.dietFollowed === 'Yes' || c.dietFollowed === 'Partial').length;
+        const overallDays = new Set(last7.filter(c => c.completed).map(c => toDateStr7(c.date))).size;
+        const sunscreenDays7 = new Set(last7.filter(c => c.sunscreen).map(c => toDateStr7(c.date))).size;
+        const dietDays7 = new Set(last7.filter(c => c.dietFollowed === 'Yes' || c.dietFollowed === 'Partial').map(c => toDateStr7(c.date))).size;
         const total7 = 7;
 
         const consistency = {
-          overall: Math.round((overallCompleted / total7) * 100),
-          sunscreen: Math.round((sunscreenCount / total7) * 100),
-          diet: Math.round((dietCount / total7) * 100),
+          overall: Math.min(100, Math.round((overallDays / total7) * 100)),
+          sunscreen: Math.min(100, Math.round((sunscreenDays7 / total7) * 100)),
+          diet: Math.min(100, Math.round((dietDays7 / total7) * 100)),
         };
 
         return {
@@ -291,14 +292,15 @@ router.get('/patient/:phone/details', async (req, res) => {
       daysAbsent = Math.floor((new Date() - new Date(streak.lastCheckIn)) / (1000 * 60 * 60 * 24));
     }
 
-    // Consistency calculations
-    const completedCheckIns = checkIns.filter(c => c.completed).length;
+    // Consistency calculations — use unique days to avoid >100% from duplicate docs
+    const toDateStr = d => new Date(d).toISOString().split('T')[0];
     const maxDay = patient.currentDay || 1;
-    const overallConsistency = maxDay > 0 ? Math.round((completedCheckIns / maxDay) * 100) : 0;
-    const sunscreenCount = checkIns.filter(c => c.sunscreen).length;
-    const dietCount = checkIns.filter(c => c.dietFollowed === 'Yes' || c.dietFollowed === 'Partial').length;
-    const sunscreenConsistency = maxDay > 0 ? Math.round((sunscreenCount / maxDay) * 100) : 0;
-    const dietConsistency = maxDay > 0 ? Math.round((dietCount / maxDay) * 100) : 0;
+    const completedDays = new Set(checkIns.filter(c => c.completed).map(c => toDateStr(c.date))).size;
+    const overallConsistency = maxDay > 0 ? Math.min(100, Math.round((completedDays / maxDay) * 100)) : 0;
+    const sunscreenDays = new Set(checkIns.filter(c => c.sunscreen).map(c => toDateStr(c.date))).size;
+    const dietDays = new Set(checkIns.filter(c => c.dietFollowed === 'Yes' || c.dietFollowed === 'Partial').map(c => toDateStr(c.date))).size;
+    const sunscreenConsistency = maxDay > 0 ? Math.min(100, Math.round((sunscreenDays / maxDay) * 100)) : 0;
+    const dietConsistency = maxDay > 0 ? Math.min(100, Math.round((dietDays / maxDay) * 100)) : 0;
 
     // Plan end date
     let planEndDate = null;
