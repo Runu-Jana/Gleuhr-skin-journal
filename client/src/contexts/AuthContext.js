@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
   const [streak, setStreak] = useState({ streak: 0, shields: 0 });
   const [skinScores, setSkinScores] = useState([]);
   const [weeklyPhotos, setWeeklyPhotos] = useState([]);
-  const [sessionExpiry, setSessionExpiry] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -22,6 +21,7 @@ export function AuthProvider({ children }) {
     } else {
       setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const verifyStoredToken = async (authToken) => {
@@ -171,6 +171,7 @@ export function AuthProvider({ children }) {
     patient,
     streak,
     skinScores,
+    weeklyPhotos,
     isLoading,
     isAuthenticated,
     loginWithWhatsApp,

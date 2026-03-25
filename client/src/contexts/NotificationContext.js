@@ -5,7 +5,6 @@ const NotificationContext = createContext();
 
 export function NotificationProvider({ children }) {
   const [permission, setPermission] = useState('default');
-  const [notifications, setNotifications] = useState([]);
   const { patient, isAuthenticated } = useAuth();
 
   // Request notification permission

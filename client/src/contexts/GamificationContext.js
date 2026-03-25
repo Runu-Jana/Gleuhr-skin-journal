@@ -4,16 +4,8 @@ import { useNotifications } from './NotificationContext';
 
 const GamificationContext = createContext();
 
-export function GamificationProvider({ children }) {
-  const { patient, streak } = useAuth();
-  const { showAchievementNotification, showMilestoneNotification } = useNotifications();
-  const [achievements, setAchievements] = useState([]);
-  const [points, setPoints] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [badges, setBadges] = useState([]);
-
-  // Achievement definitions
-  const achievementDefinitions = {
+// Achievement definitions (static — defined outside component to avoid dependency warnings)
+const achievementDefinitions = {
     first_checkin: {
       id: 'first_checkin',
       title: 'First Step',
@@ -94,7 +86,14 @@ export function GamificationProvider({ children }) {
       icon: '💧',
       condition: (hydrationStreak) => hydrationStreak >= 7
     }
-  };
+};
+
+export function GamificationProvider({ children }) {
+  const { streak } = useAuth();
+  const { showAchievementNotification, showMilestoneNotification } = useNotifications();
+  const [achievements, setAchievements] = useState([]);
+  const [points, setPoints] = useState(0);
+  const [level, setLevel] = useState(1);
 
   // Calculate level based on points
   const calculateLevel = useCallback((totalPoints) => {
