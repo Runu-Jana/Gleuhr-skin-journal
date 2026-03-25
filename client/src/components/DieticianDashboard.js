@@ -476,18 +476,20 @@ function DietComplianceTab({ phone, card }) {
   const [formRestrictions, setFormRestrictions] = useState([]);
   const [formNotes, setFormNotes]             = useState('');
 
-  const fetchDiet = () => {
+  const fetchDiet = useCallback(() => {
+    if (!phone) { setLoading(false); return; }
     setLoading(true);
     api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/diet`)
       .then(res => setDietData(res.data.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  };
+  }, [phone]);
 
   useEffect(() => {
     setDietData(null);
+    setShowForm(false);
     fetchDiet();
-  }, [phone]);
+  }, [fetchDiet]);
 
   const openForm = () => {
     setFormCategory('');
