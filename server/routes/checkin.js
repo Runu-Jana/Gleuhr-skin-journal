@@ -67,6 +67,7 @@ router.post('/', async (req, res) => {
 
     const hasAmRoutine = amRoutine === true || amRoutine === 'true';
     const hasPmRoutine = pmRoutine === true || pmRoutine === 'true';
+    const hasSunscreen = sunscreen === true || sunscreen === 'true';
     const validQuickLog = quickLogType && quickLogType !== 'missed';
 
     // A day is COMPLETE only when:
@@ -80,7 +81,7 @@ router.post('/', async (req, res) => {
       dayOfJourney,
       amRoutine: hasAmRoutine,
       pmRoutine: hasPmRoutine,
-      sunscreen: sunscreen || false,
+      sunscreen: hasSunscreen,
       dietFollowed: dietFollowed || 'No',
       triggerFoods: triggerFoods || [],
       waterIntake: waterIntake || 0,
