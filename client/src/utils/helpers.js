@@ -83,9 +83,12 @@ export function calculateConsistency(checkIns, startDate) {
   if (!checkIns || !startDate) return 0;
   const totalDays = calculateDay(startDate);
   if (totalDays === 0) return 0;
-  
-  const uniqueDays = new Set(checkIns.map(c => c.date)).size;
-  return Math.round((uniqueDays / totalDays) * 100);
+
+  // Only count check-ins on or after the programme start date
+  const startStr = new Date(startDate).toISOString().split('T')[0];
+  const validCheckIns = checkIns.filter(c => c.date >= startStr);
+  const uniqueDays = new Set(validCheckIns.map(c => c.date)).size;
+  return Math.min(100, Math.round((uniqueDays / totalDays) * 100));
 }
 
 export function formatDate(date) {

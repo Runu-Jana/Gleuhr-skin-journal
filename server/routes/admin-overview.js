@@ -60,10 +60,11 @@ router.get('/', async (req, res) => {
       const key = ci.patientPhone || ci.patientId;
       if (!key) return;
       if (!phoneToConsistency[key]) phoneToConsistency[key] = new Set();
-      phoneToConsistency[key].add(ci.date);
+      // Convert Date object to date-only string so same-day duplicates are deduplicated
+      phoneToConsistency[key].add(new Date(ci.date).toISOString().split('T')[0]);
     });
     const consistencyValues = Object.values(phoneToConsistency)
-      .map(dates => Math.round((dates.size / 7) * 100));
+      .map(dates => Math.min(100, Math.round((dates.size / 7) * 100)));
     const avgConsistency = consistencyValues.length > 0
       ? Math.round(consistencyValues.reduce((a, b) => a + b, 0) / consistencyValues.length) : 0;
 
