@@ -102,7 +102,7 @@ router.get('/dashboard', async (req, res) => {
           airtable: buildAirtableShape(plan),
           mongodb: {
             patientId: patient._id,
-            name: patient.name || patient.fullName,
+            name: plan.customerName || patient.name || patient.fullName,
             currentDay,
             streak: {
               currentStreak: streak?.currentStreak || 0,
@@ -356,7 +356,7 @@ router.get('/patient/:phone/details', async (req, res) => {
       data: {
         patient: {
           id: patient._id,
-          name: patient.name || patient.fullName,
+          name: (airtablePlans.length > 0 && airtablePlans[0].customerName) ? airtablePlans[0].customerName : (patient.name || patient.fullName),
           phone: patient.phone || patient.phoneNumber,
           email: patient.email || '',
           skinConcern: patient.skinConcern || '',

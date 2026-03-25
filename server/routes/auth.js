@@ -158,24 +158,23 @@ router.post('/register', async (req, res) => {
 
     let isNewUser = false;
 
+    // Fetch Airtable data once — used for both new and existing patients
+    let airtableName = '';
+    let airtableDietician = '';
+    try {
+      const { fetchDietPlans } = require('../services/airtableService');
+      const plans = await fetchDietPlans({ customerPhone: phoneNumber });
+      if (plans && plans.length > 0) {
+        airtableName      = plans[0].customerName  || '';
+        airtableDietician = plans[0].dieticianName || '';
+      }
+    } catch (atErr) {
+      console.warn('Airtable lookup skipped on login:', atErr.message);
+    }
+
     // Auto-create patient if not found
     if (!patient) {
       isNewUser = true;
-
-      // Enrich with Airtable data if available (non-blocking on failure)
-      let airtableName = '';
-      let airtableDietician = '';
-      try {
-        const { fetchDietPlans } = require('../services/airtableService');
-        const plans = await fetchDietPlans({ customerPhone: phoneNumber });
-        if (plans && plans.length > 0) {
-          airtableName      = plans[0].customerName  || '';
-          airtableDietician = plans[0].dieticianName || '';
-        }
-      } catch (atErr) {
-        console.warn('Airtable lookup skipped during auto-register:', atErr.message);
-      }
-
       patient = await Patient.create({
         name:         airtableName || 'New Patient',
         fullName:     airtableName || 'New Patient',
@@ -190,6 +189,14 @@ router.post('/register', async (req, res) => {
         level:        1,
         achievements: [],
       });
+    } else if (airtableName && patient.name !== airtableName) {
+      // Existing patient: sync name from Airtable (Airtable is the source of truth for names)
+      await Patient.findByIdAndUpdate(patient._id, {
+        name: airtableName,
+        fullName: airtableName,
+      });
+      patient.name = airtableName;
+      patient.fullName = airtableName;
     }
 
     // Generate persistent auth token (90 days)

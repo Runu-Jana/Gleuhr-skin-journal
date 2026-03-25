@@ -87,7 +87,7 @@ function StatCard({ label, value, color }) {
 // ── Left panel patient card (dark theme) ────────────────────────────────────
 function PatientCardLeft({ item, isSelected, onClick }) {
   const { airtable, mongodb, reason } = item;
-  const name    = safeStr(mongodb?.name) || safeStr(airtable?.customerName) || '—';
+  const name    = safeStr(airtable?.customerName) || safeStr(mongodb?.name) || '—';
   const currentDay   = mongodb?.currentDay;
   const consistency  = mongodb?.consistency?.overall;
   const avatarColor  = getAvatarColor(name);
@@ -1302,8 +1302,8 @@ export default function DieticianDashboard() {
 
     if (activeTab === 'all') {
       const sorted = (allPatients || []).slice().sort((a, b) => {
-        const na = safeStr(a.mongodb?.name) || safeStr(a.airtable?.customerName);
-        const nb = safeStr(b.mongodb?.name) || safeStr(b.airtable?.customerName);
+        const na = safeStr(a.airtable?.customerName) || safeStr(a.mongodb?.name);
+        const nb = safeStr(b.airtable?.customerName) || safeStr(b.mongodb?.name);
         return na.localeCompare(nb);
       });
       return sorted.map((item, i) => {
