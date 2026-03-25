@@ -183,18 +183,16 @@ export default function PMPage() {
   }, [patient]);
 
   const handleSubmit = async () => {
-    // In quick log mode only skin mood is required; otherwise full fields required
-    if (!isQuickLogMode) {
-      if (waterIntake === 0) {
-        alert('Please select your water intake for today');
-        return;
-      }
-      if (!dietFollowed) {
-        alert('Please select if you followed your diet plan');
-        return;
-      }
+    // All PM fields are required regardless of quick log mode
+    if (waterIntake === 0) {
+      alert('Please select your water intake for today');
+      return;
     }
-    if (!skinMood && !isQuickLogMode) {
+    if (!dietFollowed) {
+      alert('Please select if you followed your diet plan');
+      return;
+    }
+    if (!skinMood) {
       alert('Please select how your skin is feeling today');
       return;
     }
@@ -233,8 +231,8 @@ export default function PMPage() {
       // Use AM data: prefer checkbox state (user just logged it), fall back to existing DB value
       amRoutine: amRoutine || existingCheckIn?.amRoutine || false,
       sunscreen: sunscreen || existingCheckIn?.sunscreen || false,
-      // Add PM data
-      pmRoutine: isQuickLogMode ? false : true,
+      // Add PM data — use actual toggle state; in normal (non-quick-log) mode default to true
+      pmRoutine: isQuickLogMode ? pmRoutine : true,
       dietFollowed: dietFollowedValue,
       triggerFoods,
       waterIntake,
@@ -441,64 +439,60 @@ export default function PMPage() {
             </button>
 
             {/* Diet Plan */}
-            {!isQuickLogMode && (
-              <div>
-                <p className="text-sm font-semibold text-gray-900 mb-2">Followed diet plan?</p>
-                <div className="flex gap-1.5 sm:gap-2 mb-3">
-                  {['Yes ✓', 'Mostly', 'Not today'].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => !hasSubmitted && setDietFollowed(option)}
-                      disabled={hasSubmitted}
-                      className={`flex-1 px-2 py-2.5 sm:px-3 sm:py-3.5 rounded-xl border text-xs sm:text-sm transition-all ${hasSubmitted ? 'cursor-default' : 'cursor-pointer'} ${
-                        dietFollowed === option
-                          ? 'bg-green-50 border-green-300 text-green-700 font-medium'
-                          : 'bg-white border-gray-300 text-gray-500'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900 mb-2">Followed diet plan?</p>
+              <div className="flex gap-1.5 sm:gap-2 mb-3">
+                {['Yes ✓', 'Mostly', 'Not today'].map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => !hasSubmitted && setDietFollowed(option)}
+                    disabled={hasSubmitted}
+                    className={`flex-1 px-2 py-2.5 sm:px-3 sm:py-3.5 rounded-xl border text-xs sm:text-sm transition-all ${hasSubmitted ? 'cursor-default' : 'cursor-pointer'} ${
+                      dietFollowed === option
+                        ? 'bg-green-50 border-green-300 text-green-700 font-medium'
+                        : 'bg-white border-gray-300 text-gray-500'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Water Intake */}
-            {!isQuickLogMode && (
-              <div>
-                <p className="text-sm font-semibold text-gray-900 mb-2">Water intake</p>
-                <div className="flex gap-2 mb-3">
-                  {[
-                    { value: 1, label: '< 1L', height: '25%' },
-                    { value: 2, label: '1-2L', height: '50%' },
-                    { value: 3, label: '2-3L', height: '75%' },
-                    { value: 4, label: '3L+', height: '100%' }
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => !hasSubmitted && setWaterIntake(option.value)}
-                      disabled={hasSubmitted}
-                      className={`flex-1 px-1 py-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${hasSubmitted ? 'cursor-default' : 'cursor-pointer'} ${
-                        waterIntake === option.value
-                          ? 'bg-blue-50 border-blue-300'
-                          : 'bg-white border-gray-300'
-                      }`}
-                    >
-                      <div className="w-5 h-6 rounded border border-gray-300 relative overflow-hidden">
-                        <div 
-                          className="absolute bottom-0 left-0 right-0 transition-all" 
-                          style={{ 
-                            height: waterIntake === option.value ? option.height : '0%',
-                            background: waterIntake === option.value ? '#3b82f6' : '#e5e7eb'
-                          }}
-                        ></div>
-                      </div>
-                      <span className="text-xs font-normal text-gray-500">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900 mb-2">Water intake</p>
+              <div className="flex gap-2 mb-3">
+                {[
+                  { value: 1, label: '< 1L', height: '25%' },
+                  { value: 2, label: '1-2L', height: '50%' },
+                  { value: 3, label: '2-3L', height: '75%' },
+                  { value: 4, label: '3L+', height: '100%' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => !hasSubmitted && setWaterIntake(option.value)}
+                    disabled={hasSubmitted}
+                    className={`flex-1 px-1 py-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${hasSubmitted ? 'cursor-default' : 'cursor-pointer'} ${
+                      waterIntake === option.value
+                        ? 'bg-blue-50 border-blue-300'
+                        : 'bg-white border-gray-300'
+                    }`}
+                  >
+                    <div className="w-5 h-6 rounded border border-gray-300 relative overflow-hidden">
+                      <div
+                        className="absolute bottom-0 left-0 right-0 transition-all"
+                        style={{
+                          height: waterIntake === option.value ? option.height : '0%',
+                          background: waterIntake === option.value ? '#3b82f6' : '#e5e7eb'
+                        }}
+                      ></div>
+                    </div>
+                    <span className="text-xs font-normal text-gray-500">{option.label}</span>
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Skin Feeling */}
             <div>
@@ -696,6 +690,7 @@ export default function PMPage() {
               <button
                 onClick={() => {
                   setQuickLogType('some_routine');
+                  setAmRoutine(true);
                   setIsQuickLogMode(true);
                   setShowQuickLogDrawer(false);
                 }}
@@ -722,6 +717,7 @@ export default function PMPage() {
               <button
                 onClick={() => {
                   setQuickLogType('just_sunscreen');
+                  setAmRoutine(true);
                   setSunscreen(true);
                   setIsQuickLogMode(true);
                   setShowQuickLogDrawer(false);
