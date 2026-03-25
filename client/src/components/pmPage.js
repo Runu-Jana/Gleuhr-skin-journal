@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Frown, Meh, Smile } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
-import { saveCheckIn, getTodayCheckIn, getCheckIns, getWeeklyPhotos, getPatient } from '../utils/db';
-import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
+import { saveCheckIn, getTodayCheckIn, getCheckIns, getPatient } from '../utils/db';
+import { calculateDay, calculateShields, isMilestoneDay, generateId, calculateConsistency } from '../utils/helpers';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
 import BottomNavigation from './BottomNavigation';
 
@@ -17,7 +17,6 @@ export default function PMPage() {
   const navigate = useNavigate();
   
   const day = calculateDay(patient?.startDate);
-  const progress = (day / 90) * 100;
   const shields = calculateShields(streakData?.streak || 0);
   const availableShields = streakData?.restorationShields?.available || shields || 0;
   
@@ -43,7 +42,6 @@ export default function PMPage() {
   const [showShieldRestore, setShowShieldRestore] = useState(false);
   const [showShieldSuccess, setShowShieldSuccess] = useState(false);
   const [shieldRestoreData, setShieldRestoreData] = useState(null);
-  const [showCheckinSuccess, setShowCheckinSuccess] = useState(false);
   const [showQuickLogDrawer, setShowQuickLogDrawer] = useState(false);
   const [isQuickLogMode, setIsQuickLogMode] = useState(false);
   const [quickLogType, setQuickLogType] = useState(null);
@@ -92,6 +90,7 @@ export default function PMPage() {
 
   useEffect(() => {
     checkTodayAMRoutine();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient?.phoneNumber]);
 
   const restoreStreakWithShield = async () => {
@@ -311,19 +310,6 @@ export default function PMPage() {
       } 
     });
   };
-
-  const toggleTriggerFood = (food) => {
-    setTriggerFoods(prev => 
-      prev.includes(food) ? prev.filter(f => f !== food) : [...prev, food]
-    );
-  };
-
-  const milestones = [
-    { day: 1, label: 'Day 1', active: day >= 1 },
-    { day: 28, label: 'Day 28', active: day >= 28 },
-    { day: 56, label: 'Day 56', active: day >= 56 },
-    { day: 84, label: 'Day 84', active: day >= 84 },
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50">

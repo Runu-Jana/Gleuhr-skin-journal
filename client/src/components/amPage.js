@@ -19,7 +19,7 @@ export default function AMPage() {
   const { patient, streak: streakData, refreshStreak } = useAuth();
   const { isOnline, queueForSync } = useOffline();
   const { awardPoints, checkAchievements } = useGamification();
-  const { showStreakWarning } = useNotifications();
+  useNotifications();
   const navigate = useNavigate();
 
   const day = calculateDay(patient?.startDate);
@@ -42,7 +42,6 @@ export default function AMPage() {
   const [showShieldRestore, setShowShieldRestore] = useState(false);
   const [showShieldSuccess, setShowShieldSuccess] = useState(false);
   const [shieldRestoreData, setShieldRestoreData] = useState(null);
-  const [showCheckinSuccess, setShowCheckinSuccess] = useState(false);
   const [checkIns, setCheckIns] = useState([]);
 
   const consistency = calculateConsistency(checkIns, patient?.startDate);
