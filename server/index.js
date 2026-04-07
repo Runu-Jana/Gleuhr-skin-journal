@@ -1,11 +1,14 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/mongodb');
 
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Trust proxy (needed for rate limiting behind proxy)
@@ -36,6 +39,63 @@ const corsOrigin = (process.env.NODE_ENV === 'production' && process.env.CLIENT_
   ? process.env.CLIENT_URL.split(',').map(o => o.trim()).filter(Boolean)
   : true;
 app.use(cors({ origin: corsOrigin, credentials: true }));
+
+// Socket.io for WebRTC signaling (video consultations)
+const io = new Server(httpServer, {
+  cors: { origin: corsOrigin, credentials: true }
+});
+
+// Track active consultation rooms: roomId → Set of socket ids
+const consultationRooms = new Map();
+
+io.on('connection', (socket) => {
+  socket.on('join-consultation', (roomId) => {
+    if (!consultationRooms.has(roomId)) consultationRooms.set(roomId, new Set());
+    const room = consultationRooms.get(roomId);
+    if (room.size >= 2) {
+      socket.emit('room-full');
+      return;
+    }
+    room.add(socket.id);
+    socket.join(roomId);
+    socket.data.roomId = roomId;
+    if (room.size === 2) io.to(roomId).emit('ready');
+  });
+
+  socket.on('webrtc-offer', ({ roomId, offer }) => {
+    socket.to(roomId).emit('webrtc-offer', offer);
+  });
+
+  socket.on('webrtc-answer', ({ roomId, answer }) => {
+    socket.to(roomId).emit('webrtc-answer', answer);
+  });
+
+  socket.on('webrtc-ice-candidate', ({ roomId, candidate }) => {
+    socket.to(roomId).emit('webrtc-ice-candidate', candidate);
+  });
+
+  socket.on('leave-consultation', (roomId) => {
+    socket.to(roomId).emit('peer-left');
+    socket.leave(roomId);
+    const room = consultationRooms.get(roomId);
+    if (room) {
+      room.delete(socket.id);
+      if (room.size === 0) consultationRooms.delete(roomId);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    const roomId = socket.data.roomId;
+    if (roomId) {
+      socket.to(roomId).emit('peer-left');
+      const room = consultationRooms.get(roomId);
+      if (room) {
+        room.delete(socket.id);
+        if (room.size === 0) consultationRooms.delete(roomId);
+      }
+    }
+  });
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -98,7 +158,7 @@ if (require.main === module) {
       await seedTestData();
     }
 
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`Local: http://localhost:${PORT}`);
@@ -106,4 +166,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = app;
+module.exports = { app, httpServer };
