@@ -78,50 +78,71 @@ gleuhr-app/
 ### Prerequisites
 - Node.js 18+
 - npm or yarn
-- Airtable account with Personal Access Token (PAT)
+- MongoDB running locally (or use `npm run dev-start` for in-memory MongoDB)
 
 ### 1. Clone and Install
 
 ```bash
-cd gleuhr-app
+git clone <repo-url>
+cd gleuhr-skin-journal
 
-# Install server dependencies
-npm install
-
-# Install client dependencies
-cd client
-npm install
-cd ..
+# Install all dependencies (server + client)
+npm run install-all
 ```
 
-### 2. Configure Airtable PAT
+### 2. Environment Variables
 
-1. Go to [Airtable Developer Hub](https://airtable.com/create/tokens)
-2. Create a new Personal Access Token (PAT)
-3. Add these scopes:
-   - `data.records:read`
-   - `data.records:write`
-   - `schema.bases:read`
-4. Add your base to the token's access
-5. Copy the token
+> **Why this step is required:** `.env` files are excluded from version control (`.gitignore`) because they contain secrets. The repo ships `.env.example` templates — copy them and fill in your values before starting the app.
 
-### 3. Environment Variables
+Run the setup helper to copy the example files automatically:
 
-Create `.env` file in the root:
+```bash
+npm run setup
+```
+
+This creates two files if they don't already exist:
+- `.env` — server/backend config
+- `client/.env` — React dev-server config
+
+Then open `.env` and fill in your real values:
 
 ```env
-# Server
 NODE_ENV=development
-PORT=5000
+PORT=5001
 
-# Airtable PAT (required)
-AIRTABLE_PAT=patXXXXXXXXXXXXXX
-AIRTABLE_BASE_ID=appXXXXXXXXXXXXXX
+# MongoDB — use your local instance or Atlas connection string
+MONGODB_URI=mongodb://127.0.0.1:27017/gleuhr-app
 
-# Optional
-JWT_SECRET=your_secret_here
+# JWT secret — any long random string
+JWT_SECRET=change-me-to-a-random-secret
+
+# Admin portal credentials
+ADMIN_EMAIL=admin@gleuhr.com
+ADMIN_PASSWORD=change-this-password
+
+# Dietician portal shared password
+DIETICIAN_PASSWORD=change-this-password
+
+# Airtable (Diet Plan integration) — leave blank if not using Airtable
+AIRTABLE_PAT=your_airtable_personal_access_token_here
+AIRTABLE_BASE_ID=your_airtable_base_id_here
+AIRTABLE_DIET_PLAN_TABLE=Diet Plan
+AIRTABLE_TEAM_TABLE=Team
+
+# Allowed CORS origin (must match where the React app is served from)
 CLIENT_URL=http://localhost:3000
 ```
+
+> **Tip:** The server will refuse to start and print a clear error if `JWT_SECRET` or `MONGODB_URI` are missing.
+
+### 3. Configure Airtable PAT (optional)
+
+Only required if you use the diet-plan / team features:
+
+1. Go to [Airtable Developer Hub](https://airtable.com/create/tokens)
+2. Create a Personal Access Token with scopes: `data.records:read`, `data.records:write`, `schema.bases:read`
+3. Add your base to the token's access
+4. Paste the token and base ID into `.env`
 
 ### 4. Airtable Base Schema
 
@@ -201,18 +222,20 @@ Create these tables in your Airtable base:
 - Restrictions (Long text, comma-separated)
 - Recommendations (Long text, comma-separated)
 
-### 5. Run the Application
+### 4. Run the Application
 
 ```bash
-# Development mode (runs both client and server)
+# Development mode — starts both server and React client concurrently
 npm run dev
 
 # Or run separately:
-npm run server    # Backend on http://localhost:5000
+npm run server    # Backend on http://localhost:5001
 npm run client    # Frontend on http://localhost:3000
 ```
 
-### 6. Build for Production
+> **In-memory MongoDB** (no local MongoDB needed): `node dev-start.js` spins up an ephemeral MongoDB instance automatically.
+
+### 5. Build for Production
 
 ```bash
 # Build React app

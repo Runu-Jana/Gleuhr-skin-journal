@@ -10,7 +10,8 @@
     "client": "cd client && npm start",
     "build": "cd client && npm run build",
     "install-client": "cd client && npm install",
-    "install-all": "npm install && cd client && npm install"
+    "install-all": "npm install && cd client && npm install",
+    "setup": "node scripts/setup-env.js"
   },
   "dependencies": {
     "airtable": "^0.12.2",
@@ -21,7 +22,8 @@
     "express-rate-limit": "^7.1.5",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.2",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
