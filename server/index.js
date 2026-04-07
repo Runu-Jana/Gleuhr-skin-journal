@@ -1,4 +1,15 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+
+// Fail fast with a clear message if required env vars are missing
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'MONGODB_URI'];
+const missing = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
+if (missing.length > 0) {
+  console.error('\n[ERROR] Missing required environment variables:', missing.join(', '));
+  console.error('        Copy .env.example to .env and fill in the values:');
+  console.error('        cp .env.example .env\n');
+  process.exit(1);
+}
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
