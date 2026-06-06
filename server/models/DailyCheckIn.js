@@ -127,11 +127,10 @@ const dailyCheckInSchema = new mongoose.Schema({
   }
 });
 
-// Pre-save middleware - temporarily disabled due to next() issue
-// dailyCheckInSchema.pre('save', function(next) {
-//   this.updatedAt = Date.now();
-//   next();
-// });
+dailyCheckInSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
 // Index for efficient queries - removed unique constraint to allow updates
 dailyCheckInSchema.index({ patientId: 1, date: 1 });

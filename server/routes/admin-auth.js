@@ -53,12 +53,12 @@ router.post('/verify', (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== 'admin') {
+    if (decoded.role !== 'admin' && decoded.role !== 'team_lead') {
       return res.status(403).json({ error: 'Not an admin token' });
     }
     res.json({ valid: true, email: decoded.email });
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 });
 

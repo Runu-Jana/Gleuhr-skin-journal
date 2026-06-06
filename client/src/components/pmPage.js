@@ -91,7 +91,7 @@ export default function PMPage() {
   useEffect(() => {
     checkTodayAMRoutine();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patient?.phoneNumber]);
+  }, [patient?.phone]);
 
   const restoreStreakWithShield = async () => {
     if (!patient?.phone) return;

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { saveWeeklyPhoto, getWeeklyPhotos } from '../utils/db';
+import { calculateDay, getWeekNumber } from '../utils/helpers';
 import { Camera, X, Check, Upload, Calendar, TrendingUp } from 'lucide-react';
 import BottomNavigation from './BottomNavigation';
 
@@ -39,6 +40,8 @@ export default function PhotoUploadPage() {
   }, [week]);
 
   const patientPhone = patient?.phone || patient?.phoneNumber;
+  const currentDay = calculateDay(patient?.startDate);
+  const weekNumber = getWeekNumber(patient?.startDate);
 
   const loadPreviousPhoto = async () => {
     try {
@@ -160,10 +163,6 @@ export default function PhotoUploadPage() {
       setIsSubmitting(false);
     }
   };
-
-  const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
-  const isWeeklyPhotoDay = currentDay % 7 === 0;
-  const weekNumber = Math.ceil(currentDay / 7);
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
