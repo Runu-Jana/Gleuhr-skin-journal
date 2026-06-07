@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Sun, Moon, Camera, Map } from 'lucide-react';
+import { Home, Sun, Moon, Camera, Map, UtensilsCrossed } from 'lucide-react';
 
 export default function BottomNavigation() {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ export default function BottomNavigation() {
     if (path === '/amPage') return 'am';
     if (path === '/pmPage') return 'pm';
     if (path === '/transformation') return 'photos';
+    if (path === '/meal-photo') return 'meals';
     if (path === '/journey') return 'journey';
     if (path === '/checkin-success') return 'home'; // Treat success page as home
     return 'home';
@@ -24,6 +25,7 @@ export default function BottomNavigation() {
     { id: 'am', label: 'AM', icon: Sun, path: '/amPage' },
     { id: 'pm', label: 'PM', icon: Moon, path: '/pmPage' },
     { id: 'photos', label: 'Photos', icon: Camera, path: '/transformation' },
+    { id: 'meals', label: 'Meals', icon: UtensilsCrossed, path: '/meal-photo' },
     { id: 'journey', label: 'Journey', icon: Map, path: '/journey' },
   ];
 

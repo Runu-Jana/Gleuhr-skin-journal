@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { saveWeeklyPhoto, getWeeklyPhotos } from '../utils/db';
+import { getWeekNumber } from '../utils/helpers';
 import { Camera, Check, Upload } from 'lucide-react';
 
 export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
@@ -34,9 +35,7 @@ export default function WeeklyPhotoPopup({ isVisible, onClose, patient }) {
 
   useEffect(() => {
     if (patient) {
-      const currentDay = Math.floor((Date.now() - new Date(patient?.startDate)) / (1000 * 60 * 60 * 24)) + 1;
-      const week = Math.ceil(currentDay / 7);
-      setWeekNumber(week);
+      setWeekNumber(getWeekNumber(patient.startDate));
       loadPreviousPhoto();
       generateWeeklyInsight();
     }
