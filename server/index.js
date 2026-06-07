@@ -132,6 +132,7 @@ app.use('/api/skinscore', require('./routes/skinscore'));
 app.use('/api/checkin', require('./routes/checkin'));
 app.use('/api/reorder', require('./routes/reorder'));
 const adminAuth = require('./middleware/adminAuth');
+app.use('/api/meal-photo', require('./routes/meal-photo'));
 app.use('/api/admin/diet-plans', adminAuth, require('./routes/admin-diet-plans'));
 app.use('/api/admin/patients', adminAuth, require('./routes/admin-patients'));
 app.use('/api/admin/dietician', adminAuth, require('./routes/admin-dietician'));

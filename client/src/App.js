@@ -36,6 +36,7 @@ import AdminDashboard from './components/AdminDashboard';
 import AdminLogin from './components/AdminLogin';
 import DieticianLogin from './components/DieticianLogin';
 import DieticianDashboard from './components/DieticianDashboard';
+import MealPhotoPage from './components/MealPhotoPage';
 
 // Utils
 import { initDB, saveCheckIn, getWeeklyPhotos } from './utils/db';
@@ -180,6 +181,10 @@ function AppRoutes() {
                 element={!isAuthenticated ? <Navigate to="/login" replace /> : <CheckInSuccessPage />}
               />
               <Route
+                path="/meal-photo"
+                element={!isAuthenticated ? <Navigate to="/login" replace /> : <MealPhotoPage />}
+              />
+              <Route
                 path="/"
                 element={!isAuthenticated ? <Navigate to="/login" replace /> : <MainApp />}
               />
@@ -258,6 +263,7 @@ function MainApp() {
           <Route path="/photo-upload" element={<PhotoUploadPage />} />
           <Route path="/checkin-success" element={<CheckInSuccessPage />} />
           <Route path="/transformation" element={<TransformationPage />} />
+          <Route path="/meal-photo" element={<MealPhotoPage />} />
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/onboarding" element={<OnboardingScreen />} />
         </Routes>

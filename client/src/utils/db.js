@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'gleuhr-db';
-const DB_VERSION = 4; // Increment to force schema upgrade
+const DB_VERSION = 5; // Increment to force schema upgrade
 
 let db = null;
 
@@ -84,6 +84,14 @@ export async function initDB() {
         dieticianStore.createIndex('by-email', 'email');
       }
       
+      // Meal Photos store (linked to patient, one per meal type per day)
+      if (!db.objectStoreNames.contains('mealPhotos')) {
+        const mealStore = db.createObjectStore('mealPhotos', { keyPath: 'id' });
+        mealStore.createIndex('by-patient', 'patientId');
+        mealStore.createIndex('by-date', 'mealDate');
+        mealStore.createIndex('by-type', 'mealType');
+      }
+
       // Sync Queue store (for offline operations)
       if (!db.objectStoreNames.contains('syncQueue')) {
         const syncQueueStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
@@ -359,4 +367,29 @@ export async function clearSyncQueue() {
   for (const item of items) {
     await database.delete('syncQueue', item.id);
   }
+}
+
+// ============ MEAL PHOTO OPERATIONS ============
+export async function saveMealPhoto(photo) {
+  const database = await initDB();
+  const patientKey = photo.patientId || photo.patientPhone;
+  await database.put('mealPhotos', {
+    id: photo.id || `meal_${photo.mealType}_${photo.mealDate}_${Date.now()}`,
+    ...photo,
+    patientId: patientKey,
+    createdAt: photo.createdAt || new Date().toISOString()
+  });
+}
+
+export async function getTodayMealPhotos(patientId) {
+  const database = await initDB();
+  const today = new Date().toISOString().split('T')[0];
+  const all = await database.getAllFromIndex('mealPhotos', 'by-patient', patientId);
+  return all.filter(p => p.mealDate === today);
+}
+
+export async function getMealPhotosByDate(patientId, date) {
+  const database = await initDB();
+  const all = await database.getAllFromIndex('mealPhotos', 'by-patient', patientId);
+  return all.filter(p => p.mealDate === date);
 }
