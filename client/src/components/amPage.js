@@ -8,7 +8,6 @@ import { useGamification } from '../contexts/GamificationContext';
 import { saveCheckIn, getTodayCheckIn, getCheckIns, getPatient } from '../utils/db';
 import { calculateDay, calculateShields, isMilestoneDay, generateId, calculateConsistency } from '../utils/helpers';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
-import ReorderBanner from './ReorderBanner';
 import BottomNavigation from './BottomNavigation';
 
 export default function AMPage() {
@@ -54,15 +53,16 @@ export default function AMPage() {
       });
       const result = await response.json();
       if (result.success) {
-        // Persist so the popup won't reappear for this missed day
         localStorage.setItem('gleuhrShieldRestoredDate', yesterdayStr);
-        await refreshStreak();
+        // refreshStreak recalculates from DailyCheckIn records — use its return
+        // value for the animation so numbers are always correct
+        const freshStreak = await refreshStreak();
         setShowShieldRestore(false);
         setShieldRestoreData({
           streakRestored: true,
           shieldsRemaining: result.shieldsRemaining,
-          previousStreak: result.previousStreak,
-          newStreak: result.restoredStreak
+          previousStreak: 0,
+          newStreak: freshStreak?.streak ?? result.restoredStreak
         });
         setShowShieldSuccess(true);
       } else {
@@ -328,16 +328,6 @@ export default function AMPage() {
 
         </div>
       </div>
-
-      {/* Reorder banner — inline below the card, not floating */}
-      {day >= 30 && (
-        <ReorderBanner
-          coachName={patient?.coachName}
-          coachWhatsApp={patient?.coachWhatsApp}
-          day={day}
-          inline
-        />
-      )}
 
       {/* Milestone celebration */}
       {showCelebration && (

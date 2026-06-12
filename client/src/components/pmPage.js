@@ -93,33 +93,33 @@ export default function PMPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient?.phone]);
 
+  const dismissShieldPopup = () => {
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem('gleuhrShieldDismissedDate', today);
+    setShowShieldRestore(false);
+  };
+
   const restoreStreakWithShield = async () => {
     if (!patient?.phone) return;
-    
     try {
+      const yest = new Date(); yest.setDate(yest.getDate() - 1);
+      const yesterdayStr = yest.toISOString().split('T')[0];
+
       const response = await fetch('/api/streak/restore', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phoneNumber: patient.phone
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: patient.phone })
       });
-      
       const result = await response.json();
-      
       if (result.success) {
-        console.log('Streak restored with shield:', result);
-        await refreshStreak();
+        localStorage.setItem('gleuhrShieldRestoredDate', yesterdayStr);
+        const freshStreak = await refreshStreak();
         setShowShieldRestore(false);
-        
-        // Show success animation instead of alert
         setShieldRestoreData({
           streakRestored: true,
           shieldsRemaining: result.shieldsRemaining,
-          previousStreak: result.previousStreak,
-          newStreak: result.restoredStreak
+          previousStreak: 0,
+          newStreak: freshStreak?.streak ?? result.restoredStreak
         });
         setShowShieldSuccess(true);
       } else {
@@ -165,16 +165,21 @@ export default function PMPage() {
 
       // Auto-trigger shield popup if yesterday was missed and user has prior history
       const allCheckIns = await getCheckIns(patient?.id);
+      const todayDate = new Date().toISOString().split('T')[0];
       const yest = new Date(); yest.setDate(yest.getDate() - 1);
       const yesterdayStr = yest.toISOString().split('T')[0];
       const shieldRestoredDate = localStorage.getItem('gleuhrShieldRestoredDate');
-      const hadHistory = allCheckIns && allCheckIns.some(
-        c => c.amRoutine || c.pmRoutine || c.shieldRestored
-      );
-      const yesterdayActive = allCheckIns && allCheckIns.some(
+      const shieldDismissedDate = localStorage.getItem('gleuhrShieldDismissedDate');
+      const hadHistory = allCheckIns?.some(c => c.amRoutine || c.pmRoutine || c.shieldRestored);
+      const yesterdayActive = allCheckIns?.some(
         c => c.date === yesterdayStr && (c.amRoutine || c.pmRoutine || c.shieldRestored)
       );
-      if (hadHistory && !yesterdayActive && shieldRestoredDate !== yesterdayStr) {
+      if (
+        hadHistory &&
+        !yesterdayActive &&
+        shieldRestoredDate !== yesterdayStr &&
+        shieldDismissedDate !== todayDate
+      ) {
         setShowShieldRestore(true);
       }
     };
@@ -552,7 +557,7 @@ export default function PMPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowShieldRestore(false)}
+              onClick={dismissShieldPopup}
               style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 40 }}
             />
             <motion.div
@@ -580,7 +585,7 @@ export default function PMPage() {
               </h3>
 
               <p style={{ fontSize: 14, color: '#7a756d', fontFamily: 'Outfit, sans-serif', textAlign: 'center', lineHeight: 1.6, marginBottom: 10 }}>
-                You missed today's routine. Activate a shield to keep your streak alive.
+                Yesterday's routine was missed. Activate a shield to keep your streak alive.
               </p>
 
               {/* Shield count pill */}
@@ -618,7 +623,7 @@ export default function PMPage() {
               )}
 
               <button
-                onClick={() => setShowShieldRestore(false)}
+                onClick={dismissShieldPopup}
                 style={{ display: 'block', width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#9ca3af', padding: '8px 0', fontFamily: 'Outfit, sans-serif' }}
               >
                 Maybe later
