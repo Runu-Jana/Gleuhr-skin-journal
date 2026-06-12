@@ -187,7 +187,7 @@ export default function PMPage() {
   }, [patient]);
 
   const handleSubmit = async () => {
-    // All PM fields are required regardless of quick log mode
+    if (isSubmitting || hasSubmitted) return;
     if (waterIntake === 0) {
       alert('Please select your water intake for today');
       return;
