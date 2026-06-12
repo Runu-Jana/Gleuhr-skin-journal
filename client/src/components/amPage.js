@@ -15,12 +15,11 @@ import BottomNavigation from './BottomNavigation';
 export default function AMPage() {
   const { patient, streak: streakData, refreshStreak } = useAuth();
   const { isOnline, queueForSync } = useOffline();
-  const { awardPoints, checkAchievements } = useGamification();
+  const { awardPoints } = useGamification();
   useNotifications();
   const navigate = useNavigate();
 
   const day = calculateDay(patient?.startDate);
-  const progress = (day / 90) * 100;
   const shields = calculateShields(streakData?.streak || 0);
   const availableShields = streakData?.restorationShields?.available || shields || 0;
 
