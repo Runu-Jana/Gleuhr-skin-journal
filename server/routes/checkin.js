@@ -199,7 +199,9 @@ async function updateStreak(phoneNumber, currentDay, patientId = null) {
     // Any day where at least one routine was logged (AM or PM) or shield was used.
     // Matches the client-side streak logic to prevent discrepancies.
     const activeDates = new Set(
-      allCheckIns.filter(c => c.amRoutine === true || c.pmRoutine === true || c.shieldRestored === true).map(c => c.date)
+      allCheckIns
+        .filter(c => c.amRoutine === true || c.pmRoutine === true || c.shieldRestored === true)
+        .map(c => (c.date instanceof Date ? c.date.toISOString().split('T')[0] : String(c.date).split('T')[0]))
     );
 
     if (activeDates.size === 0) return;
