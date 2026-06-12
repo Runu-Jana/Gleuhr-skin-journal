@@ -296,14 +296,14 @@ export default function MealPhotoPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black flex flex-col"
+            className="fixed inset-0 z-[60] bg-black flex flex-col"
           >
             <img
               src={pendingImage}
               alt="preview"
               className="flex-1 object-contain w-full"
             />
-            <div className="bg-black px-6 py-6 flex gap-4 safe-bottom">
+            <div className="bg-black px-6 pt-4 pb-8 flex gap-4">
               <button
                 onClick={handleDiscard}
                 disabled={isSaving}
