@@ -118,6 +118,7 @@ export function AuthProvider({ children }) {
     if (patient?.phone) {
       const streakRes = await axios.get(`/api/streak/${patient.phone}`);
       setStreak(streakRes.data);
+      return streakRes.data;
     }
   };
 
