@@ -445,6 +445,9 @@ export default function HomeScreen() {
         )}
       </div>
 
+      {/* Reorder Banner — inline below the Log AM/PM card, Day 25+ */}
+      {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} inline />}
+
       {/* Progress Section */}
       <div className="px-5 py-5 flex gap-5 items-center">
         <div className="relative w-19 h-19 flex-shrink-0">
@@ -648,9 +651,6 @@ export default function HomeScreen() {
 
         </div>
       </div>
-
-      {/* Reorder Banner for Day 25+ */}
-      {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />}
 
       {/* Bottom padding for nav */}
       <div className="h-24" />
