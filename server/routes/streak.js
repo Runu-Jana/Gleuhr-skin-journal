@@ -29,7 +29,9 @@ router.get('/:phone', async (req, res) => {
     // This matches the client-side logic and prevents discrepancies where a day with
     // only AM logged would not be counted by the server but would be by the client.
     const activeDates = new Set(
-      allCheckIns.filter(c => c.amRoutine === true || c.pmRoutine === true || c.shieldRestored === true).map(c => c.date)
+      allCheckIns
+        .filter(c => c.amRoutine === true || c.pmRoutine === true || c.shieldRestored === true)
+        .map(c => (c.date instanceof Date ? c.date.toISOString().split('T')[0] : String(c.date).split('T')[0]))
     );
     const sorted = [...activeDates].sort();
 
@@ -124,17 +126,16 @@ router.post('/restore', async (req, res) => {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Find streak
-    const streak = await Streak.findOne({
-      $or: [
-        { phoneNumber },
-        { phone: phoneNumber },
-        { patientPhone: phoneNumber }
-      ]
+    // Find or create streak document
+    let streak = await Streak.findOne({
+      $or: [{ patientPhone: phoneNumber }, { patientId: patient._id.toString() }]
     });
 
     if (!streak) {
-      return res.status(404).json({ error: 'No streak data found' });
+      streak = await Streak.create({
+        patientId: patient._id.toString(),
+        patientPhone: phoneNumber,
+      });
     }
 
     // Check and reset monthly shields if needed
@@ -172,9 +173,10 @@ router.post('/restore', async (req, res) => {
     const dayOfJourney = streak.day || patient.currentDay || 1;
 
     let shieldCheckin;
+    const yesterdayDateObj = new Date(yesterdayStr + 'T00:00:00.000Z');
     const existingCheckin = await DailyCheckIn.findOne({
       patientId: patientIdStr,
-      date: yesterdayStr
+      date: { $gte: yesterdayDateObj, $lt: new Date(yesterdayDateObj.getTime() + 86400000) }
     });
 
     if (existingCheckin) {
@@ -187,7 +189,7 @@ router.post('/restore', async (req, res) => {
       shieldCheckin = await DailyCheckIn.create({
         patientId: patientIdStr,
         patientPhone,
-        date: yesterdayStr,
+        date: yesterdayDateObj,
         dayOfJourney,
         amRoutine: false,
         pmRoutine: false,
@@ -219,8 +221,8 @@ router.post('/restore', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Restore streak error:', error);
-    res.status(500).json({ error: 'Failed to restore streak' });
+    console.error('Restore streak error:', error.message, error.stack);
+    res.status(500).json({ error: error.message || 'Failed to restore streak' });
   }
 });
 
