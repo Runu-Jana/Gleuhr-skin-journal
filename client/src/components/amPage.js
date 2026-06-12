@@ -10,9 +10,6 @@ import { saveCheckIn, getTodayCheckIn, getCheckIns, getWeeklyPhotos, getPatient,
 import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
-import ReorderBanner from './ReorderBanner';
-import GamificationPanel from './GamificationPanel';
-import AchievementPopup from './AchievementPopup';
 import BottomNavigation from './BottomNavigation';
 
 export default function AMPage() {
@@ -307,10 +304,6 @@ export default function AMPage() {
 
         </div>
       </div>
-
-      {day >= 30 && (
-        <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} />
-      )}
 
       {/* Milestone celebration */}
       {showCelebration && (
