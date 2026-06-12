@@ -5,18 +5,16 @@ import { Shield, Flame } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useGamification } from '../contexts/GamificationContext';
-import { useNotifications } from '../contexts/NotificationContext';
-import { saveCheckIn, getTodayCheckIn, getCheckIns, getWeeklyPhotos, getPatient, savePatient } from '../utils/db';
-import { calculateDay, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
-import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
+import { saveCheckIn, getTodayCheckIn, getCheckIns, getPatient } from '../utils/db';
+import { calculateDay, calculateShields, isMilestoneDay, generateId, calculateConsistency } from '../utils/helpers';
 import ShieldSuccessAnimation from './ShieldSuccessAnimation';
+import ReorderBanner from './ReorderBanner';
 import BottomNavigation from './BottomNavigation';
 
 export default function AMPage() {
   const { patient, streak: streakData, refreshStreak } = useAuth();
   const { isOnline, queueForSync } = useOffline();
   const { awardPoints } = useGamification();
-  useNotifications();
   const navigate = useNavigate();
 
   const day = calculateDay(patient?.startDate);
@@ -33,6 +31,7 @@ export default function AMPage() {
   const [amRoutine, setAmRoutine] = useState(false);
   const [sunscreen, setSunscreen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [showShieldRestore, setShowShieldRestore] = useState(false);
@@ -42,12 +41,12 @@ export default function AMPage() {
 
   const consistency = calculateConsistency(checkIns, patient?.startDate);
 
-  const handleAMRoutineToggle = () => setAmRoutine(!amRoutine);
-  const handleSunscreenToggle = () => setSunscreen(!sunscreen);
-
   const restoreStreakWithShield = async () => {
     if (!patient?.phone) return;
     try {
+      const yest = new Date(); yest.setDate(yest.getDate() - 1);
+      const yesterdayStr = yest.toISOString().split('T')[0];
+
       const response = await fetch('/api/streak/restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,6 +54,8 @@ export default function AMPage() {
       });
       const result = await response.json();
       if (result.success) {
+        // Persist so the popup won't reappear for this missed day
+        localStorage.setItem('gleuhrShieldRestoredDate', yesterdayStr);
         await refreshStreak();
         setShowShieldRestore(false);
         setShieldRestoreData({
@@ -73,16 +74,21 @@ export default function AMPage() {
     }
   };
 
+  const dismissShieldPopup = () => {
+    // Remember the dismissal for today so it doesn't reappear on every navigation
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem('gleuhrShieldDismissedDate', today);
+    setShowShieldRestore(false);
+  };
+
   useEffect(() => {
     const loadToday = async () => {
       try {
         const phone = patient?.phone || patient?.phoneNumber;
         const todayDate = new Date().toISOString().split('T')[0];
 
-        // 1. IndexedDB lookup using correct patientId (MongoDB ObjectId)
         let today = await getTodayCheckIn(patient?.id);
 
-        // 2. Server fallback — covers new device or cleared IndexedDB
         if (!today && phone) {
           try {
             const res = await fetch(`/api/checkin/${phone}`);
@@ -95,36 +101,42 @@ export default function AMPage() {
 
         if (today?.date === todayDate) {
           setAmRoutine(today.amRoutine);
-          // If AM routine was completed, sunscreen must have been applied (both are required for submission).
-          // Guard against stale/overwritten DB values by defaulting to true when amRoutine is true.
           setSunscreen(today.amRoutine ? true : (today.sunscreen || false));
           setHasSubmitted(true);
         }
-        // Load all check-ins for consistency calculation
+
         const allCheckIns = await getCheckIns(patient?.id);
         setCheckIns(allCheckIns || []);
 
-        // Auto-trigger shield popup if yesterday was missed and user has prior history
+        // Show shield popup only if: yesterday was missed AND not already dismissed/restored today
         const yest = new Date(); yest.setDate(yest.getDate() - 1);
         const yesterdayStr = yest.toISOString().split('T')[0];
         const shieldRestoredDate = localStorage.getItem('gleuhrShieldRestoredDate');
-        const hadHistory = allCheckIns && allCheckIns.some(
-          c => c.amRoutine || c.pmRoutine || c.shieldRestored
-        );
-        const yesterdayActive = allCheckIns && allCheckIns.some(
+        const shieldDismissedDate = localStorage.getItem('gleuhrShieldDismissedDate');
+        const hadHistory = allCheckIns?.some(c => c.amRoutine || c.pmRoutine || c.shieldRestored);
+        const yesterdayActive = allCheckIns?.some(
           c => c.date === yesterdayStr && (c.amRoutine || c.pmRoutine || c.shieldRestored)
         );
-        if (hadHistory && !yesterdayActive && shieldRestoredDate !== yesterdayStr) {
+        if (
+          hadHistory &&
+          !yesterdayActive &&
+          shieldRestoredDate !== yesterdayStr &&
+          shieldDismissedDate !== todayDate
+        ) {
           setShowShieldRestore(true);
         }
       } catch (error) {
         console.error('Error loading today check-in:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-    loadToday();
+    if (patient) loadToday();
   }, [patient]);
 
   const handleSubmit = async () => {
+    // Hard guard — prevents re-submission even if button is briefly enabled during load
+    if (hasSubmitted || isLoading) return;
     if (!amRoutine) {
       alert('Please complete your AM routine before submitting');
       return;
@@ -137,11 +149,13 @@ export default function AMPage() {
     const phoneNumber = patient?.phoneNumber || patient?.phone;
     if (!phoneNumber) {
       alert('No phone number found. Please check your patient data.');
+      setIsSubmitting(false);
       return;
     }
     const patientRecord = await getPatient(phoneNumber);
     if (!patientRecord) {
       alert('Patient record not found. Please contact support.');
+      setIsSubmitting(false);
       return;
     }
     const patientId = patientRecord.id;
@@ -193,21 +207,21 @@ export default function AMPage() {
     });
   };
 
-  // ─── UI ────────────────────────────────────────────────────────────────────
+  // Derived button state
+  const alreadyDone = !isLoading && hasSubmitted;
+  const canSubmit = !isLoading && !hasSubmitted && amRoutine && sunscreen;
 
   return (
     <div className="min-h-screen bg-[#ede9e4] pb-24 pt-2">
 
-      {/* Card */}
+      {/* Main card */}
       <div className="mx-4 mt-8 bg-white rounded-[28px] shadow-sm overflow-hidden">
         <div className="px-5 pt-8 pb-8">
 
-          {/* MORNING CHECK-IN label */}
           <p className="text-xs font-bold text-[#c44033] font-outfit uppercase tracking-[1.2px] mb-2">
             Morning Check-in
           </p>
 
-          {/* Day heading */}
           <h1 className="text-[2.6rem] font-bold text-[#191716] font-crimson leading-none mb-6">
             Day {day}
           </h1>
@@ -247,14 +261,15 @@ export default function AMPage() {
             </div>
           </div>
 
-          {/* AM Routine toggle */}
-          <div className="bg-white border border-[#ede9e4] rounded-[18px] px-4 py-4 flex items-center justify-between mb-3">
+          {/* AM Routine toggle — locked once submitted */}
+          <div className={`bg-white border border-[#ede9e4] rounded-[18px] px-4 py-4 flex items-center justify-between mb-3 ${alreadyDone ? 'opacity-60' : ''}`}>
             <span className="text-sm font-semibold text-[#191716] font-outfit">AM Routine Completed</span>
             <button
-              onClick={handleAMRoutineToggle}
+              onClick={() => !alreadyDone && setAmRoutine(v => !v)}
+              disabled={alreadyDone}
               className={`w-[52px] h-[30px] rounded-full flex items-center px-[3px] flex-shrink-0 transition-colors duration-300 ${
                 amRoutine ? 'bg-[#c44033]' : 'bg-[#d4cfc9]'
-              }`}
+              } ${alreadyDone ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <div className={`w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-300 ${
                 amRoutine ? 'translate-x-[22px]' : 'translate-x-0'
@@ -262,14 +277,15 @@ export default function AMPage() {
             </button>
           </div>
 
-          {/* Sunscreen toggle */}
-          <div className="bg-white border border-[#ede9e4] rounded-[18px] px-4 py-4 flex items-center justify-between mb-6">
+          {/* Sunscreen toggle — locked once submitted */}
+          <div className={`bg-white border border-[#ede9e4] rounded-[18px] px-4 py-4 flex items-center justify-between mb-6 ${alreadyDone ? 'opacity-60' : ''}`}>
             <span className="text-sm font-semibold text-[#191716] font-outfit">Sunscreen Applied</span>
             <button
-              onClick={handleSunscreenToggle}
+              onClick={() => !alreadyDone && setSunscreen(v => !v)}
+              disabled={alreadyDone}
               className={`w-[52px] h-[30px] rounded-full flex items-center px-[3px] flex-shrink-0 transition-colors duration-300 ${
                 sunscreen ? 'bg-[#c44033]' : 'bg-[#d4cfc9]'
-              }`}
+              } ${alreadyDone ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <div className={`w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-300 ${
                 sunscreen ? 'translate-x-[22px]' : 'translate-x-0'
@@ -277,32 +293,51 @@ export default function AMPage() {
             </button>
           </div>
 
-          {/* Submit button */}
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || hasSubmitted || !(amRoutine && sunscreen)}
-            className={`w-full py-4 rounded-[18px] font-semibold text-sm font-outfit transition-all ${
-              isSubmitting || hasSubmitted
-                ? 'bg-[#e4e0db] text-[#a39e95] cursor-not-allowed'
-                : amRoutine && sunscreen
-                ? 'bg-[#c44033] text-white shadow-[rgba(196,64,51,0.22)_0px_4px_14px] cursor-pointer'
-                : 'bg-[#e4e0db] text-[#a39e95] cursor-not-allowed'
-            }`}
-          >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                Saving...
-              </span>
-            ) : hasSubmitted ? (
-              'Completed ✓'
-            ) : (
-              'Log AM ✓'
-            )}
-          </button>
+          {/* Submit / completed button */}
+          {alreadyDone ? (
+            <div className="w-full py-4 rounded-[18px] bg-[#f0fdf4] border border-[#bbf7d0] flex items-center justify-center gap-2">
+              <span className="text-[15px] font-semibold text-[#16a34a] font-outfit">AM Routine Completed ✓</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting || isLoading || !canSubmit}
+              className={`w-full py-4 rounded-[18px] font-semibold text-sm font-outfit transition-all ${
+                isSubmitting || isLoading
+                  ? 'bg-[#e4e0db] text-[#a39e95] cursor-not-allowed'
+                  : canSubmit
+                  ? 'bg-[#c44033] text-white shadow-[rgba(196,64,51,0.22)_0px_4px_14px] cursor-pointer'
+                  : 'bg-[#e4e0db] text-[#a39e95] cursor-not-allowed'
+              }`}
+            >
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Saving...
+                </span>
+              ) : isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-[#a39e95]/40 border-t-[#a39e95] rounded-full animate-spin" />
+                  Loading...
+                </span>
+              ) : (
+                'Log AM ✓'
+              )}
+            </button>
+          )}
 
         </div>
       </div>
+
+      {/* Reorder banner — inline below the card, not floating */}
+      {day >= 30 && (
+        <ReorderBanner
+          coachName={patient?.coachName}
+          coachWhatsApp={patient?.coachWhatsApp}
+          day={day}
+          inline
+        />
+      )}
 
       {/* Milestone celebration */}
       {showCelebration && (
@@ -342,10 +377,10 @@ export default function AMPage() {
                 Use Shield
               </button>
               <button
-                onClick={() => setShowShieldRestore(false)}
+                onClick={dismissShieldPopup}
                 className="w-full py-3.5 rounded-[14px] bg-[#f4f2ef] text-[#3d3935] font-semibold font-outfit text-sm"
               >
-                Cancel
+                Not Now
               </button>
             </div>
           </motion.div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useOffline } from '../contexts/OfflineContext';
 import { ShoppingBag, X, ArrowRight } from 'lucide-react';
 
-export default function ReorderBanner({ coachName, coachWhatsApp, day }) {
+export default function ReorderBanner({ coachName, coachWhatsApp, day, inline = false }) {
   const [isDismissed, setIsDismissed] = useState(false);
   const { trackReorderClick } = useOffline();
 
@@ -14,8 +14,12 @@ export default function ReorderBanner({ coachName, coachWhatsApp, day }) {
     window.open(`https://wa.me/${coachWhatsApp}?text=${message}`, '_blank');
   };
 
+  const wrapperClass = inline
+    ? 'mt-4 mx-4'
+    : 'fixed bottom-20 left-4 right-4 z-40';
+
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-40">
+    <div className={wrapperClass}>
       <div className="bg-gradient-to-r from-[#c44033] to-[#e85a4a] rounded-2xl p-4 shadow-2xl shadow-[#c44033]/30">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
