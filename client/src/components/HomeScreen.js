@@ -132,12 +132,19 @@ export default function HomeScreen() {
     return calendar;
   };
 
-  const [currentSkinScore, setCurrentSkinScore] = useState(0); // Default fallback
-  const [consistency, setConsistency] = useState(0); // Default fallback
-  const [checkIns, setCheckIns] = useState([]); // Store check-ins for calendar
+  const [currentSkinScore, setCurrentSkinScore] = useState(0);
+  const [consistency, setConsistency] = useState(0);
+  const [checkIns, setCheckIns] = useState([]);
   const [localStreak, setLocalStreak] = useState({ currentStreak: 0, longestStreak: 0 });
   const [missedYesterday, setMissedYesterday] = useState(false);
-  const [photosCount, setPhotosCount] = useState(0); // Store photos count
+  const [photosCount, setPhotosCount] = useState(0);
+
+  // Derive whether today's AM or PM routine is already logged
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayCheckIn = checkIns.find(c => c.date === todayStr);
+  const amDoneToday = todayCheckIn?.amRoutine === true;
+  const pmDoneToday = todayCheckIn?.pmRoutine === true;
+  const currentRoutineDone = isMorning ? amDoneToday : pmDoneToday;
 
   // Fetch latest skin score and calculate consistency
   useEffect(() => {
@@ -442,56 +449,73 @@ export default function HomeScreen() {
 
       {/* Main CTA Button */}
       <div className="mx-5 my-3">
-        <div
-          onClick={handleRoutineClick}
-          className={`p-5 rounded-[18px] bg-[#c44033] cursor-pointer relative overflow-hidden shadow-[rgba(196,64,51,0.208)_0px_8px_24px] ${day === 1 && checkIns.length === 0 ? 'animate-[ctaPulse_2s_ease-in-out_infinite]' : ''}`}
-          style={day === 1 && checkIns.length === 0 ? { animation: 'ctaPulse 2s ease-in-out infinite' } : {}}
-        >
-          <style>{`
-            @keyframes ctaPulse {
-              0%,100% { box-shadow: rgba(196,64,51,0.25) 0px 8px 24px, rgba(196,64,51,0) 0px 0px 0px 0px; }
-              50%      { box-shadow: rgba(196,64,51,0.45) 0px 8px 32px, rgba(196,64,51,0.25) 0px 0px 0px 8px; }
-            }
-            @keyframes tapBounce {
-              0%,100% { transform: translateY(0); }
-              50%      { transform: translateY(5px); }
-            }
-          `}</style>
-          <div className="absolute -top-0.15 -right-5 w-20 h-20 rounded-[40px] bg-[rgba(255,255,255,0.08)]"></div>
-          <div className="flex items-center justify-between relative">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-[14px] bg-[rgba(255,255,255,0.15)] flex items-center justify-center">
-                <span className="text-xl">{isMorning ? '☀️' : '🌙'}</span>
-              </div>
-              <div>
-                <p className="text-base font-semibold text-white font-crimson">
-                  Log {isMorning ? 'AM' : 'PM'} routine
-                </p>
-                <p className="text-xs text-[rgba(255,255,255,0.65)] font-outfit mt-0.5">
-                  {isMorning ? 'Tap after your sunscreen absorbs' : 'Complete your evening routine'}
-                </p>
-              </div>
-            </div>
-            <div className="w-5 h-5 text-white opacity-60">
-              <svg viewBox="0 0 20 20" fill="none" strokeWidth={2} strokeLinecap="round">
-                <path d="M7 4l6 6-6 6" />
+        <style>{`
+          @keyframes ctaPulse {
+            0%,100% { box-shadow: rgba(196,64,51,0.25) 0px 8px 24px, rgba(196,64,51,0) 0px 0px 0px 0px; }
+            50%      { box-shadow: rgba(196,64,51,0.45) 0px 8px 32px, rgba(196,64,51,0.25) 0px 0px 0px 8px; }
+          }
+          @keyframes tapBounce {
+            0%,100% { transform: translateY(0); }
+            50%      { transform: translateY(5px); }
+          }
+        `}</style>
+
+        {currentRoutineDone ? (
+          /* ── Completed state ── */
+          <div className="p-5 rounded-[18px] bg-[#f0faf4] border border-[#bbf0d0] flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-[14px] bg-[#1a8a4a] flex items-center justify-center flex-shrink-0">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M4 10l4.5 4.5 7.5-8" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
+            <div className="flex-1">
+              <p className="text-base font-semibold text-[#1a8a4a] font-crimson">
+                {isMorning ? 'AM' : 'PM'} Routine Completed ✓
+              </p>
+              <p className="text-xs text-[#5a9a6a] font-outfit mt-0.5">
+                {isMorning ? 'Come back tonight for your PM routine' : 'Great job! See you tomorrow morning'}
+              </p>
+            </div>
+            {!isMorning && amDoneToday && (
+              <div className="flex-shrink-0 text-xs font-outfit font-semibold text-[#1a8a4a] bg-[#d1fae5] px-2 py-1 rounded-full">Full day ✦</div>
+            )}
           </div>
-        </div>
+        ) : (
+          /* ── Log routine CTA ── */
+          <div
+            onClick={handleRoutineClick}
+            className={`p-5 rounded-[18px] bg-[#c44033] cursor-pointer relative overflow-hidden shadow-[rgba(196,64,51,0.208)_0px_8px_24px] ${day === 1 && checkIns.length === 0 ? 'animate-[ctaPulse_2s_ease-in-out_infinite]' : ''}`}
+            style={day === 1 && checkIns.length === 0 ? { animation: 'ctaPulse 2s ease-in-out infinite' } : {}}
+          >
+            <div className="absolute -top-0.15 -right-5 w-20 h-20 rounded-[40px] bg-[rgba(255,255,255,0.08)]"></div>
+            <div className="flex items-center justify-between relative">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-[14px] bg-[rgba(255,255,255,0.15)] flex items-center justify-center">
+                  <span className="text-xl">{isMorning ? '☀️' : '🌙'}</span>
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-white font-crimson">
+                    Log {isMorning ? 'AM' : 'PM'} routine
+                  </p>
+                  <p className="text-xs text-[rgba(255,255,255,0.65)] font-outfit mt-0.5">
+                    {isMorning ? 'Tap after your sunscreen absorbs' : 'Complete your evening routine'}
+                  </p>
+                </div>
+              </div>
+              <div className="w-5 h-5 text-white opacity-60">
+                <svg viewBox="0 0 20 20" fill="none" strokeWidth={2} strokeLinecap="round">
+                  <path d="M7 4l6 6-6 6" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* First-time tap hint — only shown on day 1 with no logs */}
         {day === 1 && checkIns.length === 0 && (
           <div className="flex items-center justify-center gap-1.5 mt-2">
-            <span
-              className="text-base leading-none"
-              style={{ animation: 'tapBounce 1.2s ease-in-out infinite' }}
-            >
-              👆
-            </span>
-            <span className="text-xs text-[#c44033] font-semibold font-outfit">
-              Tap here to log your first routine
-            </span>
+            <span className="text-base leading-none" style={{ animation: 'tapBounce 1.2s ease-in-out infinite' }}>👆</span>
+            <span className="text-xs text-[#c44033] font-semibold font-outfit">Tap here to log your first routine</span>
           </div>
         )}
       </div>
