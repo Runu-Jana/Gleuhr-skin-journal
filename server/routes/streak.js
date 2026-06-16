@@ -138,12 +138,12 @@ router.post('/restore', async (req, res) => {
       });
     }
 
-    // Check and reset monthly shields if needed
+    // Check and reset monthly shields if needed (hard cap at 3 per calendar month)
     const currentMonth = new Date().toISOString().slice(0, 7);
     let availableShields;
 
     if (streak.shields?.lastResetMonth === currentMonth) {
-      availableShields = (streak.shields?.monthly || 3) - (streak.shields?.used || 0);
+      availableShields = 3 - (streak.shields?.used || 0);
     } else {
       // New month, reset shields
       availableShields = 3;
@@ -155,7 +155,28 @@ router.post('/restore', async (req, res) => {
     }
 
     if (availableShields <= 0) {
-      return res.status(400).json({ error: 'No shields available this month' });
+      return res.status(400).json({ error: 'No shields left this month — you get 3 every month' });
+    }
+
+    // ── 7-day max gap rule ──────────────────────────────────────────────────────
+    // A shield can only protect a streak if the customer's last active day was
+    // within the last 7 days. Beyond that, the streak is permanently broken.
+    const recentActiveDays = await DailyCheckIn.find({
+      $and: [
+        { $or: [{ patientId: patient._id.toString() }, { patientPhone: phoneNumber }] },
+        { $or: [{ amRoutine: true }, { pmRoutine: true }, { shieldRestored: true }] },
+      ],
+    }).sort({ date: -1 }).limit(1).lean();
+
+    if (recentActiveDays.length > 0) {
+      const lastActiveDate = new Date(recentActiveDays[0].date);
+      const today = new Date();
+      const gapDays = Math.floor((today.setHours(0, 0, 0, 0) - new Date(lastActiveDate).setHours(0, 0, 0, 0)) / 86400000);
+      if (gapDays >= 7) {
+        return res.status(400).json({
+          error: `Streak can't be restored — last activity was ${gapDays} days ago. Shields only protect gaps under 7 days.`
+        });
+      }
     }
 
     // Use shield to restore streak (restore to previous day's streak + 1)

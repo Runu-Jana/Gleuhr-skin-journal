@@ -163,20 +163,27 @@ export default function PMPage() {
         setHasSubmitted(true);
       }
 
-      // Auto-trigger shield popup if yesterday was missed and user has prior history
+      // Shield popup logic — same rules as amPage:
+      //  • Today's PM not yet logged
+      //  • At least 2 real active days of history
+      //  • Yesterday was incomplete (missed or partial)
+      //  • Not already restored / dismissed today
       const allCheckIns = await getCheckIns(patient?.id);
-      const todayDate = new Date().toISOString().split('T')[0];
       const yest = new Date(); yest.setDate(yest.getDate() - 1);
       const yesterdayStr = yest.toISOString().split('T')[0];
       const shieldRestoredDate = localStorage.getItem('gleuhrShieldRestoredDate');
       const shieldDismissedDate = localStorage.getItem('gleuhrShieldDismissedDate');
-      const hadHistory = allCheckIns?.some(c => c.amRoutine || c.pmRoutine || c.shieldRestored);
-      const yesterdayActive = allCheckIns?.some(
-        c => c.date === yesterdayStr && (c.amRoutine || c.pmRoutine || c.shieldRestored)
-      );
+
+      const todayAlreadyLogged = today?.pmRoutine === true;
+      const activeDays = (allCheckIns || []).filter(c => c.amRoutine || c.pmRoutine || c.shieldRestored);
+      const hasRealHistory = activeDays.length >= 2;
+      const yest1 = (allCheckIns || []).find(c => c.date === yesterdayStr);
+      const yesterdayComplete = yest1 && ((yest1.amRoutine && yest1.pmRoutine) || yest1.shieldRestored);
+
       if (
-        hadHistory &&
-        !yesterdayActive &&
+        !todayAlreadyLogged &&
+        hasRealHistory &&
+        !yesterdayComplete &&
         shieldRestoredDate !== yesterdayStr &&
         shieldDismissedDate !== todayDate
       ) {

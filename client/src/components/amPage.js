@@ -99,27 +99,36 @@ export default function AMPage() {
           } catch { /* non-fatal */ }
         }
 
-        if (today?.date === todayDate) {
-          setAmRoutine(today.amRoutine);
-          setSunscreen(today.amRoutine ? true : (today.sunscreen || false));
+        if (today?.date === todayDate && today.amRoutine) {
+          setAmRoutine(true);
+          setSunscreen(true);
           setHasSubmitted(true);
         }
 
         const allCheckIns = await getCheckIns(patient?.id);
         setCheckIns(allCheckIns || []);
 
-        // Show shield popup only if: yesterday was missed AND not already dismissed/restored today
+        // Show shield popup ONLY when:
+        //  • Today's AM is NOT yet logged (don't bother a customer who's already done)
+        //  • User has real prior history (>= 2 active days, otherwise it's a brand-new account)
+        //  • Yesterday was incomplete (missed entirely OR partial — only AM or only PM)
+        //  • User hasn't already restored/dismissed today
         const yest = new Date(); yest.setDate(yest.getDate() - 1);
         const yesterdayStr = yest.toISOString().split('T')[0];
         const shieldRestoredDate = localStorage.getItem('gleuhrShieldRestoredDate');
         const shieldDismissedDate = localStorage.getItem('gleuhrShieldDismissedDate');
-        const hadHistory = allCheckIns?.some(c => c.amRoutine || c.pmRoutine || c.shieldRestored);
-        const yesterdayActive = allCheckIns?.some(
-          c => c.date === yesterdayStr && (c.amRoutine || c.pmRoutine || c.shieldRestored)
-        );
+
+        const todayAlreadyLogged = today?.date === todayDate && today.amRoutine;
+        const activeDays = (allCheckIns || []).filter(c => c.amRoutine || c.pmRoutine || c.shieldRestored);
+        const hasRealHistory = activeDays.length >= 2;
+        const yest1 = (allCheckIns || []).find(c => c.date === yesterdayStr);
+        // Yesterday is complete only when BOTH AM and PM (or shield) logged
+        const yesterdayComplete = yest1 && ((yest1.amRoutine && yest1.pmRoutine) || yest1.shieldRestored);
+
         if (
-          hadHistory &&
-          !yesterdayActive &&
+          !todayAlreadyLogged &&
+          hasRealHistory &&
+          !yesterdayComplete &&
           shieldRestoredDate !== yesterdayStr &&
           shieldDismissedDate !== todayDate
         ) {
