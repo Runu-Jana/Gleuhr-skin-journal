@@ -7,11 +7,11 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { saveCheckIn, getTodayCheckIn, getCheckIns, getLatestSkinScore, getWeeklyPhotos, getPatient } from '../utils/db';
 import { calculateDay, calculateStreak, calculateShields, isMilestoneDay, isWeeklyPhotoDay, generateId, calculateConsistency } from '../utils/helpers';
 import { getTimeOfDay, getTodayCheckInStatus } from '../utils/timeUtils';
-import { Flame, Shield } from 'lucide-react';
+import { Flame, Shield, MessageCircle } from 'lucide-react';
 import ReorderBanner from './ReorderBanner';
 
 export default function HomeScreen() {
-  const { patient, streak: streakData, refreshStreak } = useAuth();
+  const { patient, streak: streakData, refreshStreak, skinScores } = useAuth();
   const { isOnline, queueForSync } = useOffline();
   const { showStreakWarning } = useNotifications();
   const navigate = useNavigate();
@@ -315,13 +315,19 @@ export default function HomeScreen() {
           </h2>
         </div>
         <div className="flex items-center gap-2.5">
-          {currentSkinScore > 0 && (
-            <div className="px-3 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.03)] border border-[rgba(196,64,51,0.08)] cursor-pointer flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-[#7a756d] font-outfit">Score</span>
-              <span className="text-base font-bold text-[#c44033] font-crimson">{currentSkinScore}</span>
-              <span className="text-xs text-[#a39e95] font-outfit">/20</span>
-            </div>
-          )}
+          {currentSkinScore > 0 && (() => {
+            const sorted = [...(skinScores || [])].sort((a, b) => new Date(a.createdAt || a.date || 0) - new Date(b.createdAt || b.date || 0));
+            const firstScore = sorted[0]?.totalScore;
+            const delta = firstScore && currentSkinScore > firstScore ? currentSkinScore - firstScore : 0;
+            return (
+              <div className="px-3 py-1.5 rounded-[10px] bg-[rgba(196,64,51,0.03)] border border-[rgba(196,64,51,0.08)] cursor-pointer flex items-center gap-1.5" onClick={() => navigate('/skin-score')}>
+                <span className="text-xs font-semibold text-[#7a756d] font-outfit">Score</span>
+                <span className="text-base font-bold text-[#c44033] font-crimson">{currentSkinScore}</span>
+                <span className="text-xs text-[#a39e95] font-outfit">/20</span>
+                {delta > 0 && <span className="text-[10px] font-bold text-[#1a8a4a] font-outfit bg-[rgba(26,138,74,0.08)] px-1.5 py-0.5 rounded-full">+{delta}</span>}
+              </div>
+            );
+          })()}
           <div
             onClick={() => navigate('/profile')}
             className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
@@ -389,6 +395,51 @@ export default function HomeScreen() {
         </div>
       </div>
 
+      {/* Weekly Completion Rings */}
+      {checkIns.length > 0 && (() => {
+        const today = new Date();
+        const last7 = new Set(Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(today); d.setDate(today.getDate() - i);
+          return d.toISOString().split('T')[0];
+        }));
+        const weekCI = checkIns.filter(c => last7.has(c.date));
+        const amDays = weekCI.filter(c => c.amRoutine).length;
+        const pmDays = weekCI.filter(c => c.pmRoutine).length;
+        const fullDays = weekCI.filter(c => c.amRoutine && c.pmRoutine).length;
+        const rings = [
+          { val: amDays, color: '#c44033', label: 'Morning', icon: '☀️' },
+          { val: pmDays, color: '#7c3aed', label: 'Evening', icon: '🌙' },
+          { val: fullDays, color: '#1a8a4a', label: 'Full Days', icon: '✦' },
+        ];
+        const circ = 2 * Math.PI * 20;
+        return (
+          <div className="mx-5 mb-3 px-4 py-3.5 rounded-[16px] bg-[#faf8f5] border border-[#ede9e5]">
+            <p className="text-[10px] font-bold text-[#a39e95] uppercase tracking-[0.9px] font-outfit mb-3">This Week's Completion</p>
+            <div className="flex justify-around">
+              {rings.map(({ val, color, label, icon }) => (
+                <div key={label} className="flex flex-col items-center gap-1">
+                  <div className="relative" style={{ width: 52, height: 52 }}>
+                    <svg width="52" height="52" viewBox="0 0 52 52">
+                      <circle cx="26" cy="26" r="20" fill="none" stroke="#ede9e5" strokeWidth="4" />
+                      <circle cx="26" cy="26" r="20" fill="none" stroke={color} strokeWidth="4"
+                        strokeDasharray={`${circ * (val / 7)} ${circ}`}
+                        strokeLinecap="round" transform="rotate(-90 26 26)"
+                        style={{ transition: 'stroke-dasharray 0.7s ease' }}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span style={{ fontSize: label === 'Full Days' ? 13 : 14 }}>{icon}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-[#7a756d] font-outfit">{label}</span>
+                  <span className="text-xs font-bold text-[#191716] font-outfit">{val}/7</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Main CTA Button */}
       <div className="mx-5 my-3">
         <div
@@ -448,6 +499,30 @@ export default function HomeScreen() {
       {/* Reorder Banner — inline below the Log AM/PM card, Day 25+ */}
       {day >= 25 && <ReorderBanner coachName={patient?.coachName} coachWhatsApp={patient?.coachWhatsApp} day={day} inline />}
 
+      {/* My Coach Card */}
+      {(patient?.coachName || patient?.coachWhatsApp) && (
+        <div className="mx-5 mb-3 px-4 py-3 rounded-[16px] bg-white border border-[#ede9e5] flex items-center gap-3">
+          <div className="w-11 h-11 rounded-[22px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center flex-shrink-0">
+            <span style={{ fontSize: 20 }}>👩‍⚕️</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-[#a39e95] font-outfit uppercase tracking-[0.5px]">Your skin coach</p>
+            <p className="text-sm font-semibold text-[#191716] font-outfit truncate">{patient?.coachName || 'Your Coach'}</p>
+          </div>
+          {patient?.coachWhatsApp && (
+            <a
+              href={`https://wa.me/${patient.coachWhatsApp}?text=${encodeURIComponent(`Hi ${patient?.coachName || 'Coach'}, I have a question about my skin routine.`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 bg-[#25D366] text-white px-3 py-2 rounded-[10px] text-xs font-semibold font-outfit flex-shrink-0 active:scale-95 transition-transform"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              Chat
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Progress Section */}
       <div className="px-5 py-5 flex gap-5 items-center">
         <div className="relative w-19 h-19 flex-shrink-0">
@@ -479,6 +554,21 @@ export default function HomeScreen() {
               <>Keep going! You're making great progress on your skin journey.</>
             )}
           </p>
+          {(() => {
+            const milestones = [7, 14, 21, 28, 45, 60, 75, 90];
+            const next = milestones.find(m => m > day);
+            return next ? (
+              <div className="mt-2 inline-flex items-center gap-1 bg-[rgba(196,64,51,0.07)] px-2.5 py-1 rounded-full">
+                <span className="text-[10px]">🎯</span>
+                <span className="text-[10px] font-bold text-[#c44033] font-outfit">{next - day} days to Day {next} milestone</span>
+              </div>
+            ) : day >= 90 ? (
+              <div className="mt-2 inline-flex items-center gap-1 bg-[rgba(26,138,74,0.08)] px-2.5 py-1 rounded-full">
+                <span className="text-[10px]">🏆</span>
+                <span className="text-[10px] font-bold text-[#1a8a4a] font-outfit">Journey complete! Amazing work.</span>
+              </div>
+            ) : null;
+          })()}
         </div>
       </div>
 

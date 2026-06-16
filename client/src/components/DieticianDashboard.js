@@ -231,7 +231,8 @@ function WeekGrid({ weekGrid, last7Moods }) {
     if (val === false) return <span style={{ color: '#dc2626', fontSize: 15 }}>✗</span>;
     return <span style={{ color: '#ccc', fontSize: 13 }}>—</span>;
   };
-  const moodEmoji = (m) => ({ happy: '😄', good: '😊', neutral: '😐', sad: '😞', bad: '😟' }[m] || '—');
+  // skinMood field: 'good' | 'okay' | 'off'
+  const moodEmoji = (m) => ({ good: '😊', okay: '😐', off: '😞', excellent: '😄', fair: '🙂', poor: '😟' }[m] || '—');
   return (
     <div>
       {/* Header row */}
@@ -475,18 +476,26 @@ function DietComplianceTab({ phone, card }) {
   const [formCategory, setFormCategory]       = useState('');
   const [formRestrictions, setFormRestrictions] = useState([]);
   const [formNotes, setFormNotes]             = useState('');
+  const [mealDays, setMealDays] = useState([]);
 
   const fetchDiet = useCallback(() => {
     if (!phone) { setLoading(false); return; }
     setLoading(true);
-    api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/diet`)
-      .then(res => setDietData(res.data.data))
+    Promise.all([
+      api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/diet`),
+      api.get(`/api/dietician/patient/${encodeURIComponent(phone)}/meal-photos`).catch(() => ({ data: { days: [] } })),
+    ])
+      .then(([dietRes, mealRes]) => {
+        setDietData(dietRes.data.data);
+        setMealDays(mealRes.data.days || []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [phone]);
 
   useEffect(() => {
     setDietData(null);
+    setMealDays([]);
     setShowForm(false);
     fetchDiet();
   }, [fetchDiet]);
@@ -739,6 +748,42 @@ function DietComplianceTab({ phone, card }) {
             </div>
           </div>
         </div>
+
+        {/* Meal Photos (last 14 days) */}
+        {mealDays.length > 0 && (
+          <div style={card}>
+            <SectionHeading label="MEAL PHOTOS (LAST 14 DAYS)" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {mealDays.map(day => (
+                <div key={day.date}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 6 }}>
+                    {new Date(day.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {day.meals.breakfast && day.meals.lunch && day.meals.dinner
+                      ? <span style={{ marginLeft: 6, color: '#16a34a', fontSize: 10 }}>✓ All meals</span>
+                      : <span style={{ marginLeft: 6, color: '#f59e0b', fontSize: 10 }}>Partial</span>
+                    }
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {['breakfast', 'lunch', 'dinner'].map(mealType => {
+                      const meal = day.meals[mealType];
+                      const icons = { breakfast: '🌅', lunch: '☀️', dinner: '🌙' };
+                      return (
+                        <div key={mealType} style={{ flex: 1, borderRadius: 10, overflow: 'hidden', background: '#f8f8f8', border: '1px solid #eee', minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                          {meal?.photoUrl ? (
+                            <img src={meal.photoUrl} alt={mealType} style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
+                          ) : (
+                            <div style={{ fontSize: 22, opacity: 0.3 }}>{icons[mealType]}</div>
+                          )}
+                          <div style={{ fontSize: 9, color: '#aaa', padding: '3px 0', textTransform: 'capitalize' }}>{mealType}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
