@@ -6,6 +6,7 @@ const DailyCheckIn = require('../models/DailyCheckIn');
 const SkinScore = require('../models/SkinScore');
 const WeeklyPhoto = require('../models/WeeklyPhoto');
 const CoachNote = require('../models/CoachNote');
+const MealPhoto = require('../models/MealPhoto');
 const { fetchAllDietPlans, fetchDietPlans } = require('../services/airtableService');
 const dieticianAuth = require('../middleware/dieticianAuth');
 
@@ -331,7 +332,8 @@ router.get('/patient/:phone/details', async (req, res) => {
         dayLabel: ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i],
         amCompleted: dayCheckIn ? (dayCheckIn.amRoutine || false) : null,
         pmCompleted: dayCheckIn ? (dayCheckIn.pmRoutine || false) : null,
-        mood: dayCheckIn ? dayCheckIn.mood : null,
+        skinMood: dayCheckIn ? (dayCheckIn.skinMood || null) : null,
+        shieldRestored: dayCheckIn ? (dayCheckIn.shieldRestored || false) : false,
         isFuture: d > now,
       });
     }
@@ -350,7 +352,7 @@ router.get('/patient/:phone/details', async (req, res) => {
       d.setDate(now.getDate() - i);
       const dStr = d.toISOString().split('T')[0];
       const ci = checkIns.find(c => new Date(c.date).toISOString().split('T')[0] === dStr);
-      last7Moods.push(ci ? ci.mood : null);
+      last7Moods.push(ci ? (ci.skinMood || null) : null);
     }
 
     res.json({
@@ -381,7 +383,7 @@ router.get('/patient/:phone/details', async (req, res) => {
           currentStreak,
           longestStreak: streak?.longestStreak || 0,
           lastCheckIn: streak?.lastCheckIn || null,
-          totalCheckIns: completedCheckIns,
+          totalCheckIns: completedDays,
           shields,
           daysAbsent,
         },
@@ -681,6 +683,49 @@ router.get('/patient/:phone/photos', async (req, res) => {
   } catch (err) {
     console.error('Fetch photos error:', err);
     res.status(500).json({ error: 'Failed to fetch photos' });
+  }
+});
+
+/**
+ * GET /api/dietician/patient/:phone/meal-photos
+ * Returns the last 14 days of meal photos (breakfast/lunch/dinner) for a patient.
+ */
+router.get('/patient/:phone/meal-photos', dieticianAuth, async (req, res) => {
+  try {
+    const phoneVariants = getPhoneVariants(req.params.phone);
+    const mealOr = phoneVariants.flatMap(v => [{ patientPhone: v }, { patientId: v }]);
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 14);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+
+    const mealPhotos = await MealPhoto.find({
+      $or: mealOr,
+      mealDate: { $gte: cutoffStr },
+    })
+      .sort({ mealDate: -1, mealType: 1 })
+      .select('mealDate mealType photoUrl photoData dayOfJourney notes createdAt')
+      .lean();
+
+    // Group by date for easier rendering
+    const byDate = {};
+    mealPhotos.forEach(p => {
+      if (!byDate[p.mealDate]) byDate[p.mealDate] = { date: p.mealDate, meals: {} };
+      byDate[p.mealDate].meals[p.mealType] = {
+        photoUrl: p.photoUrl || p.photoData || '',
+        notes: p.notes || '',
+        dayOfJourney: p.dayOfJourney,
+        createdAt: p.createdAt,
+      };
+    });
+
+    res.json({
+      success: true,
+      days: Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)),
+    });
+  } catch (err) {
+    console.error('Fetch meal photos error:', err);
+    res.status(500).json({ error: 'Failed to fetch meal photos' });
   }
 });
 
