@@ -311,7 +311,7 @@ export default function HomeScreen() {
             Good {isMorning ? 'morning' : 'evening'}
           </p>
           <h2 className="text-2xl font-bold text-[#191716] font-crimson leading-tight tracking-[-0.5px]">
-            {patient?.firstName || 'Priya'}
+            {(patient?.firstName || (patient?.name || patient?.fullName || 'there').split(' ')[0])}
           </h2>
         </div>
         <div className="flex items-center gap-2.5">
@@ -333,7 +333,7 @@ export default function HomeScreen() {
             className="w-10 h-10 rounded-[20px] bg-[rgba(196,64,51,0.06)] flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
           >
             <span className="text-base font-semibold text-[#c44033] font-crimson">
-              {(patient?.name || patient?.firstName || 'P').charAt(0).toUpperCase()}
+              {(patient?.name || patient?.fullName || patient?.firstName || 'P').charAt(0).toUpperCase()}
             </span>
           </div>
         </div>
