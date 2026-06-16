@@ -280,6 +280,8 @@ router.post('/verify-token', async (req, res) => {
       patient: {
         id: patient._id,
         name: patient.name || patient.fullName,
+        fullName: patient.fullName || patient.name,
+        firstName: (patient.name || patient.fullName || '').split(' ')[0],
         email: patient.email || '',
         phone: patient.phone || patient.phoneNumber,
         concern: patient.skinConcern,
