@@ -41,8 +41,15 @@ router.get('/dashboard', async (req, res) => {
     const dieticianName = req.dietician.name;
     const dieticianEmail = req.dietician.email;
 
-    // 1. Fetch all Airtable diet plans and filter by dietician name (case-insensitive)
-    const allPlans = await fetchAllDietPlans();
+    // 1. Fetch all Airtable diet plans (cached for 5 min) and filter by dietician
+    let allPlans = [];
+    let airtableAvailable = true;
+    try {
+      allPlans = await fetchAllDietPlans();
+    } catch (airtableErr) {
+      console.warn('Airtable unavailable for dashboard — serving MongoDB-only data:', airtableErr.message);
+      airtableAvailable = false;
+    }
     const dietPlans = allPlans.filter(
       p => p.dieticianName && p.dieticianName.toLowerCase() === dieticianName.toLowerCase()
     );
@@ -193,6 +200,7 @@ router.get('/dashboard', async (req, res) => {
 
     res.json({
       success: true,
+      airtableAvailable,
       data: {
         greeting,
         dietician: { name: dieticianName, email: dieticianEmail },
