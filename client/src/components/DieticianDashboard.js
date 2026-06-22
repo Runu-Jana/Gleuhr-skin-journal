@@ -1230,32 +1230,50 @@ function EmptyState() {
   );
 }
 
+const DASH_CACHE_KEY = 'dietician_dashboard_cache';
+
 // ── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DieticianDashboard() {
-  const [dashData, setDashData]     = useState(null);
-  const [loading, setLoading]       = useState(true);
+  // Seed from localStorage so panel renders instantly on repeat visits
+  const cachedRaw = (() => { try { return JSON.parse(localStorage.getItem(DASH_CACHE_KEY)); } catch { return null; } })();
+  const [dashData, setDashData]     = useState(cachedRaw || null);
+  const [loading, setLoading]       = useState(!cachedRaw); // skip spinner if cache hit
+  const [refreshing, setRefreshing] = useState(!!cachedRaw); // silent background refresh
   const [error, setError]           = useState('');
+  const [airtableDegraded, setAirtableDegraded] = useState(false);
   const [selectedPhone, setSelectedPhone] = useState(null);
   const [activeTab, setActiveTab]   = useState('queue');
 
   const name = localStorage.getItem('dieticianName') || 'Dietician';
 
-  const fetchDashboard = useCallback(() => {
-    setLoading(true);
+  const fetchDashboard = useCallback((silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+
     api.get('/api/dietician/dashboard')
-      .then(res => setDashData(res.data.data))
+      .then(res => {
+        const data = res.data.data;
+        setDashData(data);
+        setAirtableDegraded(res.data.airtableAvailable === false);
+        try { localStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data)); } catch { /* quota */ }
+        setError('');
+      })
       .catch(err => {
         if (err.response?.status === 401) {
           localStorage.removeItem('dieticianToken');
           localStorage.removeItem('dieticianName');
           window.location.replace('/dietician/login');
         }
-        setError(err.response?.data?.error || 'Failed to load dashboard');
+        if (!dashData) setError(err.response?.data?.error || 'Failed to load dashboard');
+        // If we have cached data, silently ignore the error and keep showing stale data
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => { setLoading(false); setRefreshing(false); });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+  useEffect(() => {
+    // If we have cache, do a silent background refresh; otherwise full load
+    fetchDashboard(!!cachedRaw);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = () => {
     localStorage.removeItem('dieticianToken');
@@ -1275,12 +1293,12 @@ export default function DieticianDashboard() {
     );
   }
 
-  if (error) {
+  if (error && !dashData) {
     return (
       <div style={{ minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ color: '#dc2626', marginBottom: 12 }}>{error}</div>
-          <button onClick={fetchDashboard} style={{ padding: '8px 20px', background: '#c44033', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+          <button onClick={() => fetchDashboard(false)} style={{ padding: '8px 20px', background: '#c44033', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
             Retry
           </button>
         </div>
@@ -1397,8 +1415,11 @@ export default function DieticianDashboard() {
 
         {/* Left top: brand + dietician name */}
         <div style={{ padding: '22px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#c44033', letterSpacing: '0.1em', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#c44033', letterSpacing: '0.1em', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
             GLEUHR
+            {refreshing && (
+              <span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid #c44033', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} title="Refreshing…" />
+            )}
           </div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
             {`Dt. ${name.replace(/^Dt\.?\s*/i, '').split(' ')[0]}`}
@@ -1406,6 +1427,11 @@ export default function DieticianDashboard() {
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
             {totalCount || 0} active patients
           </div>
+          {airtableDegraded && (
+            <div style={{ marginTop: 8, fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 6, padding: '4px 8px' }}>
+              ⚠ Airtable data unavailable — showing app data only
+            </div>
+          )}
         </div>
 
         {/* Tabs */}

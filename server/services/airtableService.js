@@ -205,6 +205,33 @@ async function resolveLinkedRecords(record) {
 
 const TEAM_TABLE = process.env.AIRTABLE_TEAM_TABLE || 'Team';
 
+// ── Module-level TTL cache for the full Diet Plan table ────────────────────
+let _allPlansCache = null;
+let _allPlansCacheTime = 0;
+const PLANS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let _allPlansInFlight = null; // deduplicate concurrent requests
+
+function _isCacheValid() {
+  return _allPlansCache !== null && (Date.now() - _allPlansCacheTime) < PLANS_CACHE_TTL;
+}
+
+// Invalidate cache (call after writes to Airtable so next read is fresh)
+function invalidateDietPlansCache() {
+  _allPlansCache = null;
+  _allPlansCacheTime = 0;
+  _allPlansInFlight = null;
+}
+
+// Race a promise against a timeout — rejects with error if ms exceeded
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label || 'Operation'} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 /**
  * Fetch all team members from the Team table filtered by Department = 'Dieticians'.
  * Returns array of {id, name, email, phone}.
@@ -236,26 +263,51 @@ async function fetchTeamMembers() {
 }
 
 /**
- * Fetch all records from the Diet Plan table (paginated).
- * Optionally filter in JS by customerPhone or dieticianName.
+ * Fetch all records from the Diet Plan table (paginated), with a 5-minute
+ * in-process TTL cache. Concurrent callers share a single in-flight promise
+ * so the first request gates the rest rather than hammering Airtable.
  */
-async function fetchAllDietPlans() {
+async function fetchAllDietPlans({ bustCache = false } = {}) {
   if (!base) return [];
-  const records = [];
-  await new Promise((resolve, reject) => {
-    base(DIET_PLAN_TABLE)
-      .select({ pageSize: 100, sort: [{ field: 'ID', direction: 'desc' }] })
-      .eachPage(
-        (pageRecords, fetchNextPage) => {
-          pageRecords.forEach(r => records.push(mapRecord(r)));
-          fetchNextPage();
-        },
-        (err) => err ? reject(err) : resolve(records)
+
+  if (!bustCache && _isCacheValid()) {
+    return _allPlansCache;
+  }
+
+  // If another request is already fetching, piggyback on it
+  if (_allPlansInFlight) {
+    return _allPlansInFlight;
+  }
+
+  _allPlansInFlight = (async () => {
+    try {
+      const records = [];
+      await withTimeout(
+        new Promise((resolve, reject) => {
+          base(DIET_PLAN_TABLE)
+            .select({ pageSize: 100, sort: [{ field: 'ID', direction: 'desc' }] })
+            .eachPage(
+              (pageRecords, fetchNextPage) => {
+                pageRecords.forEach(r => records.push(mapRecord(r)));
+                fetchNextPage();
+              },
+              (err) => err ? reject(err) : resolve(records)
+            );
+        }),
+        15000, // 15-second hard cap for the Airtable list call
+        'fetchAllDietPlans'
       );
-  });
-  // Resolve linked record IDs (Treatment Plan + Products) to human-readable names
-  await Promise.all(records.map(r => resolveLinkedRecords(r)));
-  return records;
+      // Resolve linked record IDs (Treatment Plan + Products) to human-readable names
+      await Promise.all(records.map(r => resolveLinkedRecords(r)));
+      _allPlansCache = records;
+      _allPlansCacheTime = Date.now();
+      return records;
+    } finally {
+      _allPlansInFlight = null;
+    }
+  })();
+
+  return _allPlansInFlight;
 }
 
 async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
@@ -265,39 +317,54 @@ async function fetchDietPlans({ filterByStatus, customerPhone } = {}) {
   }
 
   const normalizedSearchPhone = normalizePhone(customerPhone);
+
+  // Fast path: use in-memory cache when available to avoid a full Airtable round-trip
+  if (_isCacheValid()) {
+    const cached = _allPlansCache;
+    const results = customerPhone
+      ? cached.filter(r => normalizePhone(r.customerPhone) === normalizedSearchPhone || normalizePhone(r.fullPhone) === normalizedSearchPhone)
+      : cached;
+    console.log(`🔍 fetchDietPlans (cache hit): ${results.length} records for phone=${customerPhone}`);
+    return results;
+  }
+
   console.log(`🔍 Fetching diet plans for phone: ${customerPhone} (normalized: ${normalizedSearchPhone})`);
 
   const records = [];
 
-  await new Promise((resolve, reject) => {
-    base(DIET_PLAN_TABLE)
-      .select({
-        pageSize: 100,
-        sort: [{ field: 'ID', direction: 'desc' }]
-      })
-      .eachPage(
-        (pageRecords, fetchNextPage) => {
-          pageRecords.forEach((record) => {
-            const recordPhone = getPhoneFromRecord(record);
-            const normalizedRecordPhone = normalizePhone(recordPhone);
+  await withTimeout(
+    new Promise((resolve, reject) => {
+      base(DIET_PLAN_TABLE)
+        .select({
+          pageSize: 100,
+          sort: [{ field: 'ID', direction: 'desc' }]
+        })
+        .eachPage(
+          (pageRecords, fetchNextPage) => {
+            pageRecords.forEach((record) => {
+              const recordPhone = getPhoneFromRecord(record);
+              const normalizedRecordPhone = normalizePhone(recordPhone);
 
-            if (!customerPhone || normalizedRecordPhone === normalizedSearchPhone) {
-              records.push(mapRecord(record));
+              if (!customerPhone || normalizedRecordPhone === normalizedSearchPhone) {
+                records.push(mapRecord(record));
+              }
+            });
+            fetchNextPage();
+          },
+          (err) => {
+            if (err) {
+              console.error('❌ Airtable fetch error:', err);
+              reject(err);
+            } else {
+              console.log(`✅ Fetch complete. ${records.length} matching records.`);
+              resolve(records);
             }
-          });
-          fetchNextPage();
-        },
-        (err) => {
-          if (err) {
-            console.error('❌ Airtable fetch error:', err);
-            reject(err);
-          } else {
-            console.log(`✅ Fetch complete. ${records.length} matching records.`);
-            resolve(records);
           }
-        }
-      );
-  });
+        );
+    }),
+    15000,
+    'fetchDietPlans'
+  );
   // Resolve linked record IDs (Treatment Plan + Products) to human-readable names
   await Promise.all(records.map(r => resolveLinkedRecords(r)));
   return records;
@@ -433,4 +500,5 @@ module.exports = {
   fetchTreatmentPlanName,
   extractArray,
   uploadPhotoToAirtable,
+  invalidateDietPlansCache,
 };
